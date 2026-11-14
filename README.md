@@ -13,7 +13,7 @@ Architecture board: https://claude.ai/artifact/1VKzVCeq1iRTu9mL367st1 · Decisio
 
 ## Quick start
 
-Needs Node 22+, pnpm, ffmpeg, and Google Chrome.
+Needs Node 22+, pnpm, ffmpeg, and Google Chrome. On a Mac, follow [`docs/setup-mac.md`](docs/setup-mac.md).
 
 ```sh
 pnpm install
