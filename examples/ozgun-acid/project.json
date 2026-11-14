@@ -1,0 +1,478 @@
+{
+  "version": 1,
+  "title": "ozgun acid",
+  "seed": 303,
+  "stems": {
+    "main": "media/main.wav",
+    "bass": "media/bass.wav"
+  },
+  "palette": {
+    "bg": "#2B2420",
+    "ink": "#FCFCFB",
+    "acid": "#B6FF3B"
+  },
+  "sections": [
+    {
+      "bar": 1,
+      "name": "intro"
+    },
+    {
+      "bar": 33,
+      "name": "build"
+    },
+    {
+      "bar": 49,
+      "name": "acid drop 1"
+    },
+    {
+      "bar": 81,
+      "name": "choral breakdown"
+    },
+    {
+      "bar": 97,
+      "name": "build 2"
+    },
+    {
+      "bar": 105,
+      "name": "acid drop 2"
+    },
+    {
+      "bar": 137,
+      "name": "outro"
+    },
+    {
+      "bar": 145,
+      "name": "half-time outro"
+    }
+  ],
+  "layers": [
+    {
+      "id": "grid",
+      "stem": "main",
+      "generator": "pulseGrid",
+      "z": 0,
+      "resolutionScale": 0.5,
+      "params": {
+        "density": 14,
+        "brightness": 0.55
+      },
+      "layout": {
+        "landscape": {
+          "x": 0.5,
+          "y": 0.5,
+          "w": 1,
+          "h": 1
+        },
+        "portrait": {
+          "x": 0.5,
+          "y": 0.5,
+          "w": 1,
+          "h": 1
+        }
+      }
+    },
+    {
+      "id": "bass",
+      "stem": "bass",
+      "generator": "acidRing",
+      "z": 1,
+      "blend": "add",
+      "params": {
+        "radius": 0.7,
+        "spike": 0.16,
+        "spin": 0.03,
+        "acid": 0.4,
+        "echoes": 10,
+        "lineWidth": 2
+      },
+      "layout": {
+        "landscape": {
+          "x": 0.5,
+          "y": 0.47,
+          "w": 0.6,
+          "h": 1.0667
+        },
+        "portrait": {
+          "x": 0.5,
+          "y": 0.45,
+          "w": 1,
+          "h": 0.5625
+        }
+      }
+    },
+    {
+      "id": "title",
+      "stem": "bass",
+      "generator": "typeText",
+      "z": 2,
+      "text": "ozgun acid",
+      "params": {
+        "size": 0.6,
+        "reveal": 0,
+        "shake": 0,
+        "blur": 0
+      },
+      "layout": {
+        "landscape": {
+          "x": 0.5,
+          "y": 0.88,
+          "w": 0.8,
+          "h": 0.12
+        },
+        "portrait": {
+          "x": 0.5,
+          "y": 0.78,
+          "w": 0.9,
+          "h": 0.07
+        }
+      }
+    },
+    {
+      "id": "breakText",
+      "stem": "main",
+      "generator": "typeText",
+      "z": 3,
+      "text": "OzM 3.1",
+      "opacity": 0,
+      "params": {
+        "size": 0.7,
+        "stutter": 0.8,
+        "blur": 0
+      },
+      "layout": {
+        "landscape": {
+          "x": 0.5,
+          "y": 0.47,
+          "w": 0.7,
+          "h": 0.25
+        },
+        "portrait": {
+          "x": 0.5,
+          "y": 0.45,
+          "w": 0.95,
+          "h": 0.12
+        }
+      }
+    }
+  ],
+  "automation": [
+    {
+      "target": "title.reveal",
+      "points": [
+        {
+          "bar": 1.5,
+          "v": 0
+        },
+        {
+          "bar": 4,
+          "v": 1
+        }
+      ]
+    },
+    {
+      "target": "title.opacity",
+      "points": [
+        {
+          "bar": 1,
+          "v": 1
+        },
+        {
+          "bar": 29,
+          "v": 1,
+          "curve": "smooth"
+        },
+        {
+          "bar": 33,
+          "v": 0
+        },
+        {
+          "bar": 145,
+          "v": 0,
+          "curve": "smooth"
+        },
+        {
+          "bar": 149,
+          "v": 1
+        }
+      ]
+    },
+    {
+      "target": "title.blur",
+      "points": [
+        {
+          "bar": 29,
+          "v": 0,
+          "curve": "smooth"
+        },
+        {
+          "bar": 33,
+          "v": 6
+        },
+        {
+          "bar": 145,
+          "v": 6,
+          "curve": "smooth"
+        },
+        {
+          "bar": 149,
+          "v": 0
+        }
+      ]
+    },
+    {
+      "target": "bass.radius",
+      "points": [
+        {
+          "bar": 1,
+          "v": 0.7
+        },
+        {
+          "bar": 33,
+          "v": 0.7,
+          "curve": "smooth"
+        },
+        {
+          "bar": 49,
+          "v": 0.9,
+          "curve": "hold"
+        },
+        {
+          "bar": 49.01,
+          "v": 1.0
+        },
+        {
+          "bar": 81,
+          "v": 1.0,
+          "curve": "smooth"
+        },
+        {
+          "bar": 83,
+          "v": 0.55
+        },
+        {
+          "bar": 97,
+          "v": 0.55,
+          "curve": "smooth"
+        },
+        {
+          "bar": 105,
+          "v": 0.9,
+          "curve": "hold"
+        },
+        {
+          "bar": 105.01,
+          "v": 1.15
+        },
+        {
+          "bar": 137,
+          "v": 1.15,
+          "curve": "smooth"
+        },
+        {
+          "bar": 145,
+          "v": 0.8
+        },
+        {
+          "bar": 161,
+          "v": 0.5
+        }
+      ]
+    },
+    {
+      "target": "bass.spin",
+      "points": [
+        {
+          "bar": 1,
+          "v": 0.03,
+          "curve": "hold"
+        },
+        {
+          "bar": 81,
+          "v": -0.08,
+          "curve": "hold"
+        },
+        {
+          "bar": 97,
+          "v": 0.02,
+          "curve": "smooth"
+        },
+        {
+          "bar": 105,
+          "v": 0.15,
+          "curve": "hold"
+        },
+        {
+          "bar": 105.01,
+          "v": 0.06,
+          "curve": "hold"
+        },
+        {
+          "bar": 145,
+          "v": 0.015
+        }
+      ]
+    },
+    {
+      "target": "bass.acid",
+      "points": [
+        {
+          "bar": 1,
+          "v": 0.4
+        },
+        {
+          "bar": 45,
+          "v": 0.4,
+          "curve": "smooth"
+        },
+        {
+          "bar": 49,
+          "v": 1
+        },
+        {
+          "bar": 145,
+          "v": 1,
+          "curve": "smooth"
+        },
+        {
+          "bar": 149,
+          "v": 0.5
+        }
+      ]
+    },
+    {
+      "target": "grid.density",
+      "points": [
+        {
+          "bar": 1,
+          "v": 14,
+          "curve": "hold"
+        },
+        {
+          "bar": 33,
+          "v": 18,
+          "curve": "hold"
+        },
+        {
+          "bar": 49,
+          "v": 22,
+          "curve": "hold"
+        },
+        {
+          "bar": 81,
+          "v": 10,
+          "curve": "hold"
+        },
+        {
+          "bar": 97,
+          "v": 18,
+          "curve": "hold"
+        },
+        {
+          "bar": 105,
+          "v": 26,
+          "curve": "hold"
+        },
+        {
+          "bar": 137,
+          "v": 18,
+          "curve": "hold"
+        },
+        {
+          "bar": 145,
+          "v": 12
+        }
+      ]
+    },
+    {
+      "target": "grid.wave",
+      "points": [
+        {
+          "bar": 1,
+          "v": 1,
+          "curve": "hold"
+        },
+        {
+          "bar": 145,
+          "v": 0.5
+        }
+      ]
+    },
+    {
+      "target": "breakText.opacity",
+      "points": [
+        {
+          "bar": 81,
+          "v": 0,
+          "curve": "smooth"
+        },
+        {
+          "bar": 82,
+          "v": 1
+        },
+        {
+          "bar": 95,
+          "v": 1,
+          "curve": "smooth"
+        },
+        {
+          "bar": 97,
+          "v": 0
+        }
+      ]
+    },
+    {
+      "target": "breakText.reveal",
+      "points": [
+        {
+          "bar": 81.5,
+          "v": 0
+        },
+        {
+          "bar": 84,
+          "v": 1
+        }
+      ]
+    },
+    {
+      "target": "post.vignette",
+      "points": [
+        {
+          "bar": 97,
+          "v": 0.55,
+          "curve": "smooth"
+        },
+        {
+          "bar": 105,
+          "v": 0.85,
+          "curve": "hold"
+        },
+        {
+          "bar": 105.01,
+          "v": 0.55
+        }
+      ]
+    }
+  ],
+  "modulations": [
+    {
+      "target": "title.shake",
+      "source": "bass.onset",
+      "amount": 0.8
+    },
+    {
+      "target": "bass.lineWidth",
+      "source": "bass.env",
+      "amount": 3,
+      "curve": "square"
+    },
+    {
+      "target": "post.grain",
+      "source": "main.flux",
+      "amount": 0.05
+    }
+  ],
+  "tempo": {
+    "bpm": 155,
+    "beatsPerBar": 4
+  }
+}

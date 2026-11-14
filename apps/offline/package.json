@@ -1,0 +1,11 @@
+{
+  "name": "@vizier/offline",
+  "version": "0.0.1",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@vizier/core": "workspace:*",
+    "@vizier/features": "workspace:*"
+  },
+  "license": "Apache-2.0"
+}

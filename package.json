@@ -1,0 +1,28 @@
+{
+  "name": "vizier",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.0.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -b --noEmit -p tsconfig.json",
+    "render": "node --experimental-strip-types apps/offline/src/cli.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.28.2",
+    "playwright-core": "^1.65.1",
+    "typescript": "^7.0.2",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "@types/d3-scale": "^4.0.9",
+    "@types/d3-shape": "^3.2.0",
+    "d3-scale": "^4.0.3",
+    "d3-shape": "^3.2.1"
+  },
+  "license": "Apache-2.0"
+}
