@@ -12,7 +12,7 @@ High profile at the lowest level that fits; keyframe every half second; VBR at 1
 The page is served from an intercepted `http://localhost` URL because WebCodecs needs a secure context.
 libx264 remains as `--encoder ffmpeg` and as the automatic fallback.
 
-**Consequences.** About 4.7x faster in the Linux sandbox (software render and encode); expected to be faster still
-on the Mac. Encoded output is not byte-identical between runs or machines (rendering still is). Chrome writes
+**Consequences.** On the M1 Pro (hardware encoder): ~200 fps at 1080p30, a full 4:10 song in 0.9 min, versus
+5.8 fps / ~22 min before (~35x). About 4.7x faster in the Linux sandbox (software render and encode). Encoded output is not byte-identical between runs or machines (rendering still is). Chrome writes
 full-range YUV tagged sRGB; to be checked on YouTube/Instagram. The muxer assumes no B-frames, which is
 what Chrome's encoders produced in testing; a post-render check catches frame-count or timing mismatches.
