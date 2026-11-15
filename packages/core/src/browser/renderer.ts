@@ -46,6 +46,8 @@ export class Renderer {
   private fbo: WebGLFramebuffer;
   private fboTex: WebGLTexture;
   private pixels: Uint8Array;
+  /** When set, renderFrame adds each layer's draw+upload time (ms) here. */
+  timing: Record<string, number> | null = null;
 
   constructor(private project: Project, profileId: string, private tracks: Record<string, FeatureTrack>, private font = "'Special Elite'") {
     this.profile = getProfile(profileId);
@@ -160,9 +162,11 @@ export class Renderer {
         text: L.def.text ?? "",
         font: this.font,
       };
+      const t0 = this.timing ? performance.now() : 0;
       GENERATORS[L.def.generator]!.draw(g);
       gl.bindTexture(gl.TEXTURE_2D, L.tex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, L.canvas);
+      if (this.timing) this.timing[id] = (this.timing[id] ?? 0) + performance.now() - t0;
       const x = pv("x", base.x), y = pv("y", base.y), w = pv("w", base.w), h = pv("h", base.h);
       gl.uniform2f(u("centre"), x * 2 - 1, 1 - y * 2);
       gl.uniform2f(u("halfSize"), w, h);
@@ -190,6 +194,28 @@ export class Renderer {
     gl.uniform1f(up("rot"), 0);
     gl.uniform1f(up("aspect"), 1);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+  }
+
+  /**
+   * Render-only benchmark: what live playback costs, without reading pixels back or encoding video.
+   * Waits for the GPU each frame (gl.finish) so the numbers are honest.
+   */
+  bench(start: number, count: number): { avgMs: number; p95Ms: number; maxMs: number; layersMs: Record<string, number> } {
+    const gl = this.gl;
+    for (let f = start; f < start + 10; f++) this.renderFrame(f); // warm up shaders, caches and JIT
+    gl.finish();
+    this.timing = {};
+    const times: number[] = [];
+    for (let f = start; f < start + count; f++) {
+      const t0 = performance.now();
+      this.renderFrame(f);
+      gl.finish();
+      times.push(performance.now() - t0);
+    }
+    const layersMs = Object.fromEntries(Object.entries(this.timing).map(([k, v]) => [k, v / count]));
+    this.timing = null;
+    times.sort((a, b) => a - b);
+    return { avgMs: times.reduce((a, b) => a + b, 0) / count, p95Ms: times[Math.floor(count * 0.95)]!, maxMs: times[count - 1]!, layersMs };
   }
 
   /** RGBA pixels of the last frame, bottom row first (as WebGL returns them). */

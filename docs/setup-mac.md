@@ -20,9 +20,18 @@ Anything that prints a version or path is installed. Install whatever says "comm
 - **Homebrew**, if `brew` wasn't found: copy the current install command from https://brew.sh and run it.
   When it finishes, run the "Next steps" lines it prints (they add brew to your PATH), then open a new
   Terminal window.
-- **Node, pnpm and ffmpeg:**
+- **Node** (version 22 or newer). Either way works:
+  - the installer from https://nodejs.org (LTS), or a version manager such as nvm; or
+  - Homebrew: `brew install node`.
+- **pnpm**, installed with npm (comes with Node) or Homebrew:
   ```sh
-  brew install node pnpm ffmpeg
+  npm install -g pnpm      # or: brew install pnpm
+  ```
+  If npm reports a permissions error (EACCES), your Node install needs `sudo` for global packages:
+  use `sudo npm install -g pnpm`, or switch to nvm, which avoids this.
+- **ffmpeg**, via Homebrew:
+  ```sh
+  brew install ffmpeg
   ```
 - **Google Chrome**, if it isn't installed: https://www.google.com/chrome/. The renderer drives Chrome
   in the background; it doesn't need to be open.
@@ -76,7 +85,21 @@ pnpm render examples/ozgun-acid/project.json --profile reels --duration 60 --gpu
 Videos go in `out/` (`open out` shows them in Finder). Profiles: `youtube`, `youtube60`, `youtube4k`,
 `shorts`, `reels`, `igfeed`, `draft`; see the README.
 
-Progress lines every 5 seconds show the render speed in fps and the time remaining.
+Every ~5 seconds a progress line shows the render speed (fps), where the time per frame goes
+(`render+readback`: drawing the frame in Chrome and copying it out; `encoder wait`: ffmpeg), and the time remaining.
+
+## 7. Measure live headroom
+
+Video export is slower than live playback, because every frame is copied out of Chrome and encoded.
+`--bench` measures only the drawing, which is what live playback costs:
+
+```sh
+pnpm render examples/ozgun-acid/project.json --profile youtube --start 165 --bench 300 --gpu
+```
+
+It reports milliseconds per frame (average, 95th percentile, worst), how much of the frame budget that uses at
+30 and 60 fps, and which layers cost the most. Under 100% at 60 fps means it can run live at 60 fps.
+Close other heavy apps (and browsers) first for a fair number.
 
 ## Troubleshooting
 
@@ -86,6 +109,7 @@ Progress lines every 5 seconds show the render speed in fps and the time remaini
   ```sh
   export CHROME_PATH="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
   ```
+- **The headless-Chrome test is skipped:** it runs only when Chrome is found; set `CHROME_PATH` as above.
 - **Tests fail after an update:** run `pnpm install` again; dependencies may have changed.
 
 ## Updating

@@ -6,9 +6,15 @@ import { analyzeSignal } from "../../../packages/features/src/index.ts";
 import type { Project } from "../../../packages/core/src/index.ts";
 import { openRenderer } from "../src/browser.ts";
 
-const chrome = process.env.CHROME_PATH ?? "/usr/bin/google-chrome";
-const run = existsSync(chrome) ? describe : describe.skip;
-process.env.CHROME_PATH ??= chrome;
+// Find Chrome: $CHROME_PATH, else the standard install location on macOS or Linux.
+const candidates = [
+  process.env.CHROME_PATH,
+  "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "/usr/bin/google-chrome",
+].filter((p): p is string => !!p);
+const chrome = candidates.find((p) => existsSync(p));
+const run = chrome ? describe : describe.skip;
+if (chrome) process.env.CHROME_PATH = chrome;
 
 const SR = 48000;
 const signal = Float32Array.from({ length: SR * 2 }, (_, i) => (i % 12000 < 2000 ? 0.6 : 0.1) * Math.sin((2 * Math.PI * 55 * i) / SR));

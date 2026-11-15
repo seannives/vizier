@@ -13,7 +13,8 @@ async function bundle(): Promise<string> {
   return r.outputFiles[0]!.text;
 }
 
-export interface RendererHandle { frame(n: number): Promise<Buffer>; close(): Promise<void> }
+export interface BenchResult { avgMs: number; p95Ms: number; maxMs: number; layersMs: Record<string, number> }
+export interface RendererHandle { frame(n: number): Promise<Buffer>; bench(start: number, count: number): Promise<BenchResult>; close(): Promise<void> }
 
 /**
  * Headless Chrome running the same renderer the live app uses.
@@ -39,6 +40,7 @@ export async function openRenderer(project: Project, profileId: string, tracks: 
       const b64 = await page.evaluate((f) => (window as any).vizier.renderAndRead(f), n);
       return Buffer.from(b64, "base64");
     },
+    bench: (start, count) => page.evaluate(([s, c]) => (window as any).vizier.bench(s, c), [start, count] as const),
     close: () => browser.close(),
   };
 }

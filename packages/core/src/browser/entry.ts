@@ -12,6 +12,7 @@ let r: Renderer | null = null;
     return { width: r.profile.width, height: r.profile.height, fps: r.profile.fps };
   },
   render(frame: number) { r!.renderFrame(frame); },
+  bench(start: number, count: number) { return r!.bench(start, count); },
   /** Render a frame and return its pixels as base64 (bottom row first). */
   renderAndRead(frame: number): string {
     r!.renderFrame(frame);

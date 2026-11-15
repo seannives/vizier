@@ -19,6 +19,7 @@ const { values, positionals } = parseArgs({
     start: { type: "string", default: "0" },
     duration: { type: "string" },
     still: { type: "string" },
+    bench: { type: "string" },
     out: { type: "string" },
     gpu: { type: "boolean", default: false },
   },
@@ -39,7 +40,16 @@ log(`features ready (${Object.keys(tracks).join(", ")}; ${totalFrames} frames) i
 
 const r = await openRenderer(project, profile.id, tracks, { gpu: values.gpu! });
 try {
-  if (values.still !== undefined) {
+  if (values.bench !== undefined) {
+    const count = Number(values.bench) || 300;
+    const start = Math.round(Number(values.start) * profile.fps);
+    const b = await r.bench(start, Math.min(count, totalFrames - start - 10));
+    const budget = (fps: number) => `${((b.p95Ms / (1000 / fps)) * 100).toFixed(0)}% of the ${(1000 / fps).toFixed(1)} ms budget at ${fps} fps`;
+    log(`render only (no readback, no encoding), ${profile.width}x${profile.height}, ${values.gpu ? "GPU" : "software GL"}:`);
+    log(`  avg ${b.avgMs.toFixed(1)} ms · p95 ${b.p95Ms.toFixed(1)} ms · worst ${b.maxMs.toFixed(1)} ms per frame`);
+    log(`  p95 uses ${budget(30)}, ${budget(60)}`);
+    log(`  per layer (draw + upload, avg ms): ${Object.entries(b.layersMs).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(" · ")}`);
+  } else if (values.still !== undefined) {
     const frame = Number(values.still);
     const out = resolve(values.out ?? `out/${basename(projectDir)}-${profile.id}-${frame}.png`);
     mkdirSync(dirname(out), { recursive: true });
@@ -51,18 +61,27 @@ try {
     const start = Math.round(Number(values.start) * profile.fps);
     const count = values.duration ? Math.round(Number(values.duration) * profile.fps) : totalFrames - start;
     const end = Math.min(totalFrames, start + count);
-    const out = resolve(values.out ?? `out/${basename(projectDir)}-${profile.id}.mp4`);
+    const range = values.duration || Number(values.start) ? `-${values.start}s-${values.duration ?? "end"}` : "";
+    const out = resolve(values.out ?? `out/${basename(projectDir)}-${profile.id}${range}.mp4`);
     mkdirSync(dirname(out), { recursive: true });
     const enc = startEncoder({
       out, width: profile.width, height: profile.height, fps: profile.fps, bitrateMbps: profile.videoBitrateMbps,
       audio: stemPaths.main, audioStart: start / profile.fps, duration: (end - start) / profile.fps,
     });
-    const tr = Date.now();
+    // Progress every ~5 s of wall-clock time, with where the time went: rendering + reading pixels back
+    // from the browser, versus waiting for ffmpeg to accept the frame.
+    let lastLog = Date.now(), lastFrame = start, renderMs = 0, encodeMs = 0;
     for (let f = start; f < end; f++) {
-      await enc.write(await r.frame(f));
-      if ((f - start) % (profile.fps * 5) === 0) {
-        const done = f - start + 1, rate = done / ((Date.now() - tr) / 1000);
-        log(`frame ${f}/${end} · ${rate.toFixed(1)} fps · eta ${((end - f) / rate / 60).toFixed(1)} min`);
+      const a = performance.now();
+      const px = await r.frame(f);
+      const b = performance.now();
+      await enc.write(px);
+      renderMs += b - a; encodeMs += performance.now() - b;
+      const now = Date.now();
+      if (now - lastLog >= 5000 || f === end - 1) {
+        const n = f - lastFrame + 1, rate = n / ((now - lastLog) / 1000);
+        log(`frame ${f + 1}/${end} · ${rate.toFixed(1)} fps · render+readback ${(renderMs / n).toFixed(0)} ms/frame · encoder wait ${(encodeMs / n).toFixed(0)} ms/frame · eta ${((end - f - 1) / rate / 60).toFixed(1)} min`);
+        lastLog = now; lastFrame = f + 1; renderMs = encodeMs = 0;
       }
     }
     await enc.finish();
