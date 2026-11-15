@@ -82,11 +82,15 @@ pnpm render examples/ozgun-acid/project.json --profile youtube --gpu
 pnpm render examples/ozgun-acid/project.json --profile reels --duration 60 --gpu
 ```
 
-Videos go in `out/` (`open out` shows them in Finder). Profiles: `youtube`, `youtube60`, `youtube4k`,
+Videos go in `out/` (`open out` shows them in Finder). By default the video is encoded inside Chrome
+(WebCodecs), using the Mac's hardware H.264 encoder where available, at 1.5× the profile's bitrate
+(18 Mbps for `youtube`); change it with `--bitrate 24`. `--encoder ffmpeg` uses the older, slower path
+(raw frames piped to ffmpeg's libx264). After each render the file is checked for the right frame count,
+duration and frame rate. Profiles: `youtube`, `youtube60`, `youtube4k`,
 `shorts`, `reels`, `igfeed`, `draft`; see the README.
 
 Every ~5 seconds a progress line shows the render speed (fps), where the time per frame goes
-(`render+readback`: drawing the frame in Chrome and copying it out; `encoder wait`: ffmpeg), and the time remaining.
+(`in Chrome`: drawing and encoding; `ffmpeg wait`: muxing), and the time remaining.
 
 ## 7. Measure live headroom
 

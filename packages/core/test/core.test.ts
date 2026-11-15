@@ -78,3 +78,13 @@ describe("bars timebase", () => {
     expect(validateProject(p).join()).toMatch(/tempo/);
   });
 });
+
+describe("H.264 level selection", () => {
+  it("picks the lowest High-profile level that fits", async () => {
+    const { avcCodecFor } = await import("../src/browser/encoder.ts");
+    expect(avcCodecFor(1920, 1080, 30)).toBe("avc1.640028"); // 4.0
+    expect(avcCodecFor(1080, 1920, 30)).toBe("avc1.640028"); // vertical 1080p: 4.0
+    expect(avcCodecFor(1920, 1080, 60)).toBe("avc1.64002A"); // 4.2
+    expect(avcCodecFor(3840, 2160, 30)).toBe("avc1.640033"); // 5.1
+  });
+});

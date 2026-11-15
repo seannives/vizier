@@ -43,4 +43,21 @@ run("renderer in headless Chrome", () => {
       expect(lit).toBeGreaterThan(500);   // something brighter than the background was drawn
     } finally { await r.close(); }
   }, 60_000);
+
+  it("encodes H.264 in the browser (WebCodecs) as an Annex B stream with SPS/PPS and a keyframe", async () => {
+    const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
+    const r = await openRenderer(project, "draft", { main: track, bass: track }, { gpu: false });
+    try {
+      const info = await r.encodeStart(4);
+      expect(info.codec).toMatch(/^avc1\.6400/);
+      const parts = [await r.encodeFrames(0, 20, 0), await r.encodeFinish()];
+      const bytes = Buffer.concat(parts);
+      expect(bytes.subarray(0, 4)).toEqual(Buffer.from([0, 0, 0, 1]));
+      const nalTypes = new Set<number>();
+      for (let i = 0; i + 4 < bytes.length; i++) if (bytes[i] === 0 && bytes[i + 1] === 0 && bytes[i + 2] === 1) nalTypes.add(bytes[i + 3]! & 0x1f);
+      expect(nalTypes.has(7)).toBe(true); // SPS
+      expect(nalTypes.has(8)).toBe(true); // PPS
+      expect(nalTypes.has(5)).toBe(true); // IDR keyframe
+    } finally { await r.close(); }
+  }, 60_000);
 });
