@@ -37,6 +37,15 @@ importers:
         specifier: ^5.1.0
         version: 5.1.0(@types/node@26.6.6)(vite@8.3.8(@types/node@26.6.6)(esbuild@0.28.2))
 
+  apps/live:
+    dependencies:
+      '@vizier/core':
+        specifier: workspace:*
+        version: link:../../packages/core
+      '@vizier/features':
+        specifier: workspace:*
+        version: link:../../packages/features
+
   apps/offline:
     dependencies:
       '@vizier/core':

@@ -9,7 +9,8 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc -b --noEmit -p tsconfig.json",
-    "render": "node --experimental-strip-types apps/offline/src/cli.ts"
+    "render": "node --experimental-strip-types apps/offline/src/cli.ts",
+    "live": "node --experimental-strip-types apps/live/src/server.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

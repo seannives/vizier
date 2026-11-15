@@ -98,8 +98,35 @@ pnpm render examples/ozgun-acid/project.json --profile youtube --start 165 --ben
 ```
 
 It reports milliseconds per frame (average, 95th percentile, worst), how much of the frame budget that uses at
-30 and 60 fps, and which layers cost the most. Under 100% at 60 fps means it can run live at 60 fps.
+30 and 60 fps, and which layers cost the most. Under 100% at 60 fps means it can run live at 60 fps; "frames over budget" shows how many would
+have dropped, and "slowest frames" shows whether a slow frame is a one-off or repeats.
 Close other heavy apps (and browsers) first for a fair number.
+
+## 8. Live window
+
+Plays the song and renders the visuals in time with it, in a Chrome tab, with a heads-up display of
+frame pacing. Audio plays through your Mac's current output device.
+
+```sh
+pnpm live examples/ozgun-acid/project.json
+```
+
+When it prints `ready`, open http://localhost:5173 in Chrome and click the page. Keys:
+
+| Key | Action |
+|---|---|
+| space | play / pause |
+| ← / → | back / forward one bar (with shift: 8 bars) |
+| 1–9 | jump to section 1–9 |
+| f | fullscreen (do this on the projector's screen) |
+| [ / ] | shift visuals 10 ms earlier / later, if they feel out of sync with the sound |
+| r | reset the frame statistics |
+| h | hide the help, then the whole HUD |
+
+The HUD shows the display's refresh rate, frames per second, **dropped frames** (in total and in the
+last 10 s), and how long each frame takes to draw. Zero or near-zero dropped frames at 60 Hz in
+fullscreen is the goal. `--profile live720` renders at 1280×720 instead of 1920×1080. Stop the server
+with Ctrl+C in Terminal.
 
 ## Troubleshooting
 

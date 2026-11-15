@@ -44,10 +44,12 @@ try {
     const count = Number(values.bench) || 300;
     const start = Math.round(Number(values.start) * profile.fps);
     const b = await r.bench(start, Math.min(count, totalFrames - start - 10));
-    const budget = (fps: number) => `${((b.p95Ms / (1000 / fps)) * 100).toFixed(0)}% of the ${(1000 / fps).toFixed(1)} ms budget at ${fps} fps`;
-    log(`render only (no readback, no encoding), ${profile.width}x${profile.height}, ${values.gpu ? "GPU" : "software GL"}:`);
-    log(`  avg ${b.avgMs.toFixed(1)} ms · p95 ${b.p95Ms.toFixed(1)} ms · worst ${b.maxMs.toFixed(1)} ms per frame`);
-    log(`  p95 uses ${budget(30)}, ${budget(60)}`);
+    const pct = (ms: number, fps: number) => `${((ms / (1000 / fps)) * 100).toFixed(0)}%`;
+    log(`render only (no readback, no encoding), ${profile.width}x${profile.height}, ${values.gpu ? "GPU" : "software GL"}, ${b.frames} frames:`);
+    log(`  avg ${b.avgMs.toFixed(1)} ms · p95 ${b.p95Ms.toFixed(1)} · p99 ${b.p99Ms.toFixed(1)} · worst ${b.maxMs.toFixed(1)} ms per frame`);
+    log(`  p99 uses ${pct(b.p99Ms, 30)} of the 30 fps budget (33.3 ms), ${pct(b.p99Ms, 60)} of the 60 fps budget (16.7 ms)`);
+    log(`  frames over budget: ${b.over60} over 16.7 ms (would drop at 60 fps), ${b.over30} over 33.3 ms (would drop at 30 fps)`);
+    log(`  slowest frames: ${b.worst.map((w) => `#${w.frame} ${w.ms.toFixed(1)} ms`).join(", ")}`);
     log(`  per layer (draw + upload, avg ms): ${Object.entries(b.layersMs).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(" · ")}`);
   } else if (values.still !== undefined) {
     const frame = Number(values.still);

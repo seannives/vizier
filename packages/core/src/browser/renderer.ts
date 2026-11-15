@@ -32,6 +32,27 @@ void main(){
   o = vec4(col, 1.);
 }`;
 
+export interface BenchStats {
+  frames: number; avgMs: number; p95Ms: number; p99Ms: number; maxMs: number;
+  over60: number; over30: number;               // frames slower than the 60 / 30 fps budget
+  worst: { frame: number; ms: number }[];       // the five slowest frames, to see if a stall repeats
+  layersMs: Record<string, number>;
+}
+
+export function benchStats(times: { f: number; ms: number }[], layersMs: Record<string, number>): BenchStats {
+  const sorted = [...times].sort((a, b) => a.ms - b.ms);
+  const q = (p: number) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * p))]!.ms;
+  return {
+    frames: times.length,
+    avgMs: times.reduce((a, b) => a + b.ms, 0) / times.length,
+    p95Ms: q(0.95), p99Ms: q(0.99), maxMs: sorted[sorted.length - 1]!.ms,
+    over60: times.filter((t) => t.ms > 1000 / 60).length,
+    over30: times.filter((t) => t.ms > 1000 / 30).length,
+    worst: sorted.slice(-5).reverse().map((t) => ({ frame: t.f, ms: t.ms })),
+    layersMs,
+  };
+}
+
 interface LayerState { def: LayerDef; canvas: OffscreenCanvas; ctx: OffscreenCanvasRenderingContext2D; tex: WebGLTexture }
 
 /** Renders any frame of a project from (frame number, features). Same code drives offline and live. */
@@ -129,6 +150,10 @@ export class Renderer {
     return frame < 0 ? new Array(tr.bins).fill(0) : tr.spectrum.slice(i * tr.bins, (i + 1) * tr.bins);
   }
 
+  /** Render the moment `t` seconds into the song (live: driven by the audio clock, any display refresh rate). */
+  renderAtTime(t: number): void { this.renderFrame(t * this.profile.fps); }
+
+  /** Render frame `frame` (may be fractional when driven by time). */
   renderFrame(frame: number): void {
     const gl = this.gl;
     const { width, height, fps } = this.profile;
@@ -157,7 +182,7 @@ export class Renderer {
         p: pv,
         f: (name, ago = 0, s = stem) => this.feature(s, name, frame - ago),
         spectrum: (ago = 0, s = stem) => this.spectrum(s, frame - ago),
-        rng: frameRng(this.project.seed, frame, idx + 1),
+        rng: frameRng(this.project.seed, Math.floor(frame), idx + 1),
         palette: this.project.palette,
         text: L.def.text ?? "",
         font: this.font,
@@ -187,7 +212,7 @@ export class Renderer {
     gl.uniform3f(up("bg"), ((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255);
     gl.uniform1f(up("grain"), this.resolver.value("post.grain", 0.05, t, lookup));
     gl.uniform1f(up("vignette"), this.resolver.value("post.vignette", 0.55, t, lookup));
-    gl.uniform1f(up("seed"), (frame % 997) * 0.731);
+    gl.uniform1f(up("seed"), (Math.floor(frame) % 997) * 0.731);
     gl.uniform2f(up("res"), width, height);
     gl.uniform2f(up("centre"), 0, 0);
     gl.uniform2f(up("halfSize"), 1, 1);
@@ -200,22 +225,21 @@ export class Renderer {
    * Render-only benchmark: what live playback costs, without reading pixels back or encoding video.
    * Waits for the GPU each frame (gl.finish) so the numbers are honest.
    */
-  bench(start: number, count: number): { avgMs: number; p95Ms: number; maxMs: number; layersMs: Record<string, number> } {
+  bench(start: number, count: number): BenchStats {
     const gl = this.gl;
     for (let f = start; f < start + 10; f++) this.renderFrame(f); // warm up shaders, caches and JIT
     gl.finish();
     this.timing = {};
-    const times: number[] = [];
+    const times: { f: number; ms: number }[] = [];
     for (let f = start; f < start + count; f++) {
       const t0 = performance.now();
       this.renderFrame(f);
       gl.finish();
-      times.push(performance.now() - t0);
+      times.push({ f, ms: performance.now() - t0 });
     }
     const layersMs = Object.fromEntries(Object.entries(this.timing).map(([k, v]) => [k, v / count]));
     this.timing = null;
-    times.sort((a, b) => a - b);
-    return { avgMs: times.reduce((a, b) => a + b, 0) / count, p95Ms: times[Math.floor(count * 0.95)]!, maxMs: times[count - 1]!, layersMs };
+    return benchStats(times, layersMs);
   }
 
   /** RGBA pixels of the last frame, bottom row first (as WebGL returns them). */

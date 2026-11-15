@@ -3,7 +3,8 @@
 Audio-reactive visuals for music videos and live shows. One renderer, two drivers:
 
 - **Offline**: stems + a project file → frame-exact MP4s for YouTube, Shorts, Instagram.
-- **Live** (planned): the same renderer fullscreen on a projector, fed by live audio and MIDI.
+- **Live**: the same renderer fullscreen on a projector. Today it plays a song with a dropped-frame HUD
+  (`pnpm live <project.json>`); live audio input and MIDI are next ([roadmap](docs/roadmap.md)).
 
 Everything that changes over a song (geometry parameters, colours, text, layer position) is a
 parameter. Its value comes from a stack, **base → automation lane → audio modulation → live override**,
@@ -35,6 +36,7 @@ so a vertical render is recomposed rather than cropped.
 ```
 packages/features   audio → per-frame features (bands, envelope, onsets, centroid, spectrum). Pure TS, causal.
 packages/core       project model, automation, parameter stack, profiles; browser/ holds the WebGL renderer
+apps/live           live window: local server + page that renders in time with the audio, frame-pacing HUD
 apps/offline        CLI: decode stems (ffmpeg) → features → headless Chrome renders frames → ffmpeg → MP4
 examples/           project files (audio is git-ignored)
 assets/fonts        Special Elite (Apache 2.0, see LICENSE-SpecialElite.txt)

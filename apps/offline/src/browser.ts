@@ -13,7 +13,8 @@ async function bundle(): Promise<string> {
   return r.outputFiles[0]!.text;
 }
 
-export interface BenchResult { avgMs: number; p95Ms: number; maxMs: number; layersMs: Record<string, number> }
+export type { BenchStats as BenchResult } from "../../../packages/core/src/browser/renderer.ts";
+import type { BenchStats as BenchResult } from "../../../packages/core/src/browser/renderer.ts";
 export interface RendererHandle { frame(n: number): Promise<Buffer>; bench(start: number, count: number): Promise<BenchResult>; close(): Promise<void> }
 
 /**
