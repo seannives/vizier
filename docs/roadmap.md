@@ -18,7 +18,9 @@ Rough priority within each section is top to bottom. Decisions behind items live
 
 ## Next
 
-- [ ] Measure the live window on the MacBook and the projector (dropped frames at 60 Hz, fullscreen)
+- [x] Measure the live window on the MacBook: 0 dropped frames at 60 Hz fullscreen, 1.2 ms avg / 2.9 ms p99 draw (2026-11-15)
+- [ ] Test the live window on the projector (fullscreen on the projector's display, dropped frames, A/V offset)
+- [ ] Remember the A/V offset per machine/output between sessions (set to −20 ms on the MacBook speakers)
 - [ ] Faster export: encode inside Chrome with the Mac's hardware H.264 encoder (WebCodecs) instead of copying raw frames out
 - [ ] Re-render the ozgun-acid clips with the bar-based arrangement; first full-song render
 
