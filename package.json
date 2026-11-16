@@ -10,7 +10,10 @@
     "test": "vitest run",
     "typecheck": "tsc -b --noEmit -p tsconfig.json",
     "render": "node --experimental-strip-types apps/offline/src/cli.ts",
-    "live": "node --experimental-strip-types apps/live/src/server.ts"
+    "live": "node --experimental-strip-types apps/live/src/server.ts",
+    "validate": "node --experimental-strip-types apps/offline/src/tools.ts validate",
+    "analyze": "node --experimental-strip-types apps/offline/src/tools.ts analyze",
+    "demo": "node --experimental-strip-types scripts/make-demo-audio.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
@@ -22,8 +25,10 @@
   "dependencies": {
     "@types/d3-scale": "^4.0.9",
     "@types/d3-shape": "^3.2.0",
+    "ajv": "^8.20.0",
     "d3-scale": "^4.0.3",
     "d3-shape": "^3.2.1"
   },
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "version": "0.2.0"
 }

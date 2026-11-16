@@ -2,7 +2,7 @@
 
 Audio-reactive visuals for music videos and live shows. One renderer, two drivers:
 
-- **Offline**: stems + a project file → frame-exact MP4s for YouTube, Shorts, Instagram.
+- **Offline**: stems + a project → frame-exact MP4s for YouTube, Shorts, Instagram.
 - **Live**: the same renderer fullscreen on a projector. Today it plays a song with a dropped-frame HUD
   (`pnpm live <project.json>`); live audio input and MIDI are next ([roadmap](docs/roadmap.md)).
 
@@ -19,41 +19,36 @@ Needs Node 22+, pnpm, ffmpeg, and Google Chrome. On a Mac, follow [`docs/setup-m
 ```sh
 pnpm install
 pnpm test
-# put your stems next to the project: examples/<song>/media/main.wav, bass.wav, ...
-pnpm render examples/the-maleficus/project.json --profile youtube            # whole song
-pnpm render examples/the-maleficus/project.json --profile reels --start 60 --duration 15
-pnpm render examples/the-maleficus/project.json --profile youtube --still 1200   # one frame as PNG
+pnpm demo                                            # generates the demo project's audio
+pnpm render projects/demo --video full --gpu         # → projects/demo/output/full-youtube.mp4
+pnpm render projects/demo --video reel --gpu         # a vertical Reel that builds on the full video
+pnpm live projects/demo --video full                 # then open http://localhost:5173 in Chrome
 ```
 
-Add `--gpu` on a Mac to render with the GPU instead of software GL.
-
-Profiles: `youtube` (1920×1080 30), `youtube60`, `youtube4k`, `shorts` and `reels` (1080×1920 30),
-`igfeed` (1080×1350 30), `draft` (960×540). Each layer has a layout per family (landscape, portrait, feed),
-so a vertical render is recomposed rather than cropped.
+`--gpu` renders with the GPU (leave it out for software rendering, e.g. on a server).
 
 ## Layout
 
 ```
 packages/features   audio → per-frame features (bands, envelope, onsets, centroid, spectrum). Pure TS, causal.
-packages/core       project model, automation, parameter stack, profiles; browser/ holds the WebGL renderer
+packages/core       formats (song/video), grid, automation, parameter stack, profiles, plugins (generators,
+                    effects), JSON Schemas; browser/ holds the WebGL renderer and encoder
+apps/offline        render, validate, analyze: tracks → features → headless Chrome → MP4 (encoded in Chrome)
 apps/live           live window: local server + page that renders in time with the audio, frame-pacing HUD
-apps/offline        CLI: decode stems (ffmpeg) → features → headless Chrome renders frames → ffmpeg → MP4
-examples/           project files (audio is git-ignored)
+projects/           one folder per song (only projects/demo/ is part of this repo)
+scripts/            demo audio generator
 assets/fonts        Special Elite (Apache 2.0, see LICENSE-SpecialElite.txt)
+docs/               projects.md (project files and commands), setup-mac.md, adding-a-generator.md, roadmap.md, adr/
 ```
 
-## Project files
+## Projects
 
-See [`examples/the-maleficus/project.json`](examples/the-maleficus/project.json). Positions are in bars (1-based, like Live;
-`33.5` = halfway through bar 33) when the project has a `tempo`, or in seconds with `t`.
+Each song is a folder with a `song.json` (tracks, tempo, sections) and one file per video in `videos/`.
+A video can build on another, so Reels reuse the full video's look with their own bar range and text.
+See [`docs/projects.md`](docs/projects.md).
 
-- `layers[]`: `generator` (`acidRing`, `pulseGrid`, `typeText`, `ridgeline`, `flowField`), `stem`, `z`, `blend`,
-  `opacity`, `params`, `layout`, `effects` (`glow`, `trails`). Adding visuals: [`docs/adding-a-generator.md`](docs/adding-a-generator.md).
-- `automation[]`: lanes of breakpoints; targets are `<layer>.<param>`, `<layer>.<effect>.<param>` or `post.<param>`, `{ "target": "bass.radius", "points": [{ "bar": 49, "v": 1.0, "curve": "smooth" }, ...] }`.
-  Curves: `linear`, `hold`, `smooth`. Layer transform (`x y w h rotation`) and `opacity` are automatable too.
-- `modulations[]`: `{ "target": "bass.lineWidth", "source": "bass.env", "amount": 3, "curve": "square" }`.
-
-Features available as sources: `rms env low lowMid mid high centroid flux onset`.
+Generators: `acidRing`, `pulseGrid`, `typeText`, `ridgeline`, `flowField`. Effects: `glow`, `trails`.
+Adding visuals: [`docs/adding-a-generator.md`](docs/adding-a-generator.md).
 
 ## Licence
 

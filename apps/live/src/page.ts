@@ -1,6 +1,6 @@
 // The live window. Visuals follow the audio clock, so they stay in sync at any display refresh rate.
 import { Renderer } from "../../../packages/core/src/browser/renderer.ts";
-import { sectionTimes, barToSeconds, type Project } from "../../../packages/core/src/index.ts";
+import { sectionTimes, barToSeconds, secondsToBar, barLabel, type Project } from "../../../packages/core/src/index.ts";
 import type { FeatureTrack } from "../../../packages/features/src/index.ts";
 import { FrameStats } from "./stats.ts";
 
@@ -13,8 +13,9 @@ async function main() {
   const r = new Renderer(project, profileId, tracks);
   document.body.prepend(r.canvas);
   const sections = sectionTimes(project);
-  const tempo = project.tempo;
-  const barLen = tempo ? barToSeconds(2, tempo) - barToSeconds(1, tempo) : 0;
+  const grid = project.grid;
+  /** Jump by whole bars from time t (falls back to 2 s steps without a tempo). */
+  const barStep = (t: number, n: number) => grid ? barToSeconds(Math.floor(secondsToBar(t, grid) + 1e-6) + n, grid) : t + 2 * n;
   const duration = Math.min(...Object.values(tracks).map((t) => t.frameCount / t.fps));
 
   // ---- audio ----
@@ -46,8 +47,8 @@ async function main() {
   addEventListener("keydown", (e) => {
     const t = songTime();
     if (e.key === " ") { e.preventDefault(); playing ? pause() : void play(); }
-    else if (e.key === "ArrowRight") seek(t + (barLen || 2) * (e.shiftKey ? 8 : 1));
-    else if (e.key === "ArrowLeft") seek(t - (barLen || 2) * (e.shiftKey ? 8 : 1));
+    else if (e.key === "ArrowRight") seek(barStep(t, e.shiftKey ? 8 : 1));
+    else if (e.key === "ArrowLeft") seek(barStep(t, e.shiftKey ? -8 : -1));
     else if (e.key === "Home") seek(0);
     else if (e.key === "f") document.fullscreenElement ? void document.exitFullscreen() : void document.documentElement.requestFullscreen();
     else if (e.key === "h") { if (helpShown) { helpShown = false; } else { hudShown = !hudShown; } }
@@ -70,7 +71,7 @@ async function main() {
       hudAt = now;
       const s = stats.summary();
       const sec = [...sections].reverse().find((x) => x.t <= t + 1e-6);
-      const bar = tempo ? `${Math.floor(t / barLen) + 1}.${Math.floor(((t % barLen) / barLen) * (tempo.beatsPerBar ?? 4)) + 1}` : "–";
+      const bar = grid ? barLabel(secondsToBar(t, grid), grid) : "–";
       hud.style.display = hudShown ? "block" : "none";
       hud.textContent = [
         `${project.title} · ${r.profile.label}`,

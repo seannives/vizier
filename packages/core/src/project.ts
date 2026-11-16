@@ -1,4 +1,5 @@
-import { positionToSeconds, type LaneInput, type Tempo } from "./automation.ts";
+import { positionToSeconds, type LaneInput } from "./automation.ts";
+import { validateGrid, type Grid } from "./grid.ts";
 import { GENERATORS } from "./generators/index.ts";
 import { EFFECTS } from "./effects/index.ts";
 import { LAYER_PARAMS, POST_PARAMS } from "./plugins.ts";
@@ -14,8 +15,10 @@ export interface EffectRef { type: string; id?: string; params?: Record<string, 
 
 export interface LayerDef {
   id: string;
-  /** Which stem's features drive this layer by default (e.g. "bass"). */
-  stem?: string;
+  /** Display name (the id never changes, so references survive renaming). */
+  name?: string;
+  /** Which track's features drive this layer (a track id; default: the mix). */
+  track?: string;
   generator: string;
   z: number;
   opacity?: number;
@@ -33,7 +36,7 @@ export interface LayerDef {
 /** Audio-to-parameter mapping: target += amount * feature (after curve). */
 export interface Modulation {
   target: string;           // "layerId.param", e.g. "bass.radius"
-  source: string;           // "stem.feature", e.g. "bass.env"
+  source: string;           // "trackId.feature", e.g. "bass.env"
   amount: number;
   curve?: "linear" | "square" | "sqrt";
 }
@@ -41,16 +44,21 @@ export interface Modulation {
 /** A section of the arrangement, placed in seconds (`t`) or bars (`bar`, 1-based). */
 export interface Section { t?: number; bar?: number; name: string }
 
+/** What the renderer works from: a song plus one resolved video (see formats.ts for the files). */
 export interface Project {
-  version: 1;
+  version: 2;
   title: string;
   seed: number;
-  /** Needed for anything placed in bars. */
-  tempo?: Tempo;
-  /** Stem name → audio file path (relative to the project file). "main" is muxed into the video. */
-  stems: Record<string, string>;
+  /** Track id → audio file path. */
+  tracks: Record<string, string>;
+  trackNames?: Record<string, string>;
+  /** The track whose audio goes into the video. */
+  mix: string;
+  grid?: Grid;
   palette: Record<string, string>;
   sections?: Section[];
+  /** The video's bar range: `to` is exclusive. */
+  range?: { from?: number; to?: number };
   layers: LayerDef[];
   automation?: LaneInput[];
   modulations?: Modulation[];
@@ -76,7 +84,9 @@ export function paramTargets(p: Project): Map<string, { label: string; min: numb
 
 export function validateProject(p: Project): string[] {
   const errs: string[] = [];
-  if (p.version !== 1) errs.push("version must be 1");
+  if (p.version !== 2) errs.push("version must be 2");
+  if (!(p.mix in p.tracks)) errs.push(`the mix track "${p.mix}" doesn't exist`);
+  if (p.grid) errs.push(...validateGrid(p.grid));
   const ids = new Set<string>();
   for (const l of p.layers) {
     if (ids.has(l.id)) errs.push(`duplicate layer id ${l.id}`);
@@ -85,7 +95,7 @@ export function validateProject(p: Project): string[] {
     const gen = GENERATORS[l.generator];
     if (!gen) errs.push(`layer ${l.id}: unknown generator "${l.generator}" (known: ${Object.keys(GENERATORS).join(", ")})`);
     if (!l.layout.landscape && !l.layout.portrait) errs.push(`layer ${l.id} needs a landscape or portrait layout`);
-    if (l.stem && !(l.stem in p.stems)) errs.push(`layer ${l.id} uses unknown stem ${l.stem}`);
+    if (l.track && !(l.track in p.tracks)) errs.push(`layer ${l.id} uses unknown track "${l.track}"`);
     const known = new Set([...(gen?.params ?? []), ...LAYER_PARAMS].map((s) => s.name));
     for (const k of Object.keys(l.params ?? {})) if (gen && !known.has(k)) errs.push(`layer ${l.id}: "${k}" is not a parameter of ${l.generator}`);
     const effIds = new Set<string>();
@@ -103,18 +113,25 @@ export function validateProject(p: Project): string[] {
     if (!targets.has(lane.target)) errs.push(`automation target "${lane.target}" doesn't exist`);
     for (const pt of lane.points) {
       if (pt.t === undefined && pt.bar === undefined) errs.push(`${lane.target}: a breakpoint needs t or bar`);
-      if (pt.bar !== undefined && !p.tempo) errs.push(`${lane.target}: breakpoints in bars need a project tempo`);
+      if (pt.bar !== undefined && !p.grid) errs.push(`${lane.target}: breakpoints in bars need a tempo (song grid)`);
     }
   }
-  for (const s of p.sections ?? []) if (s.bar !== undefined && !p.tempo) errs.push(`section ${s.name}: bars need a project tempo`);
+  for (const s of p.sections ?? []) if (s.bar !== undefined && !p.grid) errs.push(`section ${s.name}: bars need a tempo (song grid)`);
   for (const m of p.modulations ?? []) {
     if (!targets.has(m.target)) errs.push(`modulation target "${m.target}" doesn't exist`);
-    if (!(m.source.split(".")[0]! in p.stems)) errs.push(`modulation uses unknown stem: ${m.source}`);
+    if (!(m.source.split(".")[0]! in p.tracks)) errs.push(`modulation uses unknown track: ${m.source}`);
   }
   return errs;
 }
 
 /** Sections with their start times in seconds, in order. */
 export function sectionTimes(p: Project): { t: number; name: string }[] {
-  return (p.sections ?? []).map((s) => ({ t: positionToSeconds(s, p.tempo), name: s.name })).sort((a, b) => a.t - b.t);
+  return (p.sections ?? []).map((s) => ({ t: positionToSeconds(s, p.grid), name: s.name })).sort((a, b) => a.t - b.t);
+}
+
+/** The video's range in seconds ([from, to)), clipped to [0, duration]. */
+export function rangeSeconds(p: Project, duration: number): { from: number; to: number } {
+  const from = p.range?.from !== undefined && p.grid ? positionToSeconds({ bar: p.range.from }, p.grid) : 0;
+  const to = p.range?.to !== undefined && p.grid ? positionToSeconds({ bar: p.range.to }, p.grid) : duration;
+  return { from: Math.max(0, from), to: Math.min(duration, to) };
 }

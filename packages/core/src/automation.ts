@@ -1,7 +1,8 @@
+import { barToSeconds, type Grid } from "./grid.ts";
 /**
  * Automation, modelled on Ableton's: a lane is a list of breakpoints for one target parameter.
  * A breakpoint is placed either in seconds (`t`) or in bars (`bar`, 1-based like Live: bar 33 = the first beat
- * of bar 33, 33.5 = halfway through it). Bars need the project's `tempo`. Lanes are converted to seconds on load.
+ * of bar 33, 33.5 = halfway through it). Bars need the song's grid (see grid.ts). Lanes are converted to seconds on load.
  */
 export type Curve = "linear" | "hold" | "smooth";
 
@@ -10,25 +11,18 @@ export interface Breakpoint { t: number; v: number; curve?: Curve } // curve app
 export interface BreakpointInput { t?: number; bar?: number; v: number; curve?: Curve }
 export interface LaneInput { target: string; points: BreakpointInput[] }
 
-/** Constant tempo for now; a full tempo map (from a Live export) can replace this without changing project files. */
-export interface Tempo { bpm: number; beatsPerBar?: number; offsetSec?: number }
-
-export function barToSeconds(bar: number, tempo: Tempo): number {
-  return (tempo.offsetSec ?? 0) + ((bar - 1) * (tempo.beatsPerBar ?? 4) * 60) / tempo.bpm;
-}
-
 /** Resolve a position given as `t` (seconds) or `bar` to seconds. */
-export function positionToSeconds(p: { t?: number; bar?: number }, tempo?: Tempo): number {
+export function positionToSeconds(p: { t?: number; bar?: number }, grid?: Grid): number {
   if (p.t !== undefined) return p.t;
   if (p.bar !== undefined) {
-    if (!tempo) throw new Error("A position in bars needs the project's tempo");
-    return barToSeconds(p.bar, tempo);
+    if (!grid) throw new Error("A position in bars needs the song's grid (tempo)");
+    return barToSeconds(p.bar, grid);
   }
   throw new Error("A position needs t (seconds) or bar");
 }
 
-export function laneToSeconds(lane: LaneInput, tempo?: Tempo): Lane {
-  return { target: lane.target, points: lane.points.map((p) => ({ t: positionToSeconds(p, tempo), v: p.v, ...(p.curve ? { curve: p.curve } : {}) })) };
+export function laneToSeconds(lane: LaneInput, grid?: Grid): Lane {
+  return { target: lane.target, points: lane.points.map((p) => ({ t: positionToSeconds(p, grid), v: p.v, ...(p.curve ? { curve: p.curve } : {}) })) };
 }
 export interface Lane { target: string; points: Breakpoint[] }
 

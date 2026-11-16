@@ -294,7 +294,7 @@ export class Renderer {
       const opacity = pv("opacity", L.def.opacity ?? 1);
       if (opacity <= 0.001 && !L.effects.some((e) => e.fb)) { finals.push(null); return; }
       const t0 = this.timing ? performance.now() : 0;
-      const stem = L.def.stem ?? "main";
+      const stem = L.def.track ?? this.project.mix;
       // 1. the generator draws the layer's source image
       let src: WebGLTexture;
       if (L.gen.kind === "canvas2d") {

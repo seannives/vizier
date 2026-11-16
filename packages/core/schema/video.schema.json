@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://github.com/seannives/vizier/schema/video.schema.json",
+  "title": "vizier video",
+  "description": "projects/<id>/videos/<name>.json: one video of a song. With `base`, it builds on another video.",
+  "type": "object",
+  "required": ["version"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 2 },
+    "name": { "type": "string" },
+    "base": { "type": "string", "description": "Another video in this project to build on" },
+    "profiles": { "type": "array", "items": { "type": "string" }, "description": "Output formats; the first is the default" },
+    "range": {
+      "type": "object", "additionalProperties": false,
+      "properties": { "from": { "type": "number" }, "to": { "type": "number" } },
+      "description": "Bars; `to` is where the video ends (exclusive)"
+    },
+    "seed": { "type": "integer" },
+    "palette": { "type": "object", "additionalProperties": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" } },
+    "layers": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["id"], "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$" },
+          "name": { "type": "string" },
+          "remove": { "type": "boolean", "description": "Drop this layer inherited from the base" },
+          "track": { "type": "string" },
+          "generator": { "type": "string" },
+          "z": { "type": "number" },
+          "opacity": { "type": "number" },
+          "blend": { "enum": ["normal", "add", "screen", "multiply"] },
+          "resolutionScale": { "type": "number", "exclusiveMinimum": 0, "maximum": 2 },
+          "params": { "type": "object", "additionalProperties": { "type": "number" } },
+          "text": { "type": "string" },
+          "effects": {
+            "type": "array",
+            "items": {
+              "type": "object", "required": ["type"], "additionalProperties": false,
+              "properties": {
+                "type": { "type": "string" }, "id": { "type": "string" },
+                "params": { "type": "object", "additionalProperties": { "type": "number" } }
+              }
+            }
+          },
+          "layout": {
+            "type": "object", "additionalProperties": false,
+            "properties": { "landscape": { "$ref": "#/definitions/transform" }, "portrait": { "$ref": "#/definitions/transform" }, "feed": { "$ref": "#/definitions/transform" } }
+          }
+        }
+      }
+    },
+    "automation": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["target", "points"], "additionalProperties": false,
+        "properties": {
+          "target": { "type": "string" },
+          "points": {
+            "type": "array",
+            "items": {
+              "type": "object", "required": ["v"], "additionalProperties": false,
+              "properties": {
+                "bar": { "type": "number" }, "t": { "type": "number" }, "v": { "type": "number" },
+                "curve": { "enum": ["linear", "hold", "smooth"] }
+              }
+            }
+          }
+        }
+      }
+    },
+    "modulations": {
+      "type": "array",
+      "items": {
+        "type": "object", "required": ["target", "source"], "additionalProperties": false,
+        "properties": {
+          "target": { "type": "string" }, "source": { "type": "string" },
+          "amount": { "type": "number" }, "curve": { "enum": ["linear", "square", "sqrt"] }, "remove": { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "transform": {
+      "type": "object", "required": ["x", "y", "w", "h"], "additionalProperties": false,
+      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "w": { "type": "number" }, "h": { "type": "number" }, "rotation": { "type": "number" } }
+    }
+  }
+}

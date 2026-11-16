@@ -7,7 +7,7 @@ automation and (soon) the editor's controls all work from those declarations.
 
 1. Create `packages/core/src/generators/<id>/index.ts` that default-exports `defineGenerator({...})`.
 2. Add one import line to `packages/core/src/generators/index.ts`.
-3. Use it in a project: `{ "id": "mylayer", "generator": "<id>", "stem": "drums", ... }`.
+3. Use it in a video: `{ "id": "mylayer", "generator": "<id>", "track": "drums", ... }`.
 
 Every generator has `id`, `label`, `description`, `params` and a `kind`:
 
@@ -29,8 +29,8 @@ generator if a value must stay in range. A parameter can be automated as `<layer
 | | |
 |---|---|
 | `g.p("name")` | the parameter's current value (base → automation → modulation → live override) |
-| `g.f("env", framesAgo?, stem?)` | a feature of the layer's stem: `rms env low lowMid mid high centroid flux onset hit` |
-| `g.spectrum(framesAgo?, stem?)` | 32 log-spaced bands, 0–1 |
+| `g.f("env", framesAgo?, track?)` | a feature of the layer's track: `rms env low lowMid mid high centroid flux onset hit` |
+| `g.spectrum(framesAgo?, track?)` | 32 log-spaced bands, 0–1 |
 | `g.t`, `g.frame`, `g.fps` | time in seconds, frame number, frame rate |
 | `g.rng()` | seeded random numbers: never use `Math.random()` |
 | `g.palette`, `g.text`, `g.font` | project colours (`bg`, `ink`, `acid`), the layer's text, the font |
@@ -40,7 +40,7 @@ Look back with `framesAgo` rather than keeping state between frames: a frame mus
 ### GLSL (`kind: "shader"`)
 
 `fragment` is the body of `vec4 generate(vec2 uv)`, returning premultiplied RGBA. See `flowField`.
-`uv` runs 0–1 with y up. Available: `u_res`, `u_aspect`, `u_time`, `u_frame`, `u_seed`; the features
+`uv` runs 0–1 with y up. Available: `u_res`, `u_aspect`, `u_time`, `u_frame`, `u_seed`; the layer's track's features
 `u_rms u_env u_low u_lowMid u_mid u_high u_centroid u_flux u_onset u_hit`; `spec(bin01, framesAgo01)`
 for the last 64 frames of spectrum; colours `u_inkColor u_acidColor u_bgColor`; each parameter as
 `u_<name>`; helpers `hash21`, `noise`, `fbm`.
@@ -63,5 +63,5 @@ renderer first renders a few seconds of lead-in, so the frame matches the same m
 ## Checklist
 
 - `pnpm test`: the plugin test checks every parameter declaration (unique names, `min ≤ default ≤ max`).
-- Render a still at a busy moment and a quiet one: `pnpm render <project> --still <frame> --gpu`.
-- `pnpm render <project> --bench 300 --gpu` to check the cost per frame.
+- Render a still at a busy moment and a quiet one: `pnpm render projects/demo --video full --still-bar 13 --gpu`.
+- `pnpm render projects/demo --video full --bench 300 --gpu` to check the cost per frame.

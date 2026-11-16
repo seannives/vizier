@@ -19,11 +19,11 @@ if (chrome) process.env.CHROME_PATH = chrome;
 const SR = 48000;
 const signal = Float32Array.from({ length: SR * 2 }, (_, i) => (i % 12000 < 2000 ? 0.6 : 0.1) * Math.sin((2 * Math.PI * 55 * i) / SR));
 const project: Project = {
-  version: 1, title: "test", seed: 7, stems: { main: "x", bass: "x" },
+  version: 2, title: "test", seed: 7, tracks: { mix: "x", bass: "x" }, mix: "mix",
   palette: { bg: "#2B2420", ink: "#FCFCFB", acid: "#B6FF3B" },
   layers: [
-    { id: "grid", stem: "main", generator: "pulseGrid", z: 0, layout: { landscape: { x: 0.5, y: 0.5, w: 1, h: 1 } } },
-    { id: "bass", stem: "bass", generator: "acidRing", z: 1, blend: "add", layout: { landscape: { x: 0.5, y: 0.5, w: 0.56, h: 1 } } },
+    { id: "grid", track: "mix", generator: "pulseGrid", z: 0, layout: { landscape: { x: 0.5, y: 0.5, w: 1, h: 1 } } },
+    { id: "bass", track: "bass", generator: "acidRing", z: 1, blend: "add", layout: { landscape: { x: 0.5, y: 0.5, w: 0.56, h: 1 } } },
     { id: "title", generator: "typeText", z: 2, text: "test", params: { shake: 1, stutter: 1 }, layout: { landscape: { x: 0.5, y: 0.85, w: 0.6, h: 0.15 } } },
   ],
 };
@@ -31,16 +31,16 @@ const project: Project = {
 const fxProject: Project = {
   ...project,
   layers: [
-    { id: "flow", stem: "main", generator: "flowField", z: 0, blend: "add", effects: [{ type: "glow" }], layout: { landscape: { x: 0.5, y: 0.5, w: 1, h: 1 } } },
-    { id: "ring", stem: "bass", generator: "acidRing", z: 1, blend: "add", effects: [{ type: "trails", params: { persistence: 1, zoom: 1.3, rotate: 20 } }], layout: { landscape: { x: 0.5, y: 0.5, w: 0.56, h: 1 } } },
-    { id: "chorus", stem: "main", generator: "ridgeline", z: 2, layout: { landscape: { x: 0.5, y: 0.75, w: 1, h: 0.5 } } },
+    { id: "flow", track: "mix", generator: "flowField", z: 0, blend: "add", effects: [{ type: "glow" }], layout: { landscape: { x: 0.5, y: 0.5, w: 1, h: 1 } } },
+    { id: "ring", track: "bass", generator: "acidRing", z: 1, blend: "add", effects: [{ type: "trails", params: { persistence: 1, zoom: 1.3, rotate: 20 } }], layout: { landscape: { x: 0.5, y: 0.5, w: 0.56, h: 1 } } },
+    { id: "chorus", track: "mix", generator: "ridgeline", z: 2, layout: { landscape: { x: 0.5, y: 0.75, w: 1, h: 0.5 } } },
   ],
 };
 
 run("renderer in headless Chrome", () => {
   it("draws non-blank frames, and the same frame twice is byte-identical", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
-    const r = await openRenderer(project, "draft", { main: track, bass: track }, { gpu: false });
+    const r = await openRenderer(project, "draft", { mix: track, bass: track }, { gpu: false });
     try {
       const a = await r.frame(20), b = await r.frame(45), a2 = await r.frame(20);
       expect(a.length).toBe(960 * 540 * 4);
@@ -55,7 +55,7 @@ run("renderer in headless Chrome", () => {
 
   it("renders shader generators and effect chains", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
-    const r = await openRenderer(fxProject, "draft", { main: track, bass: track }, { gpu: false });
+    const r = await openRenderer(fxProject, "draft", { mix: track, bass: track }, { gpu: false });
     try {
       const px = await r.frame(40);
       let lit = 0;
@@ -67,10 +67,10 @@ run("renderer in headless Chrome", () => {
   it("a frame with trails looks the same whether rendered in sequence or jumped to (lead-in)", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
     const hash = (x: Buffer) => createHash("sha1").update(x).digest("hex");
-    const a = await openRenderer(fxProject, "draft", { main: track, bass: track }, { gpu: false });
-    const b = await openRenderer(fxProject, "draft", { main: track, bass: track }, { gpu: false });
+    const a = await openRenderer(fxProject, "draft", { mix: track, bass: track }, { gpu: false });
+    const b = await openRenderer(fxProject, "draft", { mix: track, bass: track }, { gpu: false });
     try {
-      let seq = Buffer.alloc(0);
+      let seq: Buffer = Buffer.alloc(0);
       for (let f = 0; f <= 45; f++) seq = await a.frame(f); // sequential, as in a full render
       const jumped = await b.frame(45);                       // straight to frame 45, as in an excerpt
       expect(hash(jumped)).toBe(hash(seq));
@@ -79,7 +79,7 @@ run("renderer in headless Chrome", () => {
 
   it("encodes H.264 in the browser (WebCodecs) as an Annex B stream with SPS/PPS and a keyframe", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
-    const r = await openRenderer(project, "draft", { main: track, bass: track }, { gpu: false });
+    const r = await openRenderer(project, "draft", { mix: track, bass: track }, { gpu: false });
     try {
       const info = await r.encodeStart(4);
       expect(info.codec).toMatch(/^avc1\.6400/);

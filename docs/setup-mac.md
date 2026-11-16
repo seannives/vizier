@@ -48,50 +48,54 @@ pnpm test
 
 All tests should pass (the same checks GitHub runs on every push).
 
-## 4. Add your stems
-
-Each example project reads its audio from a `media` folder next to its `project.json`. Git ignores
-these folders, so audio is never pushed to GitHub.
+## 4. Try the demo
 
 ```sh
-mkdir -p examples/the-maleficus/media
-open examples/the-maleficus/media
+pnpm demo                                      # generates the demo's audio (a 32-bar techno sketch)
+pnpm render projects/demo --video full --gpu
+open projects/demo/output
 ```
 
-Copy your exported WAVs into the folder and name them as the project's `stems` section expects
-(for `the-maleficus`: the full mix as `main.wav`, and the stems as `bass.wav`, `drums.wav` (drums without
-the kick) and `chorus.wav`).
+## 5. Set up a song
 
-## 5. Render one frame
+Each song is a folder in `projects/` (see [projects.md](projects.md) for the files and all commands).
+For a new song:
 
 ```sh
-pnpm render examples/the-maleficus/project.json --profile youtube --still 4830 --gpu --out out/test.png
-open out/test.png
+mkdir -p projects/<song-id>/media
+open projects/<song-id>/media
 ```
 
-`--still` takes a frame number (seconds × frame rate; the `youtube` profile is 30 fps). The first run
-analyses the audio; the results are cached in `.cache/`.
-
-## 6. Render video
+Copy in the mix and the stems (all exported from the same start point), then:
 
 ```sh
-# a 30-second excerpt
-pnpm render examples/the-maleficus/project.json --profile youtube --start 130 --duration 30 --gpu
-# the whole song
-pnpm render examples/the-maleficus/project.json --profile youtube --gpu
-# vertical, first minute
-pnpm render examples/the-maleficus/project.json --profile reels --duration 60 --gpu
+pnpm analyze projects/<song-id>     # suggests tempo, where bar 1 starts, where each stem plays, sections
 ```
 
-Videos go in `out/` (`open out` shows them in Finder). By default the video is encoded inside Chrome
-(WebCodecs), using the Mac's hardware H.264 encoder where available, at 1.5× the profile's bitrate
-(18 Mbps for `youtube`); change it with `--bitrate 24`. `--encoder ffmpeg` uses the older, slower path
-(raw frames piped to ffmpeg's libx264). After each render the file is checked for the right frame count,
-duration and frame rate. Profiles: `youtube`, `youtube60`, `youtube4k`,
-`shorts`, `reels`, `igfeed`, `draft`; see the README.
+Write `song.json` and a video in `videos/` (copy the demo's as a starting point, or ask Claude to take a first
+pass), then check them:
 
-Every ~5 seconds a progress line shows the render speed (fps), where the time per frame goes
-(`in Chrome`: drawing and encoding; `ffmpeg wait`: muxing), and the time remaining.
+```sh
+pnpm validate projects/<song-id>
+```
+
+## 6. Render
+
+```sh
+pnpm render projects/the-maleficus --video youtube-full --gpu                   # whole video
+pnpm render projects/the-maleficus --video reel-breakdown --gpu                 # a Reel (its own bars and format)
+pnpm render projects/the-maleficus --video youtube-full --bars 81-97 --gpu      # any bar range
+pnpm render projects/the-maleficus --video youtube-full --still-bar 105 --gpu   # one frame as PNG
+```
+
+Renders go to the project's `output/` folder, named after the video, format and bar range. **A render replaces
+the previous one with the same name**: rename or move a file to keep it, or add `--keep` to put a timestamp in the
+name. Next to each video is a `.json` snapshot of exactly how it was made.
+
+The video is encoded inside Chrome (WebCodecs) with the Mac's hardware H.264 encoder, at 1.5× the format's
+bitrate (18 Mbps for `youtube`); change it with `--bitrate 24`. `--encoder ffmpeg` uses the older, slower path.
+After each render the file is checked for the right frame count, duration and frame rate. Progress lines show the
+speed (fps), where the time goes, and the time remaining.
 
 ## 7. Measure live headroom
 
@@ -99,7 +103,7 @@ Video export is slower than live playback, because every frame is copied out of 
 `--bench` measures only the drawing, which is what live playback costs:
 
 ```sh
-pnpm render examples/the-maleficus/project.json --profile youtube --start 165 --bench 300 --gpu
+pnpm render projects/the-maleficus --video youtube-full --bars 105-137 --bench 300 --gpu
 ```
 
 It reports milliseconds per frame (average, 95th percentile, worst), how much of the frame budget that uses at
@@ -113,7 +117,7 @@ Plays the song and renders the visuals in time with it, in a Chrome tab, with a 
 frame pacing. Audio plays through your Mac's current output device.
 
 ```sh
-pnpm live examples/the-maleficus/project.json
+pnpm live projects/the-maleficus --video youtube-full
 ```
 
 When it prints `ready`, open http://localhost:5173 in Chrome and click the page. Keys:
@@ -150,3 +154,35 @@ with Ctrl+C in Terminal.
 cd ~/Code/vizier
 git pull && pnpm install
 ```
+
+## Keeping your projects in their own git repo
+
+vizier's repository ignores `projects/` (apart from the demo), so your songs never end up in vizier's public
+history. To version your project files privately, make `projects/` a git repository of its own:
+
+```sh
+cd ~/Code/vizier/projects
+git init
+cat > .gitignore <<'IGNORE'
+demo/
+*/media/
+*/output/
+*/.cache/
+IGNORE
+git add -A
+git commit -m "My vizier projects"
+```
+
+That versions every song's `song.json` and `videos/` (small text files) and leaves out audio, renders and caches.
+To back it up on GitHub, create a **private** repository there (for example `vizier-projects`, with no README),
+then:
+
+```sh
+git remote add origin https://github.com/<you>/vizier-projects.git
+git branch -M main
+git push -u origin main
+```
+
+After that, commit whenever you've made changes you want to keep (`git add -A && git commit -m "…"`,
+then `git push`). The two repositories don't interfere: commands run in `~/Code/vizier` affect vizier,
+commands run in `~/Code/vizier/projects` affect your projects.

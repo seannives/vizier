@@ -21,8 +21,8 @@ describe("automation lanes", () => {
 });
 
 const project: Project = {
-  version: 1, title: "t", seed: 1, stems: { main: "m.wav", bass: "b.wav" }, palette: {},
-  layers: [{ id: "bass", stem: "bass", generator: "acidRing", z: 1, params: { radius: 1 }, layout: { landscape: { x: 0.5, y: 0.5, w: 1, h: 1 } } }],
+  version: 2, title: "t", seed: 1, tracks: { mix: "m.wav", bass: "b.wav" }, mix: "mix", palette: {},
+  layers: [{ id: "bass", track: "bass", generator: "acidRing", z: 1, params: { radius: 1 }, layout: { landscape: { x: 0.5, y: 0.5, w: 1, h: 1 } } }],
   automation: [{ target: "bass.radius", points: [{ t: 0, v: 1 }, { t: 10, v: 2 }] }],
   modulations: [{ target: "bass.radius", source: "bass.env", amount: 0.5 }],
 };
@@ -40,13 +40,18 @@ describe("parameter stack", () => {
 });
 
 describe("project", () => {
-  it("validates the example project", () => {
-    const p = JSON.parse(readFileSync(new URL("../../../examples/the-maleficus/project.json", import.meta.url), "utf8"));
-    expect(validateProject(p)).toEqual([]);
+  it("validates the demo project's videos", async () => {
+    const { buildProject, resolveVideo } = await import("../src/index.ts");
+    const read = (f: string) => JSON.parse(readFileSync(new URL(`../../../projects/demo/${f}`, import.meta.url), "utf8"));
+    const song = read("song.json");
+    for (const v of ["full", "reel"]) {
+      const video = resolveVideo(v, (n) => read(`videos/${n}.json`));
+      expect(validateProject(buildProject(song, video, (t) => t.file))).toEqual([]);
+    }
   });
-  it("catches references to unknown layers and stems", () => {
+  it("catches references to unknown layers and tracks", () => {
     const bad = { ...project, automation: [{ target: "nope.x", points: [] }], modulations: [{ target: "bass.x", source: "drums.env", amount: 1 }] };
-    expect(validateProject(bad)).toHaveLength(2);
+    expect(validateProject(bad)).toHaveLength(2); // unknown automation target ("nope"), unknown track ("drums")
   });
   it("falls back from portrait to landscape layout", () => {
     expect(layoutFor(project.layers[0]!, "portrait")).toEqual({ x: 0.5, y: 0.5, w: 1, h: 1 });
@@ -61,21 +66,73 @@ describe("project", () => {
   });
 });
 
-describe("bars timebase", () => {
-  it("converts Live-style bar numbers at 155 BPM", async () => {
+describe("beat grid", () => {
+  it("converts bars at a steady tempo, with bar 1 at the downbeat", async () => {
     const { barToSeconds } = await import("../src/index.ts");
-    expect(barToSeconds(1, { bpm: 155 })).toBe(0);
-    expect(barToSeconds(49, { bpm: 155 })).toBeCloseTo(48 * 4 * 60 / 155);
-    expect(barToSeconds(161, { bpm: 155 })).toBeCloseTo(247.74, 2);
+    const g = { tempo: [{ bar: 1, bpm: 155 }] };
+    expect(barToSeconds(1, g)).toBe(0);
+    expect(barToSeconds(49, g)).toBeCloseTo((48 * 4 * 60) / 155);
+    expect(barToSeconds(161, g)).toBeCloseTo(247.74, 2);
+  });
+  it("handles a lead-in before bar 1 (downbeat) and bar 0.x", async () => {
+    const { barToSeconds, secondsToBar } = await import("../src/index.ts");
+    const g = { tempo: [{ bar: 1, bpm: 120 }], downbeat: 0.75 };
+    expect(barToSeconds(1, g)).toBe(0.75);
+    expect(barToSeconds(2, g)).toBeCloseTo(2.75);
+    expect(barToSeconds(0.75, g)).toBeCloseTo(0.25); // the last beat of the lead-in bar
+    expect(secondsToBar(2.75, g)).toBeCloseTo(2, 6);
+  });
+  it("handles tempo and metre changes", async () => {
+    const { barToSeconds, secondsToBar, barLabel } = await import("../src/index.ts");
+    const g = { tempo: [{ bar: 1, bpm: 120 }, { bar: 9, bpm: 60 }, { bar: 11, bpm: 60, beatsPerBar: 3 }] };
+    expect(barToSeconds(9, g)).toBeCloseTo(16);       // 8 bars × 2 s
+    expect(barToSeconds(11, g)).toBeCloseTo(24);      // + 2 bars × 4 s
+    expect(barToSeconds(12, g)).toBeCloseTo(27);      // + 1 bar of 3/4 at 60
+    expect(secondsToBar(20, g)).toBeCloseTo(10, 6);
+    expect(barLabel(12 + 2 / 3, g)).toBe("12.3");
+    expect(barLabel(5, { ...g, barLabelOffset: 16 })).toBe("21.1");
   });
   it("evaluates lanes written in bars", () => {
-    const p: Project = { ...project, tempo: { bpm: 120 }, automation: [{ target: "bass.radius", points: [{ bar: 1, v: 0 }, { bar: 3, v: 1 }] }], modulations: [] };
+    const p: Project = { ...project, grid: { tempo: [{ bar: 1, bpm: 120 }] }, automation: [{ target: "bass.radius", points: [{ bar: 1, v: 0 }, { bar: 3, v: 1 }] }], modulations: [] };
     const r = new ParamResolver(p);
     expect(r.value("bass.radius", 0, 2, () => 0)).toBeCloseTo(0.5); // bar 2 starts at 2 s at 120 BPM
   });
   it("rejects bars without a tempo", () => {
     const p: Project = { ...project, automation: [{ target: "bass.radius", points: [{ bar: 5, v: 1 }] }] };
     expect(validateProject(p).join()).toMatch(/tempo/);
+  });
+});
+
+describe("videos building on other videos", () => {
+  it("overrides layers by id, merges params, replaces lanes by target, and can remove things", async () => {
+    const { resolveVideo } = await import("../src/index.ts");
+    const files: Record<string, any> = {
+      full: { version: 2, profiles: ["youtube"], seed: 3,
+        layers: [{ id: "ring", generator: "acidRing", params: { radius: 1, spin: 0.1 }, layout: { landscape: { x: 0.5, y: 0.5, w: 1, h: 1 } } },
+                 { id: "title", generator: "typeText", text: "hi", layout: { landscape: { x: 0.5, y: 0.9, w: 1, h: 0.1 } } }],
+        automation: [{ target: "ring.radius", points: [{ bar: 1, v: 1 }] }, { target: "ring.spin", points: [{ bar: 1, v: 0 }] }],
+        modulations: [{ target: "ring.radius", source: "bass.env", amount: 1 }] },
+      reel: { version: 2, base: "full", profiles: ["reels"], range: { from: 9, to: 17 },
+        layers: [{ id: "ring", params: { radius: 2 }, layout: { portrait: { x: 0.5, y: 0.4, w: 1, h: 0.5 } } }, { id: "title", remove: true },
+                 { id: "caption", generator: "typeText", text: "new", layout: { portrait: { x: 0.5, y: 0.2, w: 1, h: 0.1 } } }],
+        automation: [{ target: "ring.spin", points: [] }, { target: "caption.reveal", points: [{ bar: 9, v: 0 }, { bar: 10, v: 1 }] }],
+        modulations: [{ target: "ring.radius", source: "bass.env", remove: true }] },
+    };
+    const v = resolveVideo("reel", (n) => files[n]);
+    expect(v.profiles).toEqual(["reels"]);
+    expect(v.seed).toBe(3);
+    expect(v.range).toEqual({ from: 9, to: 17 });
+    const ring = v.layers!.find((l) => l.id === "ring")!;
+    expect(ring.params).toEqual({ radius: 2, spin: 0.1 });
+    expect(Object.keys(ring.layout!)).toEqual(["landscape", "portrait"]);
+    expect(v.layers!.map((l) => l.id)).toEqual(["ring", "caption"]);
+    expect(v.automation!.map((a) => a.target)).toEqual(["ring.radius", "caption.reveal"]);
+    expect(v.modulations).toEqual([]);
+  });
+  it("detects loops", async () => {
+    const { resolveVideo } = await import("../src/index.ts");
+    const files: Record<string, any> = { a: { version: 2, base: "b" }, b: { version: 2, base: "a" } };
+    expect(() => resolveVideo("a", (n) => files[n])).toThrow(/loop/);
   });
 });
 

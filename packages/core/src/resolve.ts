@@ -13,7 +13,7 @@ export class ParamResolver {
   overrides = new Map<string, number>();
 
   constructor(project: Project) {
-    for (const l of project.automation ?? []) this.lanes.set(l.target, normalizeLane(laneToSeconds(l, project.tempo)));
+    for (const l of project.automation ?? []) this.lanes.set(l.target, normalizeLane(laneToSeconds(l, project.grid)));
     for (const m of project.modulations ?? []) {
       const list = this.mods.get(m.target) ?? [];
       list.push(m);

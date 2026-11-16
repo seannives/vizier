@@ -4,4 +4,9 @@ out/
 *.mp4
 *.wav
 dist/
-examples/*/media
+# Song projects are yours, not vizier's: only the demo's project files are committed.
+projects/*
+!projects/demo/
+projects/demo/media/
+**/output/
+**/.cache/

@@ -1,0 +1,215 @@
+{
+  "$schema": "../../../packages/core/schema/video.schema.json",
+  "version": 2,
+  "name": "Full demo",
+  "profiles": [
+    "youtube"
+  ],
+  "seed": 1,
+  "layers": [
+    {
+      "id": "grid",
+      "name": "Dot grid",
+      "track": "mix",
+      "generator": "pulseGrid",
+      "z": 0,
+      "resolutionScale": 0.5,
+      "params": {
+        "density": 16,
+        "brightness": 0.6
+      },
+      "layout": {
+        "landscape": {
+          "x": 0.5,
+          "y": 0.5,
+          "w": 1,
+          "h": 1
+        },
+        "portrait": {
+          "x": 0.5,
+          "y": 0.5,
+          "w": 1,
+          "h": 1
+        }
+      }
+    },
+    {
+      "id": "flow",
+      "name": "Drums flow",
+      "track": "drums",
+      "generator": "flowField",
+      "z": 1,
+      "blend": "add",
+      "resolutionScale": 0.75,
+      "params": {
+        "brightness": 0.35
+      },
+      "effects": [
+        {
+          "type": "glow",
+          "params": {
+            "amount": 0.4
+          }
+        }
+      ],
+      "layout": {
+        "landscape": {
+          "x": 0.5,
+          "y": 0.5,
+          "w": 1,
+          "h": 1
+        },
+        "portrait": {
+          "x": 0.5,
+          "y": 0.5,
+          "w": 1,
+          "h": 1
+        }
+      }
+    },
+    {
+      "id": "ridge",
+      "name": "Pad ridgeline",
+      "track": "pad",
+      "generator": "ridgeline",
+      "z": 2,
+      "opacity": 0,
+      "layout": {
+        "landscape": {
+          "x": 0.5,
+          "y": 0.74,
+          "w": 1,
+          "h": 0.52
+        },
+        "portrait": {
+          "x": 0.5,
+          "y": 0.8,
+          "w": 1,
+          "h": 0.4
+        }
+      }
+    },
+    {
+      "id": "ring",
+      "name": "Bass ring",
+      "track": "bass",
+      "generator": "acidRing",
+      "z": 3,
+      "blend": "add",
+      "params": {
+        "radius": 0.9,
+        "spike": 0.2
+      },
+      "effects": [
+        {
+          "type": "trails",
+          "params": {
+            "persistence": 0.6,
+            "zoom": 1.2,
+            "rotate": 10
+          }
+        }
+      ],
+      "layout": {
+        "landscape": {
+          "x": 0.5,
+          "y": 0.47,
+          "w": 0.6,
+          "h": 1.0667
+        },
+        "portrait": {
+          "x": 0.5,
+          "y": 0.45,
+          "w": 1,
+          "h": 0.5625
+        }
+      }
+    },
+    {
+      "id": "title",
+      "name": "Title",
+      "generator": "typeText",
+      "z": 4,
+      "text": "vizier demo",
+      "params": {
+        "size": 0.6,
+        "reveal": 0
+      },
+      "layout": {
+        "landscape": {
+          "x": 0.5,
+          "y": 0.88,
+          "w": 0.8,
+          "h": 0.12
+        },
+        "portrait": {
+          "x": 0.5,
+          "y": 0.78,
+          "w": 0.9,
+          "h": 0.07
+        }
+      }
+    }
+  ],
+  "automation": [
+    {
+      "target": "title.reveal",
+      "points": [
+        {
+          "bar": 1,
+          "v": 0
+        },
+        {
+          "bar": 3,
+          "v": 1
+        }
+      ]
+    },
+    {
+      "target": "title.opacity",
+      "points": [
+        {
+          "bar": 7,
+          "v": 1,
+          "curve": "smooth"
+        },
+        {
+          "bar": 9,
+          "v": 0
+        }
+      ]
+    },
+    {
+      "target": "ring.radius",
+      "points": [
+        {
+          "bar": 9,
+          "v": 0.9,
+          "curve": "hold"
+        },
+        {
+          "bar": 25,
+          "v": 0.5,
+          "curve": "smooth"
+        },
+        {
+          "bar": 29,
+          "v": 1.1
+        }
+      ]
+    }
+  ],
+  "modulations": [
+    {
+      "target": "ridge.opacity",
+      "source": "pad.env",
+      "amount": 1.4,
+      "curve": "square"
+    },
+    {
+      "target": "title.shake",
+      "source": "drums.onset",
+      "amount": 0.6
+    }
+  ]
+}

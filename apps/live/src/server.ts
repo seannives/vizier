@@ -4,34 +4,35 @@
  * fullscreen in Chrome, with a dropped-frame HUD. Features are precomputed from the stems for now;
  * live audio input replaces them later (docs/roadmap.md).
  *
- *   pnpm live examples/the-maleficus/project.json [--profile live|live720] [--port 5173]
+ *   pnpm live projects/the-maleficus [--video youtube-full] [--profile live|live720] [--port 5173]
  *   then open http://localhost:5173 in Chrome.
  */
 import { createServer } from "node:http";
 import { parseArgs } from "node:util";
 import { readFileSync, statSync, createReadStream } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
-import { getProfile, validateProject, type Project } from "../../../packages/core/src/index.ts";
+import { getProfile, validateProject } from "../../../packages/core/src/index.ts";
+import { loadProject } from "../../offline/src/project-io.ts";
 import { loadFeatures } from "../../offline/src/audio.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { profile: { type: "string", default: "live" }, port: { type: "string", default: "5173" } },
+  options: { video: { type: "string" }, profile: { type: "string", default: "live" }, port: { type: "string", default: "5173" } },
 });
-const projectPath = resolve(positionals[0] ?? die("usage: pnpm live <project.json> [--profile live] [--port 5173]"));
-const project: Project = JSON.parse(readFileSync(projectPath, "utf8"));
+if (!positionals[0]) die("usage: pnpm live <project folder> [--video name] [--profile live] [--port 5173]");
+let lp;
+try { lp = loadProject(positionals[0], values.video); } catch (e) { die((e as Error).message); }
+const { project } = lp;
 const errs = validateProject(project);
 if (errs.length) die("Invalid project:\n  " + errs.join("\n  "));
 const profile = getProfile(values.profile!);
-const projectDir = dirname(projectPath);
-const stemPaths = Object.fromEntries(Object.entries(project.stems).map(([k, v]) => [k, resolve(projectDir, v)]));
-if (!stemPaths.main) die("The project needs a `main` stem to play.");
+const mixPath = project.tracks[project.mix]!;
 
-log(`analysing stems at ${profile.fps} fps…`);
-const features = JSON.stringify(await loadFeatures(stemPaths, profile.fps));
+log(`analysing tracks at ${profile.fps} fps…`);
+const features = JSON.stringify(await loadFeatures(project.tracks, profile.fps, join(lp.cacheDir, "features")));
 const bundle = (await build({
   entryPoints: [root + "apps/live/src/page.ts"], bundle: true, write: false, format: "iife", target: "es2022",
   tsconfig: root + "tsconfig.json", logLevel: "error",
@@ -58,7 +59,7 @@ const server = createServer((req, res) => {
   if (url === "/features.json") return send("application/json", features);
   if (url === "/font.ttf") return send("font/ttf", font);
   if (url === "/audio/main") {
-    const p = stemPaths.main!;
+    const p = mixPath;
     res.writeHead(200, { "content-type": "audio/wav", "content-length": statSync(p).size, "cache-control": "no-store" });
     return void createReadStream(p).pipe(res);
   }
