@@ -20,9 +20,9 @@ Needs Node 22+, pnpm, ffmpeg, and Google Chrome. On a Mac, follow [`docs/setup-m
 pnpm install
 pnpm test
 # put your stems next to the project: examples/<song>/media/main.wav, bass.wav, ...
-pnpm render examples/ozgun-acid/project.json --profile youtube            # whole song
-pnpm render examples/ozgun-acid/project.json --profile reels --start 60 --duration 15
-pnpm render examples/ozgun-acid/project.json --profile youtube --still 1200   # one frame as PNG
+pnpm render examples/the-maleficus/project.json --profile youtube            # whole song
+pnpm render examples/the-maleficus/project.json --profile reels --start 60 --duration 15
+pnpm render examples/the-maleficus/project.json --profile youtube --still 1200   # one frame as PNG
 ```
 
 Add `--gpu` on a Mac to render with the GPU instead of software GL.
@@ -44,7 +44,7 @@ assets/fonts        Special Elite (Apache 2.0, see LICENSE-SpecialElite.txt)
 
 ## Project files
 
-See [`examples/ozgun-acid/project.json`](examples/ozgun-acid/project.json). Positions are in bars (1-based, like Live;
+See [`examples/the-maleficus/project.json`](examples/the-maleficus/project.json). Positions are in bars (1-based, like Live;
 `33.5` = halfway through bar 33) when the project has a `tempo`, or in seconds with `t`.
 
 - `layers[]`: `generator` (`acidRing`, `pulseGrid`, `typeText`), `stem`, `z`, `blend`, `opacity`, `params`, `layout`.

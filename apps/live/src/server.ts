@@ -4,7 +4,7 @@
  * fullscreen in Chrome, with a dropped-frame HUD. Features are precomputed from the stems for now;
  * live audio input replaces them later (docs/roadmap.md).
  *
- *   pnpm live examples/ozgun-acid/project.json [--profile live|live720] [--port 5173]
+ *   pnpm live examples/the-maleficus/project.json [--profile live|live720] [--port 5173]
  *   then open http://localhost:5173 in Chrome.
  */
 import { createServer } from "node:http";

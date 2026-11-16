@@ -14,46 +14,73 @@ Rough priority within each section is top to bottom. Decisions behind items live
 - [x] Text in Special Elite: fixed text, typing reveal, shake, stutter, blur
 - [x] Mac setup guide; CI on GitHub
 - [x] Benchmark reports p99, over-budget frames and the slowest frames
-- [x] Faster export: H.264 encoded inside Chrome (WebCodecs, hardware where available), muxed by ffmpeg without re-encoding; post-render frame/duration check
+- [x] Faster export (M1 Pro: ~200 fps, full song in under a minute): H.264 encoded inside Chrome (WebCodecs, hardware where available), muxed by ffmpeg without re-encoding; post-render frame/duration check
 - [x] Live window (playback mode): renders by the audio clock at the display's refresh rate; dropped-frame HUD; bar/section navigation; A/V offset
 
-## Next
+## Phase 1: Visual variety (so the editor has something to edit)
 
-- [x] Measure the live window on the MacBook: 0 dropped frames at 60 Hz fullscreen, 1.2 ms avg / 2.9 ms p99 draw (2026-11-15)
+- [ ] Generator plugin format: each generator declares its parameters (name, label, range, default, type),
+      lives in its own folder, and registers itself. The editor builds its controls from these declarations;
+      adding a visual means adding one folder
+- [ ] Shader generators (GLSL), alongside the Canvas 2D ones
+- [ ] Two or three new generators, including at least one shader generator and one for each new stem
+      (inspiration: Book of Shapes categories such as radial, flow, noise, Truchet; the D3 gallery)
+- [ ] Per-layer effect chains as GPU passes; first two or three effects (candidates: feedback trails, glow/blur,
+      kaleidoscope, RGB-split glitch). Feedback needs a fixed pre-roll so excerpts render identically
+- [ ] Add the two new stems to the-maleficus and use them
+
+## Phase 2: Importer and project organisation (discuss requirements first)
+
+- [ ] **Open question:** where projects live. The repo should hold the code and a demo project; your own song
+      projects probably belong in a separate folder (versioned in git or not). Rename `examples/` accordingly
+- [ ] **Open question:** naming conventions for songs, projects, stems and renders, so many songs stay easy to find
+- [ ] **Open question:** how tempo and sections get in: Live export (tempo map, locators/cue points, clip names),
+      a control MIDI track, or entered in the editor
+- [ ] **Open question:** starter scene templates: needed, or scope creep?
+- [ ] Importer for Live's arrangement export (kept out of this public repo)
+- [ ] Full tempo map behind the `bar` syntax; MIDI CC lanes from a control track as automation
+
+## Phase 3: Editor MVP (replaces hand-editing project.json)
+
+- [ ] Local web app (same kind of server as the live window), saving to the project file
+- [ ] Transport: play, pause, scrub, loop a range; audio waveform; bar ruler; section markers
+- [ ] Preview canvas per output profile; layers dragged and resized like in OBS; z-order, opacity, blend
+- [ ] Layer list: add or remove layers, choose generator, stem and effects
+- [ ] Parameter panel built from the generators' declarations
+- [ ] Automation lanes on the timeline: add, move and delete breakpoints; curve types
+- [ ] Render buttons per profile (calls the existing exporter)
+- [ ] Later: record control moves (mouse or MIDI) as automation; undo history
+
+## Phase 4: Platform polish (then: Reels/Shorts and the YouTube video for the maleficus)
+
+- [ ] Named excerpts (in bars) per project, for Reels/Shorts; audio fade-in/out at excerpt ends
+- [ ] Text cards: several timed text blocks per video (explaining the project, progress, the track's motivation)
+- [ ] Safe-area guides in the editor preview for vertical formats
+- [ ] Thumbnail / cover frame export
+- [ ] Upload test: check colours of a WebCodecs export on YouTube and Instagram (Chrome writes full-range video;
+      the libx264 path writes limited range). If they shift, convert range in the browser before encoding
+- [ ] Release videos for the maleficus; repeat for the second song (in mixing)
+- [ ] **Open question:** videos for earlier songs, or new tracks only?
+
+## Later: live performance (on hold)
+
 - [ ] Test the live window on the projector (fullscreen on the projector's display, dropped frames, A/V offset)
 - [ ] Remember the A/V offset per machine/output between sessions (set to −20 ms on the MacBook speakers)
-- [ ] Upload test: check colours of a WebCodecs export on YouTube and Instagram (Chrome writes full-range video; the libx264 path writes limited range). If they shift, convert range in the browser before encoding
-- [ ] Re-render the ozgun-acid clips with the bar-based arrangement; first full-song render
-
-## Live performance
-
-- [ ] Live audio input per track group (bass, drums, synths, main). First test: several stereo BlackHole devices in Chrome at once; fallback: Node bridge reading a multichannel device, streaming features over WebSocket
-- [ ] Clock sources: MIDI clock + Song Position Pointer via IAC (Web MIDI); Ableton Link via Node bridge; tap/internal tempo; audio-only
+- [ ] Live audio input per track group (bass, drums, synths, main). First test: several stereo BlackHole devices in
+      Chrome at once; fallback: Node bridge reading a multichannel device, streaming features over WebSocket
+- [ ] Clock sources: MIDI clock + Song Position Pointer via IAC (Web MIDI); Ableton Link via Node bridge; tap/internal
+      tempo; audio-only
 - [ ] Control input: MIDI controllers / Push 3 mapped to parameters (live overrides)
 - [ ] Record a performance (control moves + events) and convert it to automation lanes for exact offline re-render
 - [ ] Scene/section state machine in the renderer, triggered by MIDI notes, keys or the score
-- [ ] Projector profile at the projector's native resolution; frame pacing checks at 60 fps
 - [ ] Works with any source audio, not just Ableton (other performers via an audio interface)
+- [ ] Decide on OBS's role (streaming/recording only, not in the concert path)
 
-## Visuals
+## Later: other ideas
 
-- [ ] Layers for drums, synths and main from their own stems
-- [ ] More generators; shader-based generators and per-layer effect chains (blur, feedback, kaleidoscope, burn, psychedelia)
-- [ ] Choral-breakdown scene for ozgun-acid
+- [ ] Choral-breakdown scene for the maleficus
 - [ ] Live typing from the keyboard (recorded as events for replay)
 - [ ] SVG layers (D3/SVG rendered to a texture)
 - [ ] Camera layers: laptop camera and iPhone (Continuity Camera), with effects
-- [ ] Safe-area guides drawn in preview for vertical formats
-
-## Authoring and data
-
-- [ ] Import arrangement from Live (tempo map, cue points, clips, control-track MIDI) into project files; importer kept out of this public repo
-- [ ] Full tempo map behind the `bar` syntax (tempo changes)
-- [ ] Import MIDI CC lanes from a control track as automation
-- [ ] Editor UI: layer layout (drag/resize like OBS), parameter controls, automation lane editing
 - [ ] Project file schema validation with clear error messages
-
-## Infrastructure
-
 - [ ] Golden-image tests per machine (pixels differ between software GL and the Mac GPU)
-- [ ] Decide on OBS's role (streaming/recording only, not in the concert path)

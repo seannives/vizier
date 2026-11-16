@@ -54,17 +54,17 @@ Each example project reads its audio from a `media` folder next to its `project.
 these folders, so audio is never pushed to GitHub.
 
 ```sh
-mkdir -p examples/ozgun-acid/media
-open examples/ozgun-acid/media
+mkdir -p examples/the-maleficus/media
+open examples/the-maleficus/media
 ```
 
 Copy your exported WAVs into the folder and name them as the project's `stems` section expects
-(for `ozgun-acid`: the full mix as `main.wav`, the bass stem as `bass.wav`).
+(for `the-maleficus`: the full mix as `main.wav`, the bass stem as `bass.wav`).
 
 ## 5. Render one frame
 
 ```sh
-pnpm render examples/ozgun-acid/project.json --profile youtube --still 4830 --gpu --out out/test.png
+pnpm render examples/the-maleficus/project.json --profile youtube --still 4830 --gpu --out out/test.png
 open out/test.png
 ```
 
@@ -75,11 +75,11 @@ analyses the audio; the results are cached in `.cache/`.
 
 ```sh
 # a 30-second excerpt
-pnpm render examples/ozgun-acid/project.json --profile youtube --start 130 --duration 30 --gpu
+pnpm render examples/the-maleficus/project.json --profile youtube --start 130 --duration 30 --gpu
 # the whole song
-pnpm render examples/ozgun-acid/project.json --profile youtube --gpu
+pnpm render examples/the-maleficus/project.json --profile youtube --gpu
 # vertical, first minute
-pnpm render examples/ozgun-acid/project.json --profile reels --duration 60 --gpu
+pnpm render examples/the-maleficus/project.json --profile reels --duration 60 --gpu
 ```
 
 Videos go in `out/` (`open out` shows them in Finder). By default the video is encoded inside Chrome
@@ -98,7 +98,7 @@ Video export is slower than live playback, because every frame is copied out of 
 `--bench` measures only the drawing, which is what live playback costs:
 
 ```sh
-pnpm render examples/ozgun-acid/project.json --profile youtube --start 165 --bench 300 --gpu
+pnpm render examples/the-maleficus/project.json --profile youtube --start 165 --bench 300 --gpu
 ```
 
 It reports milliseconds per frame (average, 95th percentile, worst), how much of the frame budget that uses at
@@ -112,7 +112,7 @@ Plays the song and renders the visuals in time with it, in a Chrome tab, with a 
 frame pacing. Audio plays through your Mac's current output device.
 
 ```sh
-pnpm live examples/ozgun-acid/project.json
+pnpm live examples/the-maleficus/project.json
 ```
 
 When it prints `ready`, open http://localhost:5173 in Chrome and click the page. Keys:

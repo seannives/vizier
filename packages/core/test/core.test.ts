@@ -41,7 +41,7 @@ describe("parameter stack", () => {
 
 describe("project", () => {
   it("validates the example project", () => {
-    const p = JSON.parse(readFileSync(new URL("../../../examples/ozgun-acid/project.json", import.meta.url), "utf8"));
+    const p = JSON.parse(readFileSync(new URL("../../../examples/the-maleficus/project.json", import.meta.url), "utf8"));
     expect(validateProject(p)).toEqual([]);
   });
   it("catches references to unknown layers and stems", () => {

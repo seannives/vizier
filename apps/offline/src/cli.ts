@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Offline driver: project + stems → MP4.
- *   pnpm render examples/ozgun-acid/project.json --profile youtube [--start 60 --duration 20] [--out out/x.mp4]
+ *   pnpm render examples/the-maleficus/project.json --profile youtube [--start 60 --duration 20] [--out out/x.mp4]
  *   pnpm render <project> --profile reels --still 1800 --out out/frame.png
  */
 import { parseArgs } from "node:util";
