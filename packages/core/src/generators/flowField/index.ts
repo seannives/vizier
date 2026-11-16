@@ -6,6 +6,10 @@ export default defineGenerator({
   label: "Flow field",
   description: "Flowing contour lines of animated noise (GPU). Hits distort and brighten the flow; hats thicken lines.",
   kind: "shader",
+  colors: [
+    { name: "line", label: "Lines", default: "ink" },
+    { name: "highlight", label: "Highlight", default: "accent" },
+  ],
   params: [
     { name: "scale", label: "Scale", min: 0.5, max: 8, default: 2.5 },
     { name: "speed", label: "Drift speed", min: 0, max: 2, default: 0.2 },
@@ -14,7 +18,7 @@ export default defineGenerator({
     { name: "thickness", label: "Line thickness", min: 0.01, max: 0.5, default: 0.08 },
     { name: "brightness", label: "Brightness", min: 0, max: 3, default: 1 },
     { name: "kick", label: "Hit response", min: 0, max: 3, default: 1 },
-    { name: "acid", label: "Acid colour", min: 0, max: 1, default: 0.3 },
+    { name: "acid", label: "Highlight amount", min: 0, max: 1, default: 0.3 },
   ],
   fragment: /* glsl */ `
     vec2 p = vec2((uv.x - 0.5) * u_aspect, uv.y - 0.5) * u_scale;
@@ -25,7 +29,7 @@ export default defineGenerator({
     float w = u_thickness * (0.6 + 0.8 * u_high);
     float line = 1.0 - smoothstep(w * 0.5, w, d);
     float a = line * clamp((0.12 + 0.9 * u_env + 0.9 * u_kick * u_hit) * u_brightness, 0.0, 1.0);
-    vec3 col = mix(u_inkColor, u_acidColor, clamp(u_acid * (0.5 + u_centroid), 0.0, 1.0));
+    vec3 col = mix(u_line, u_highlight, clamp(u_acid * (0.5 + u_centroid), 0.0, 1.0));
     return vec4(col * a, a);
   `,
 });

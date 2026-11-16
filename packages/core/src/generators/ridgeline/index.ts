@@ -1,7 +1,7 @@
 import { line, area, curveBasis } from "d3-shape";
 import { scaleLinear } from "d3-scale";
 import { defineGenerator } from "../../plugins.ts";
-import { mix, ink, acid, bg } from "../color.ts";
+import { mix, rgba } from "../color.ts";
 
 /**
  * Ridgeline ("Joy Division") of the stem's recent spectra: the newest at the front, older ones receding upward.
@@ -12,6 +12,11 @@ export default defineGenerator({
   label: "Ridgeline",
   description: "Stacked spectrum lines over time, newest at the front, older ones receding into the distance.",
   kind: "canvas2d",
+  colors: [
+    { name: "line", label: "Lines", default: "ink" },
+    { name: "highlight", label: "Highlight (bright vocals)", default: "accent" },
+    { name: "fill", label: "Fill under ridges", default: "bg" },
+  ],
   params: [
     { name: "rows", label: "Rows", type: "int", min: 4, max: 80, default: 36 },
     { name: "spacing", label: "Frames between rows", type: "int", min: 1, max: 8, default: 2 },
@@ -20,7 +25,7 @@ export default defineGenerator({
     { name: "depth", label: "Perspective", min: 0, max: 0.9, default: 0.55 },
     { name: "lineWidth", label: "Line width", min: 0.5, max: 6, default: 1.5 },
     { name: "fill", label: "Hide lines behind", type: "toggle", min: 0, max: 1, default: 1 },
-    { name: "acid", label: "Acid colour", min: 0, max: 2, default: 0 },
+    { name: "acid", label: "Highlight amount", min: 0, max: 2, default: 0 },
   ],
   draw(g) {
     const { ctx, w, h } = g;
@@ -32,6 +37,7 @@ export default defineGenerator({
     const amp = g.p("height") * rowGap * 12;
     const floor = Math.min(0.95, Math.max(0, g.p("floor")));
     const lw = g.p("lineWidth") * (Math.min(w, h) / 1080);
+    const lineC = g.color("line"), hiC = g.color("highlight"), fillC = rgba(g.color("fill"));
     for (let r = rows - 1; r >= 0; r--) { // back (oldest) to front (newest)
       const ago = r * spacing;
       const spec = g.spectrum(ago);
@@ -50,13 +56,13 @@ export default defineGenerator({
       if (fill) {
         ctx.beginPath();
         area<[number, number]>().x((d) => d[0]).y0(base + 2).y1((d) => d[1]).curve(curveBasis).context(ctx)(edge);
-        ctx.fillStyle = bg(g.palette);
+        ctx.fillStyle = fillC;
         ctx.fill();
       }
       ctx.beginPath();
       line<[number, number]>().x((d) => d[0]).y((d) => d[1]).curve(curveBasis).context(ctx)(edge);
       const fade = 0.15 + 0.85 * Math.pow(1 - u, 1.5);
-      ctx.strokeStyle = mix(ink(g.palette), acid(g.palette), g.p("acid") * g.f("centroid", ago), fade);
+      ctx.strokeStyle = mix(lineC, hiC, g.p("acid") * g.f("centroid", ago), fade);
       ctx.lineWidth = lw * (r === 0 ? 1.6 : 1);
       ctx.stroke();
     }

@@ -119,7 +119,8 @@ describe("videos building on other videos", () => {
         modulations: [{ target: "ring.radius", source: "bass.env", remove: true }] },
     };
     const v = resolveVideo("reel", (n) => files[n]);
-    expect(v.profiles).toEqual(["reels"]);
+    expect(v.format).toBe("reels"); // old "profiles" lists become one format
+    expect(v.profiles).toBeUndefined();
     expect(v.seed).toBe(3);
     expect(v.range).toEqual({ from: 9, to: 17 });
     const ring = v.layers!.find((l) => l.id === "ring")!;

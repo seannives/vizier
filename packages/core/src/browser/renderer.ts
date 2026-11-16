@@ -1,11 +1,12 @@
 import type { FeatureTrack } from "@vizier/features";
 import { getProfile, type OutputProfile } from "../profiles.ts";
-import { layoutFor, type BlendMode, type LayerDef, type Project } from "../project.ts";
+import { layoutFor, normalizePalette, type BlendMode, type LayerDef, type Project } from "../project.ts";
 import { ParamResolver } from "../resolve.ts";
 import { frameRng } from "../rng.ts";
 import { GENERATORS } from "../generators/index.ts";
 import { EFFECTS } from "../effects/index.ts";
-import { defaults, type DrawContext, type EffectDef, type Generator, type ParamSpec } from "../plugins.ts";
+import { defaults, PALETTE_SLOTS, PALETTE_ALIASES, type DrawContext, type EffectDef, type Generator, type ParamSpec } from "../plugins.ts";
+import { parseHex, shiftColor } from "../color.ts";
 
 // Composite: draws a layer texture as a transformed quad on the output.
 const VS_QUAD = `#version 300 es
@@ -54,7 +55,8 @@ precision highp float; in vec2 uv; out vec4 o;
 uniform vec2 u_res; uniform float u_aspect, u_time, u_frame, u_seed;
 ${FEATURE_UNIFORMS.map((f) => `uniform float u_${f};`).join(" ")}
 uniform sampler2D u_specHist;
-uniform vec3 u_inkColor, u_acidColor, u_bgColor;
+${PALETTE_SLOTS.map((s) => `uniform vec3 u_pal_${s.id};`).join(" ")}
+${(g.colors ?? []).map((c) => `uniform vec3 u_${c.name};`).join(" ")}
 ${uniformDecl(g.params)}
 ${GLSL_LIB}
 float spec(float bin, float ago){ return texture(u_specHist, vec2(bin, ago)).r; }
@@ -255,9 +257,18 @@ export class Renderer {
     const i = this.index(stem, frame);
     return tr.spectrum.slice(i * tr.bins, (i + 1) * tr.bins);
   }
-  private color(hex: string | undefined, fallback: string): [number, number, number] {
-    const n = parseInt((hex ?? fallback).replace("#", ""), 16);
-    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+  /** The palette at time t: song/video palette, with palette lanes applied. */
+  private paletteAt(t: number): Record<string, string> {
+    const base = normalizePalette(this.project.palette);
+    return Object.fromEntries(PALETTE_SLOTS.map((s) => [s.id, this.resolver.color(`palette.${s.id}`, base[s.id]!, t)]));
+  }
+  /** A layer's colour at time t: its lane, else its own colour or palette slot, then hue shift and lightness. */
+  private layerColor(L: LayerState, name: string, palette: Record<string, string>, t: number, hue: number, light: number): string {
+    const spec = L.gen.colors?.find((c) => c.name === name);
+    const own = L.def.colors?.[name];
+    const slot = own && !own.startsWith("#") ? PALETTE_ALIASES[own] ?? own : spec?.default ?? "ink";
+    const base = own?.startsWith("#") ? own : palette[slot] ?? "#ffffff";
+    return shiftColor(this.resolver.color(`${L.def.id}.${name}`, base, t), hue, light);
   }
 
   /** Render the moment `t` seconds into the song (live: driven by the audio clock, any display refresh rate). */
@@ -283,7 +294,8 @@ export class Renderer {
     const { width, height, fps } = this.profile;
     const t = frame / fps;
     const lookup = (stem: string, feat: string) => this.feature(stem, feat, frame);
-    const [ink, acid, bg] = [this.color(this.project.palette.ink, "#FCFCFB"), this.color(this.project.palette.acid, "#B6FF3B"), this.color(this.project.palette.bg, "#2B2420")];
+    const palette = this.paletteAt(t);
+    const bg = parseHex(palette.bg!);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     const finals: (WebGLTexture | null)[] = [];
     this.layers.forEach((L, idx) => {
@@ -295,6 +307,13 @@ export class Renderer {
       if (opacity <= 0.001 && !L.effects.some((e) => e.fb)) { finals.push(null); return; }
       const t0 = this.timing ? performance.now() : 0;
       const stem = L.def.track ?? this.project.mix;
+      const hue = pv("hueShift"), light = pv("lightness");
+      const colorCache = new Map<string, string>();
+      const colorOf = (name: string) => {
+        let c = colorCache.get(name);
+        if (!c) { c = this.layerColor(L, name, palette, t, hue, light); colorCache.set(name, c); }
+        return c;
+      };
       // 1. the generator draws the layer's source image
       let src: WebGLTexture;
       if (L.gen.kind === "canvas2d") {
@@ -303,10 +322,11 @@ export class Renderer {
         const g: DrawContext = {
           ctx, w: L.w, h: L.h, t, frame, fps,
           p: (name) => pv(name),
+          color: colorOf,
           f: (name, ago = 0, s = stem) => this.feature(s, name, frame - ago),
           spectrum: (ago = 0, s = stem) => this.spectrum(s, frame - ago),
           rng: frameRng(this.project.seed, Math.floor(frame), idx + 1),
-          palette: this.project.palette, text: L.def.text ?? "", font: this.font,
+          palette, text: L.def.text ?? "", font: this.font,
         };
         L.gen.draw(g);
         gl.bindTexture(gl.TEXTURE_2D, L.srcTex!);
@@ -334,7 +354,8 @@ export class Renderer {
         gl.uniform1f(u("u_seed"), this.project.seed);
         for (const f of FEATURE_UNIFORMS) gl.uniform1f(u(`u_${f}`), this.feature(stem, f, frame));
         gl.uniform1i(u("u_specHist"), 1);
-        gl.uniform3f(u("u_inkColor"), ...ink); gl.uniform3f(u("u_acidColor"), ...acid); gl.uniform3f(u("u_bgColor"), ...bg);
+        for (const s of PALETTE_SLOTS) gl.uniform3f(u(`u_pal_${s.id}`), ...parseHex(palette[s.id]!));
+        for (const c of L.gen.colors ?? []) gl.uniform3f(u(`u_${c.name}`), ...parseHex(colorOf(c.name)));
         for (const s of L.gen.params) gl.uniform1f(u(`u_${s.name}`), pv(s.name));
         gl.bindFramebuffer(gl.FRAMEBUFFER, L.src!.fbo);
         gl.viewport(0, 0, L.w, L.h);

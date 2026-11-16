@@ -4,50 +4,178 @@
   "title": "vizier video",
   "description": "projects/<id>/videos/<name>.json: one video of a song. With `base`, it builds on another video.",
   "type": "object",
-  "required": ["version"],
+  "required": [
+    "version"
+  ],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string" },
-    "version": { "const": 2 },
-    "name": { "type": "string" },
-    "base": { "type": "string", "description": "Another video in this project to build on" },
-    "profiles": { "type": "array", "items": { "type": "string" }, "description": "Output formats; the first is the default" },
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "const": 2
+    },
+    "name": {
+      "type": "string"
+    },
+    "base": {
+      "type": "string",
+      "description": "Another video in this project to build on"
+    },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Deprecated: use format"
+    },
     "range": {
-      "type": "object", "additionalProperties": false,
-      "properties": { "from": { "type": "number" }, "to": { "type": "number" } },
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "from": {
+          "type": "number"
+        },
+        "to": {
+          "type": "number"
+        }
+      },
       "description": "Bars; `to` is where the video ends (exclusive)"
     },
-    "seed": { "type": "integer" },
-    "palette": { "type": "object", "additionalProperties": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$" } },
+    "seed": {
+      "type": "integer"
+    },
+    "palette": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Five colour slots; `acid` is the older name for `accent`",
+      "properties": {
+        "bg": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "ink": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "accent": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "extra1": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "extra2": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        },
+        "acid": {
+          "type": "string",
+          "pattern": "^#[0-9A-Fa-f]{6}$"
+        }
+      }
+    },
     "layers": {
       "type": "array",
       "items": {
-        "type": "object", "required": ["id"], "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false,
         "properties": {
-          "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$" },
-          "name": { "type": "string" },
-          "remove": { "type": "boolean", "description": "Drop this layer inherited from the base" },
-          "track": { "type": "string" },
-          "generator": { "type": "string" },
-          "z": { "type": "number" },
-          "opacity": { "type": "number" },
-          "blend": { "enum": ["normal", "add", "screen", "multiply"] },
-          "resolutionScale": { "type": "number", "exclusiveMinimum": 0, "maximum": 2 },
-          "params": { "type": "object", "additionalProperties": { "type": "number" } },
-          "text": { "type": "string" },
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]*$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "remove": {
+            "type": "boolean",
+            "description": "Drop this layer inherited from the base"
+          },
+          "track": {
+            "type": "string"
+          },
+          "generator": {
+            "type": "string"
+          },
+          "z": {
+            "type": "number"
+          },
+          "opacity": {
+            "type": "number"
+          },
+          "blend": {
+            "enum": [
+              "normal",
+              "add",
+              "screen",
+              "multiply"
+            ]
+          },
+          "resolutionScale": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "maximum": 2
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "number"
+            }
+          },
+          "text": {
+            "type": "string"
+          },
           "effects": {
             "type": "array",
             "items": {
-              "type": "object", "required": ["type"], "additionalProperties": false,
+              "type": "object",
+              "required": [
+                "type"
+              ],
+              "additionalProperties": false,
               "properties": {
-                "type": { "type": "string" }, "id": { "type": "string" },
-                "params": { "type": "object", "additionalProperties": { "type": "number" } }
+                "type": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "params": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "number"
+                  }
+                }
               }
             }
           },
           "layout": {
-            "type": "object", "additionalProperties": false,
-            "properties": { "landscape": { "$ref": "#/definitions/transform" }, "portrait": { "$ref": "#/definitions/transform" }, "feed": { "$ref": "#/definitions/transform" } }
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "landscape": {
+                "$ref": "#/definitions/transform"
+              },
+              "portrait": {
+                "$ref": "#/definitions/transform"
+              },
+              "feed": {
+                "$ref": "#/definitions/transform"
+              }
+            }
+          },
+          "colors": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "pattern": "^(#[0-9A-Fa-f]{6}|bg|ink|accent|extra1|extra2|acid)$"
+            },
+            "description": "Generator colour \u2192 #rrggbb or a palette slot"
           }
         }
       }
@@ -55,17 +183,57 @@
     "automation": {
       "type": "array",
       "items": {
-        "type": "object", "required": ["target", "points"], "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target",
+          "points"
+        ],
+        "additionalProperties": false,
         "properties": {
-          "target": { "type": "string" },
+          "target": {
+            "type": "string"
+          },
           "points": {
             "type": "array",
             "items": {
-              "type": "object", "required": ["v"], "additionalProperties": false,
+              "type": "object",
+              "required": [],
+              "additionalProperties": false,
               "properties": {
-                "bar": { "type": "number" }, "t": { "type": "number" }, "v": { "type": "number" },
-                "curve": { "enum": ["linear", "hold", "smooth"] }
-              }
+                "bar": {
+                  "type": "number"
+                },
+                "t": {
+                  "type": "number"
+                },
+                "v": {
+                  "type": "number"
+                },
+                "curve": {
+                  "enum": [
+                    "linear",
+                    "hold",
+                    "smooth"
+                  ]
+                },
+                "c": {
+                  "type": "string",
+                  "pattern": "^#[0-9A-Fa-f]{6}$",
+                  "description": "Colour lanes: a colour instead of v"
+                }
+              },
+              "oneOf": [
+                {
+                  "required": [
+                    "v"
+                  ]
+                },
+                {
+                  "required": [
+                    "c"
+                  ]
+                }
+              ]
             }
           }
         }
@@ -74,18 +242,67 @@
     "modulations": {
       "type": "array",
       "items": {
-        "type": "object", "required": ["target", "source"], "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "target",
+          "source"
+        ],
+        "additionalProperties": false,
         "properties": {
-          "target": { "type": "string" }, "source": { "type": "string" },
-          "amount": { "type": "number" }, "curve": { "enum": ["linear", "square", "sqrt"] }, "remove": { "type": "boolean" }
+          "target": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "amount": {
+            "type": "number"
+          },
+          "curve": {
+            "enum": [
+              "linear",
+              "square",
+              "sqrt"
+            ]
+          },
+          "remove": {
+            "type": "boolean"
+          }
         }
       }
+    },
+    "format": {
+      "type": "string",
+      "description": "Output format: youtube, youtube60, youtube4k, shorts, reels, igfeed, draft"
     }
   },
   "definitions": {
     "transform": {
-      "type": "object", "required": ["x", "y", "w", "h"], "additionalProperties": false,
-      "properties": { "x": { "type": "number" }, "y": { "type": "number" }, "w": { "type": "number" }, "h": { "type": "number" }, "rotation": { "type": "number" } }
+      "type": "object",
+      "required": [
+        "x",
+        "y",
+        "w",
+        "h"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "w": {
+          "type": "number"
+        },
+        "h": {
+          "type": "number"
+        },
+        "rotation": {
+          "type": "number"
+        }
+      }
     }
   }
 }

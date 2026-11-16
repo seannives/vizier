@@ -32,7 +32,7 @@ Keep `media/`, `output/` and `.cache/` out of it.
   ],
   "grid": { "tempo": [{ "bar": 1, "bpm": 128, "beatsPerBar": 4 }], "downbeat": 0.75 },
   "sections": [{ "bar": 1, "name": "intro" }, { "bar": 9, "name": "groove" }, { "bar": 25, "name": "break" }],
-  "palette": { "bg": "#2B2420", "ink": "#FCFCFB", "acid": "#B6FF3B" }
+  "palette": { "bg": "#2B2420", "ink": "#FCFCFB", "accent": "#B6FF3B", "extra1": "#E0533A", "extra2": "#5B8CFF" }
 }
 ```
 
@@ -45,6 +45,8 @@ Keep `media/`, `output/` and `.cache/` out of it.
   `barLabelOffset` (optional) only changes how bars are displayed, e.g. 16 to match a Live arrangement where the
   music starts at bar 17.
 - Bars are 1-based and fractional: `33` is the first beat of bar 33, `33.5` halfway through it.
+- **Palette**: five colour slots: `bg` (background), `ink`, `accent`, `extra1`, `extra2`. Every layer's colours
+  follow these unless the layer sets its own (see [Colour](#colour)). A video can override slots.
 
 ## videos/*.json
 
@@ -53,7 +55,7 @@ Keep `media/`, `output/` and `.cache/` out of it.
   "version": 2,
   "name": "Reel: the break",
   "base": "full",
-  "profiles": ["reels", "shorts"],
+  "format": "reels",
   "range": { "from": 21, "to": 31 },
   "layers": [
     { "id": "caption", "generator": "typeText", "z": 5, "text": "the break",
@@ -63,14 +65,32 @@ Keep `media/`, `output/` and `.cache/` out of it.
 }
 ```
 
-- `profiles`: output formats (`youtube`, `youtube60`, `youtube4k`, `shorts`, `reels`, `igfeed`, `draft`); the first
-  is the default for `pnpm render`.
+- `format`: the output format: `youtube`, `youtube60`, `youtube4k`, `shorts`, `reels`, `igfeed` or `draft`.
+  One per video: a Reel and a Short are two videos (one can build on the other).
 - `range`: bars, where `to` is exclusive (21–31 = bars 21 to 30). Leave it out for the whole song.
 - `layers`: each has an `id`, an optional `name`, a `generator`, the `track` it listens to (default: the mix),
-  `z`, `blend`, `opacity`, `params`, `effects`, `text` and a `layout` per shape (`landscape`, `portrait`, `feed`).
+  `z`, `blend`, `opacity`, `params`, `colors`, `effects`, `text` and a `layout` per shape (`landscape`, `portrait`,
+  `feed`).
 - `automation`: lanes of breakpoints in bars (or seconds with `t`); targets are `<layer>.<param>`,
   `<layer>.<effect>.<param>` or `post.<param>`. Curves: `linear`, `hold`, `smooth`.
 - `modulations`: audio driving a parameter: `{ "target": "chorus.opacity", "source": "chorus.env", "amount": 1.4 }`.
+
+### Colour
+
+Each generator declares the colours it draws with, and each defaults to a palette slot: the acid ring has `line`
+(ink) and `highlight` (accent); the ridgeline `line`, `highlight` and `fill` (bg); the flow field `line` and
+`highlight`; the dot grid `dots`; text `text`.
+
+- **Follow the palette** (default), or point a colour at another slot or give it its own colour:
+  `"colors": { "highlight": "extra2", "line": "#FFD27A" }`.
+- **Colour lanes** automate colours. Their points hold a colour `c` instead of a number, and blend in OKLCH, so
+  fades keep their brightness and vividness instead of going muddy:
+  `{ "target": "palette.accent", "points": [{ "bar": 24, "c": "#B6FF3B", "curve": "smooth" }, { "bar": 25, "c": "#FF3B8A" }] }`.
+  Targets: `palette.<slot>` (changes every layer that follows that slot) or `<layer>.<colour>` (one layer).
+- **Hue shift and lightness**: every layer has `hueShift` (degrees) and `lightness` (−1 black … +1 white), applied to
+  all its colours. Automate them, or let audio drive them:
+  `{ "target": "ring.hueShift", "source": "bass.centroid", "amount": 60 }` swings the ring's colours as the
+  filter opens.
 
 ### Building on another video (`base`)
 
@@ -96,6 +116,7 @@ pnpm render projects/demo --video full --keep --gpu                # keep: adds 
 pnpm live   projects/demo --video full
 pnpm validate projects/demo
 pnpm analyze  projects/demo              # or a folder of stems with no song.json yet
+pnpm upgrade  projects/demo              # update old names in a project's files (e.g. "profiles" → "format")
 ```
 
 `--video` can be left out when a project has only one video.

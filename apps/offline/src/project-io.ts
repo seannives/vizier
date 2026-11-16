@@ -2,7 +2,7 @@
 import { readFileSync, readdirSync, existsSync, statSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import {
-  buildProject, resolveVideo, validateSong, validateProject,
+  buildProject, resolveVideo, validateSong, validateProject, fileWarnings,
   type Project, type SongFile, type VideoFile,
 } from "../../../packages/core/src/index.ts";
 
@@ -56,6 +56,12 @@ export function loadProject(path: string, videoName?: string): LoadedProject {
   const video = resolveVideo(name, (n) => loadVideoFile(dir, n));
   const project = buildProject(song, video, (t) => resolve(dir, t.file));
   return { dir, id: basename(dir), song, videoName: name, video, project, cacheDir: join(dir, ".cache"), outputDir: join(dir, "output") };
+}
+
+/** Old names in a project's files that still work but should be updated. */
+export function projectWarnings(path: string): string[] {
+  const dir = projectDir(path);
+  return fileWarnings(loadSong(dir), Object.fromEntries(listVideos(dir).map((v) => [v, loadVideoFile(dir, v)])));
 }
 
 /** All problems with a project folder: the song, and every video (resolved). */

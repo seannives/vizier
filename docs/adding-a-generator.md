@@ -19,6 +19,18 @@ params: [
 ]
 ```
 
+Colours are declared separately, each defaulting to a palette slot (`bg`, `ink`, `accent`, `extra1`, `extra2`):
+
+```ts
+colors: [
+  { name: "line", label: "Line", default: "ink" },
+  { name: "highlight", label: "Highlight", default: "accent" },
+]
+```
+
+A layer can point a colour at another slot or give it its own; colours can be automated with colour lanes, and
+every layer's `hueShift` and `lightness` apply to all of them. Draw with the resolved colour, never a fixed one.
+
 `min`/`max` are the range the editor offers; audio modulation can push a value beyond it, so clamp inside the
 generator if a value must stay in range. A parameter can be automated as `<layer>.<name>`.
 
@@ -29,11 +41,12 @@ generator if a value must stay in range. A parameter can be automated as `<layer
 | | |
 |---|---|
 | `g.p("name")` | the parameter's current value (base → automation → modulation → live override) |
+| `g.color("line")` | a declared colour, `#rrggbb`, with automation, hue shift and lightness applied |
 | `g.f("env", framesAgo?, track?)` | a feature of the layer's track: `rms env low lowMid mid high centroid flux onset hit` |
 | `g.spectrum(framesAgo?, track?)` | 32 log-spaced bands, 0–1 |
 | `g.t`, `g.frame`, `g.fps` | time in seconds, frame number, frame rate |
 | `g.rng()` | seeded random numbers: never use `Math.random()` |
-| `g.palette`, `g.text`, `g.font` | project colours (`bg`, `ink`, `acid`), the layer's text, the font |
+| `g.text`, `g.font` | the layer's text, the font (`g.palette` has the palette, but prefer declared colours) |
 
 Look back with `framesAgo` rather than keeping state between frames: a frame must be drawable on its own.
 
@@ -42,7 +55,7 @@ Look back with `framesAgo` rather than keeping state between frames: a frame mus
 `fragment` is the body of `vec4 generate(vec2 uv)`, returning premultiplied RGBA. See `flowField`.
 `uv` runs 0–1 with y up. Available: `u_res`, `u_aspect`, `u_time`, `u_frame`, `u_seed`; the layer's track's features
 `u_rms u_env u_low u_lowMid u_mid u_high u_centroid u_flux u_onset u_hit`; `spec(bin01, framesAgo01)`
-for the last 64 frames of spectrum; colours `u_inkColor u_acidColor u_bgColor`; each parameter as
+for the last 64 frames of spectrum; each declared colour as `vec3 u_<name>`; the palette as `u_pal_<slot>`; each parameter as
 `u_<name>`; helpers `hash21`, `noise`, `fbm`.
 
 ## An effect

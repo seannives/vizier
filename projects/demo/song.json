@@ -57,6 +57,8 @@
   "palette": {
     "bg": "#2B2420",
     "ink": "#FCFCFB",
-    "acid": "#B6FF3B"
+    "accent": "#B6FF3B",
+    "extra1": "#E0533A",
+    "extra2": "#5B8CFF"
   }
 }

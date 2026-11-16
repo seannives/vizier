@@ -6,6 +6,22 @@
 
 export type ParamType = "number" | "int" | "toggle";
 
+/** The palette: five colour slots per song (a video can override them). Colours default to these. */
+export const PALETTE_SLOTS = [
+  { id: "bg", label: "Background", default: "#2B2420" },
+  { id: "ink", label: "Ink", default: "#FCFCFB" },
+  { id: "accent", label: "Accent", default: "#B6FF3B" },
+  { id: "extra1", label: "Extra 1", default: "#E0533A" },
+  { id: "extra2", label: "Extra 2", default: "#5B8CFF" },
+] as const;
+export type PaletteSlot = (typeof PALETTE_SLOTS)[number]["id"];
+export const isPaletteSlot = (s: string): s is PaletteSlot => PALETTE_SLOTS.some((x) => x.id === s);
+/** Older project files used "acid" for the accent colour. */
+export const PALETTE_ALIASES: Record<string, PaletteSlot> = { acid: "accent" };
+
+/** A colour a generator draws with. It follows a palette slot unless the layer sets its own colour. */
+export interface ColorSpec { name: string; label: string; default: PaletteSlot }
+
 export interface ParamSpec {
   name: string;          // used in automation targets: "<layer>.<name>" or "<layer>.<effect>.<name>"
   label: string;
@@ -23,10 +39,13 @@ export interface DrawContext {
   t: number; frame: number; fps: number;
   /** Resolved parameter value (base → automation → modulation → override). */
   p(name: string): number;
+  /** One of the generator's declared colours, as "#rrggbb" (palette or layer colour, automated, hue/lightness applied). */
+  color(name: string): string;
   /** Scalar feature of this layer's stem (or another stem), optionally from k frames ago. */
   f(feature: string, framesAgo?: number, stem?: string): number;
   spectrum(framesAgo?: number, stem?: string): number[];
   rng: () => number;
+  /** The palette at this moment (slot → "#rrggbb"). Prefer declared colours via `color()`. */
   palette: Record<string, string>;
   text: string;
   font: string;
@@ -37,6 +56,7 @@ interface PluginBase {
   label: string;
   description: string;
   params: ParamSpec[];
+  colors?: ColorSpec[];
 }
 
 export interface Canvas2DGenerator extends PluginBase {
@@ -50,7 +70,8 @@ export interface Canvas2DGenerator extends PluginBase {
  * Available: uv (0..1, y up), u_res (layer pixels), u_aspect, u_time, u_frame, u_seed;
  * features of the layer's stem: u_rms u_env u_low u_lowMid u_mid u_high u_centroid u_flux u_onset,
  * u_hit (onset envelope that decays over ~0.3 s), spec(bin01, framesAgo01) (spectrum history, 64 frames);
- * palette u_inkColor u_acidColor u_bgColor; each parameter as u_<name>; helpers hash21, noise, fbm.
+ * each declared colour as vec3 u_<name>; the palette as u_pal_<slot>; each parameter as u_<name>;
+ * helpers hash21, noise, fbm.
  */
 export interface ShaderGenerator extends PluginBase {
   kind: "shader";
@@ -80,6 +101,8 @@ export const LAYER_PARAMS: ParamSpec[] = [
   { name: "w", label: "Width", min: 0, max: 2, default: 1 },
   { name: "h", label: "Height", min: 0, max: 2, default: 1 },
   { name: "rotation", label: "Rotation (degrees)", min: -180, max: 180, default: 0 },
+  { name: "hueShift", label: "Hue shift (degrees)", min: -180, max: 180, default: 0, description: "Rotates all of the layer's colours" },
+  { name: "lightness", label: "Lightness", min: -1, max: 1, default: 0, description: "−1 black … 0 as is … +1 white, for all of the layer's colours" },
 ];
 
 /** Global post-processing parameters, automatable as "post.<name>". */

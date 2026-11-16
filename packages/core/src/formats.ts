@@ -36,7 +36,9 @@ export interface VideoFile {
   version: 2;
   name?: string;
   base?: string;                  // another video in the same project to build on
-  profiles?: string[];            // output formats; the first is the default
+  format?: string;                // output format (profile id): youtube, shorts, reels, igfeed, …
+  /** @deprecated older files: a list of formats; the first is used. Use `format`. */
+  profiles?: string[];
   range?: { from?: number; to?: number }; // bars; `to` is where it ends (exclusive): 17–49 = bars 17..48
   seed?: number;
   palette?: Record<string, string>; // overrides the song's
@@ -50,6 +52,7 @@ const isObj = (x: unknown): x is Record<string, unknown> => typeof x === "object
 /** Merge `child` over `base` (both already resolved). Arrays of layers/lanes/modulations merge by key. */
 export function mergeVideos(base: VideoFile, child: VideoFile): VideoFile {
   const out: VideoFile = { ...base, ...child, base: undefined };
+  if (child.format || child.profiles) { out.format = child.format ?? child.profiles?.[0]; delete out.profiles; }
   // layers by id: deep-merge params and layout; effects replace; `remove` drops
   const layers = new Map<string, VideoLayer>((base.layers ?? []).map((l) => [l.id, l]));
   for (const l of child.layers ?? []) {
@@ -102,6 +105,20 @@ export function buildProject(song: SongFile, video: VideoFile, trackPath: (t: Tr
     automation: video.automation ?? [],
     modulations: (video.modulations ?? []).filter((m) => !m.remove),
   };
+}
+
+/** The video's output format (accepts the older `profiles` list). */
+export const videoFormat = (v: VideoFile): string | undefined => v.format ?? v.profiles?.[0];
+
+/** Old names that still work but should be updated. */
+export function fileWarnings(song: SongFile, videos: Record<string, VideoFile>): string[] {
+  const w: string[] = [];
+  if (song.palette && "acid" in song.palette) w.push(`song.json: palette "acid" is now called "accent"`);
+  for (const [name, v] of Object.entries(videos)) {
+    if (v.profiles) w.push(`videos/${name}.json: "profiles": [...] is now "format": "${v.profiles[0]}" (one format per video)`);
+    if (v.palette && "acid" in v.palette) w.push(`videos/${name}.json: palette "acid" is now called "accent"`);
+  }
+  return w;
 }
 
 export function validateSong(song: SongFile): string[] {

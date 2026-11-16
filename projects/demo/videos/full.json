@@ -2,9 +2,7 @@
   "$schema": "../../../packages/core/schema/video.schema.json",
   "version": 2,
   "name": "Full demo",
-  "profiles": [
-    "youtube"
-  ],
+  "format": "youtube",
   "seed": 1,
   "layers": [
     {
@@ -65,6 +63,9 @@
           "w": 1,
           "h": 1
         }
+      },
+      "colors": {
+        "highlight": "extra2"
       }
     },
     {
@@ -197,6 +198,68 @@
           "v": 1.1
         }
       ]
+    },
+    {
+      "target": "palette.accent",
+      "points": [
+        {
+          "bar": 24,
+          "c": "#B6FF3B",
+          "curve": "smooth"
+        },
+        {
+          "bar": 25,
+          "c": "#FF3B8A",
+          "curve": "hold"
+        },
+        {
+          "bar": 29,
+          "c": "#FF3B8A",
+          "curve": "smooth"
+        },
+        {
+          "bar": 30,
+          "c": "#B6FF3B"
+        }
+      ]
+    },
+    {
+      "target": "palette.bg",
+      "points": [
+        {
+          "bar": 24,
+          "c": "#2B2420",
+          "curve": "smooth"
+        },
+        {
+          "bar": 25,
+          "c": "#1B1830",
+          "curve": "hold"
+        },
+        {
+          "bar": 29,
+          "c": "#1B1830",
+          "curve": "smooth"
+        },
+        {
+          "bar": 30,
+          "c": "#2B2420"
+        }
+      ]
+    },
+    {
+      "target": "ring.line",
+      "points": [
+        {
+          "bar": 9,
+          "c": "#FCFCFB",
+          "curve": "smooth"
+        },
+        {
+          "bar": 17,
+          "c": "#FFD27A"
+        }
+      ]
     }
   ],
   "modulations": [
@@ -210,6 +273,16 @@
       "target": "title.shake",
       "source": "drums.onset",
       "amount": 0.6
+    },
+    {
+      "target": "ring.hueShift",
+      "source": "bass.centroid",
+      "amount": 60
+    },
+    {
+      "target": "grid.lightness",
+      "source": "drums.hit",
+      "amount": 0.25
     }
   ]
 }

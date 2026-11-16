@@ -1,4 +1,4 @@
-import { evaluateLane, laneToSeconds, normalizeLane, type Lane } from "./automation.ts";
+import { evaluateLane, laneToSeconds, normalizeLane, isColorLane, colorLaneToSeconds, evaluateColorLane, type Lane, type ColorLane } from "./automation.ts";
 import type { Modulation, Project } from "./project.ts";
 
 export type FeatureLookup = (stem: string, feature: string) => number;
@@ -9,11 +9,15 @@ export type FeatureLookup = (stem: string, feature: string) => number;
  */
 export class ParamResolver {
   private lanes = new Map<string, Lane>();
+  private colorLanes = new Map<string, ColorLane>();
   private mods = new Map<string, Modulation[]>();
   overrides = new Map<string, number>();
 
   constructor(project: Project) {
-    for (const l of project.automation ?? []) this.lanes.set(l.target, normalizeLane(laneToSeconds(l, project.grid)));
+    for (const l of project.automation ?? []) {
+      if (isColorLane(l)) this.colorLanes.set(l.target, colorLaneToSeconds(l, project.grid));
+      else this.lanes.set(l.target, normalizeLane(laneToSeconds(l, project.grid)));
+    }
     for (const m of project.modulations ?? []) {
       const list = this.mods.get(m.target) ?? [];
       list.push(m);
@@ -34,4 +38,11 @@ export class ParamResolver {
     }
     return v;
   }
+
+  /** A colour target ("palette.<slot>" or "<layer>.<colour>"): its lane's value at t, else `base`. */
+  color(target: string, base: string, t: number): string {
+    const lane = this.colorLanes.get(target);
+    return (lane && evaluateColorLane(lane, t)) || base;
+  }
+  hasColorLane(target: string): boolean { return this.colorLanes.has(target); }
 }

@@ -77,6 +77,19 @@ run("renderer in headless Chrome", () => {
     } finally { await a.close(); await b.close(); }
   }, 120_000);
 
+  it("palette lanes change the picture (background follows palette.bg)", async () => {
+    const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
+    const p: Project = { ...project, layers: [], automation: [{ target: "palette.bg", points: [{ t: 0, c: "#ff0000", curve: "hold" }, { t: 1, c: "#0000ff" }] }] };
+    const r = await openRenderer(p, "draft", { mix: track, bass: track }, { gpu: false });
+    try {
+      const centre = (px: Buffer) => { const i = (270 * 960 + 480) * 4; return [px[i]!, px[i + 1]!, px[i + 2]!]; };
+      const [r0, , b0] = centre(await r.frame(10)); // 0.33 s: red
+      const [r1, , b1] = centre(await r.frame(40)); // 1.33 s: blue
+      expect(r0).toBeGreaterThan(200); expect(b0).toBeLessThan(60);
+      expect(b1).toBeGreaterThan(200); expect(r1).toBeLessThan(60);
+    } finally { await r.close(); }
+  }, 60_000);
+
   it("encodes H.264 in the browser (WebCodecs) as an Annex B stream with SPS/PPS and a keyframe", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
     const r = await openRenderer(project, "draft", { mix: track, bass: track }, { gpu: false });

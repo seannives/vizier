@@ -2,7 +2,9 @@ import { positionToSeconds, type LaneInput } from "./automation.ts";
 import { validateGrid, type Grid } from "./grid.ts";
 import { GENERATORS } from "./generators/index.ts";
 import { EFFECTS } from "./effects/index.ts";
-import { LAYER_PARAMS, POST_PARAMS } from "./plugins.ts";
+import { LAYER_PARAMS, POST_PARAMS, PALETTE_SLOTS, PALETTE_ALIASES, isPaletteSlot } from "./plugins.ts";
+import { isHex } from "./color.ts";
+import { isColorLane } from "./automation.ts";
 import type { LayoutFamily } from "./profiles.ts";
 
 /** Where a layer sits on the output canvas. Fractions of the canvas, centre-anchored. */
@@ -27,6 +29,9 @@ export interface LayerDef {
   resolutionScale?: number;
   params?: Record<string, number>;
   text?: string;
+  /** The layer's own colours: generator colour name → "#rrggbb" or a palette slot ("accent"). Default: the
+   *  generator's palette slot. */
+  colors?: Record<string, string>;
   /** Effects applied to this layer's image, in order. Their parameters are "<layer>.<effect id>.<param>". */
   effects?: EffectRef[];
   /** One transform per layout family; "feed" falls back to "portrait", then "landscape". */
@@ -82,6 +87,21 @@ export function paramTargets(p: Project): Map<string, { label: string; min: numb
   return out;
 }
 
+/** Every colour target: "palette.<slot>" and "<layer>.<colour name>". */
+export function colorTargets(p: Project): Map<string, { label: string }> {
+  const out = new Map<string, { label: string }>();
+  for (const s of PALETTE_SLOTS) out.set(`palette.${s.id}`, { label: `Palette: ${s.label}` });
+  for (const l of p.layers) for (const c of GENERATORS[l.generator]?.colors ?? []) out.set(`${l.id}.${c.name}`, { label: c.label });
+  return out;
+}
+
+/** The palette with defaults filled in and old slot names mapped ("acid" → "accent"). */
+export function normalizePalette(palette: Record<string, string> | undefined): Record<string, string> {
+  const out: Record<string, string> = Object.fromEntries(PALETTE_SLOTS.map((s) => [s.id, s.default]));
+  for (const [k, v] of Object.entries(palette ?? {})) out[PALETTE_ALIASES[k] ?? k] = v;
+  return out;
+}
+
 export function validateProject(p: Project): string[] {
   const errs: string[] = [];
   if (p.version !== 2) errs.push("version must be 2");
@@ -98,6 +118,11 @@ export function validateProject(p: Project): string[] {
     if (l.track && !(l.track in p.tracks)) errs.push(`layer ${l.id} uses unknown track "${l.track}"`);
     const known = new Set([...(gen?.params ?? []), ...LAYER_PARAMS].map((s) => s.name));
     for (const k of Object.keys(l.params ?? {})) if (gen && !known.has(k)) errs.push(`layer ${l.id}: "${k}" is not a parameter of ${l.generator}`);
+    const colorNames = new Set((gen?.colors ?? []).map((c) => c.name));
+    for (const [k, v] of Object.entries(l.colors ?? {})) {
+      if (gen && !colorNames.has(k)) errs.push(`layer ${l.id}: "${k}" is not a colour of ${l.generator}${colorNames.size ? ` (has: ${[...colorNames].join(", ")})` : ""}`);
+      if (!isHex(v) && !isPaletteSlot(PALETTE_ALIASES[v] ?? v)) errs.push(`layer ${l.id}: colour "${k}" must be #rrggbb or a palette slot (${PALETTE_SLOTS.map((s) => s.id).join(", ")})`);
+    }
     const effIds = new Set<string>();
     for (const e of l.effects ?? []) {
       const def = EFFECTS[e.type];
@@ -108,9 +133,20 @@ export function validateProject(p: Project): string[] {
       for (const k of Object.keys(e.params ?? {})) if (!def.params.some((s) => s.name === k)) errs.push(`layer ${l.id}: "${k}" is not a parameter of effect ${e.type}`);
     }
   }
+  for (const [k, v] of Object.entries(p.palette ?? {})) {
+    if (!isPaletteSlot(PALETTE_ALIASES[k] ?? k)) errs.push(`palette: "${k}" is not a slot (${PALETTE_SLOTS.map((s) => s.id).join(", ")})`);
+    if (!isHex(v)) errs.push(`palette: ${k} must be #rrggbb`);
+  }
   const targets = paramTargets(p);
+  const ctargets = colorTargets(p);
   for (const lane of p.automation ?? []) {
-    if (!targets.has(lane.target)) errs.push(`automation target "${lane.target}" doesn't exist`);
+    if (isColorLane(lane)) {
+      if (!ctargets.has(lane.target)) errs.push(`colour lane target "${lane.target}" isn't a colour (palette.<slot> or <layer>.<colour>)`);
+      for (const pt of lane.points) if (pt.c === undefined || !isHex(pt.c)) errs.push(`${lane.target}: every point of a colour lane needs c: "#rrggbb"`);
+    } else {
+      if (!targets.has(lane.target)) errs.push(ctargets.has(lane.target) ? `"${lane.target}" is a colour: give its points c: "#rrggbb" instead of v` : `automation target "${lane.target}" doesn't exist`);
+      for (const pt of lane.points) if (pt.v === undefined) errs.push(`${lane.target}: every point needs v (a number)`);
+    }
     for (const pt of lane.points) {
       if (pt.t === undefined && pt.bar === undefined) errs.push(`${lane.target}: a breakpoint needs t or bar`);
       if (pt.bar !== undefined && !p.grid) errs.push(`${lane.target}: breakpoints in bars need a tempo (song grid)`);

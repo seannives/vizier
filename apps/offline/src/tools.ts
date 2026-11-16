@@ -3,15 +3,16 @@
  *   pnpm validate projects/the-maleficus     check song.json and every video (schema + references + files)
  *   pnpm analyze projects/the-maleficus      tempo, bar 1, where tracks play, likely section changes
  *   pnpm analyze <folder of stems>           the same, for a folder that has no song.json yet
+ *   pnpm upgrade projects/the-maleficus      rewrite old names in a project's files (shows what changed)
  *   options for analyze: --json, --bpm 155 (if the guess is off), --mix <track id or file name>
  */
 import { parseArgs } from "node:util";
-import { readFileSync, readdirSync, existsSync } from "node:fs";
+import { readFileSync, readdirSync, existsSync, writeFileSync } from "node:fs";
 import { join, resolve, basename, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import AjvModule from "ajv";
 const Ajv = (AjvModule as unknown as { default: typeof AjvModule }).default ?? AjvModule;
-import { checkProject, listVideos, projectDir } from "./project-io.ts";
+import { checkProject, listVideos, projectDir, projectWarnings } from "./project-io.ts";
 import { decodeMono, SAMPLE_RATE } from "./audio.ts";
 import { analyze } from "./analyze.ts";
 
@@ -20,7 +21,7 @@ const { values, positionals } = parseArgs({
   options: { json: { type: "boolean", default: false }, bpm: { type: "string" }, mix: { type: "string" } },
 });
 const [cmd, target] = positionals;
-if (!cmd || !target) die("usage: pnpm validate <project folder> | pnpm analyze <project folder or folder of stems>");
+if (!cmd || !target) die("usage: pnpm validate <project> | pnpm analyze <project or folder of stems> | pnpm upgrade <project>");
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 
 if (cmd === "validate") {
@@ -37,6 +38,8 @@ if (cmd === "validate") {
   if (!songSchema(JSON.parse(readFileSync(join(dir, "song.json"), "utf8")))) report("song.json (format)", schemaErrs(songSchema));
   for (const v of listVideos(dir)) if (!videoSchema(JSON.parse(readFileSync(join(dir, "videos", `${v}.json`), "utf8")))) report(`videos/${v}.json (format)`, schemaErrs(videoSchema));
   for (const r of checkProject(dir)) report(r.video === "(song)" ? "song.json" : `videos/${r.video}.json`, r.errors);
+  const warnings = projectWarnings(dir);
+  for (const w of warnings) console.log(`⚠ ${w}`);
   if (problems) { console.log(`\n${problems} problem(s)`); process.exit(1); }
 } else if (cmd === "analyze") {
   const dir = resolve(target);
@@ -70,6 +73,25 @@ if (cmd === "validate") {
   }
   console.log(`\nlikely section changes (bar: strength): ${a.sectionChanges.map((c) => `${c.bar}: ${c.strength}`).join(", ") || "none found"}`);
   console.log(`\nsuggested grid for song.json:\n  "grid": { "tempo": [{ "bar": 1, "bpm": ${a.bpm}, "beatsPerBar": ${a.beatsPerBar} }], "downbeat": ${a.downbeat} }`);
+} else if (cmd === "upgrade") {
+  const dir = projectDir(target);
+  // Rename keys in place, keeping their order, so git diffs stay small.
+  const rename = (o: Record<string, unknown>, from: string, to: string, value = (v: unknown) => v) =>
+    Object.fromEntries(Object.entries(o).map(([k, v]) => (k === from ? [to, value(v)] : [k, v])));
+  const files = [join(dir, "song.json"), ...listVideos(dir).map((v) => join(dir, "videos", `${v}.json`))];
+  let changed = 0;
+  for (const f of files) {
+    let j = JSON.parse(readFileSync(f, "utf8")) as Record<string, unknown>;
+    const before = JSON.stringify(j);
+    if (Array.isArray(j.profiles)) j = rename(j, "profiles", "format", (v) => (v as string[])[0]);
+    if (j.palette && typeof j.palette === "object" && "acid" in (j.palette as object)) j.palette = rename(j.palette as Record<string, unknown>, "acid", "accent");
+    if (JSON.stringify(j) !== before) {
+      writeFileSync(f, JSON.stringify(j, null, 2) + "\n");
+      console.log(`updated ${f.slice(dir.length + 1)}`);
+      changed++;
+    }
+  }
+  console.log(changed ? `${changed} file(s) updated` : "nothing to update");
 } else die(`Unknown command ${cmd}`);
 
 function die(s: string): never { process.stderr.write(s + "\n"); process.exit(1); }

@@ -1,13 +1,8 @@
-/** Small colour helpers shared by Canvas 2D generators. */
-export const hexToRgb = (hex: string): [number, number, number] => {
-  const n = parseInt(hex.replace("#", ""), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+/** Colour helpers for Canvas 2D generators. Blends happen in OKLCH (see ../color.ts). */
+import { mixHex, parseHex } from "../color.ts";
+
+export const rgba = (hex: string, alpha = 1) => {
+  const [r, g, b] = parseHex(hex);
+  return `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${alpha})`;
 };
-export const mix = (a: string, b: string, u: number, alpha = 1) => {
-  const x = hexToRgb(a), y = hexToRgb(b);
-  const c = x.map((v, i) => Math.round(v + (y[i]! - v) * Math.min(1, Math.max(0, u))));
-  return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
-};
-export const ink = (p: Record<string, string>) => p.ink ?? "#FCFCFB";
-export const acid = (p: Record<string, string>) => p.acid ?? "#B6FF3B";
-export const bg = (p: Record<string, string>) => p.bg ?? "#2B2420";
+export const mix = (a: string, b: string, u: number, alpha = 1) => rgba(mixHex(a, b, Math.min(1, Math.max(0, u))), alpha);

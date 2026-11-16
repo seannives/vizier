@@ -13,7 +13,7 @@ import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import { join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { getProfile, validateProject, rangeSeconds, positionToSeconds } from "../../../packages/core/src/index.ts";
+import { getProfile, validateProject, rangeSeconds, positionToSeconds, videoFormat } from "../../../packages/core/src/index.ts";
 import { loadFeatures } from "./audio.ts";
 import { openRenderer } from "./browser.ts";
 import { startEncoder, startMuxer, probeVideo } from "./encode.ts";
@@ -44,7 +44,7 @@ try { lp = loadProject(positionals[0], values.video); } catch (e) { die((e as Er
 const { project } = lp;
 const errs = validateProject(project);
 if (errs.length) die(`Problems in ${lp.id}/${lp.videoName}:\n  ` + errs.join("\n  "));
-const profile = getProfile(values.profile ?? lp.video.profiles?.[0] ?? "youtube");
+const profile = getProfile(values.profile ?? videoFormat(lp.video) ?? "youtube");
 
 const t0 = Date.now();
 const tracks = await loadFeatures(project.tracks, profile.fps, join(lp.cacheDir, "features"));

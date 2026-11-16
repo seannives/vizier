@@ -1,5 +1,5 @@
 import { defineGenerator } from "../../plugins.ts";
-import { ink } from "../color.ts";
+import { rgba } from "../color.ts";
 
 /** Typewriter text: reveal (typing), shake, stutter and blur, all automatable. */
 export default defineGenerator({
@@ -8,6 +8,7 @@ export default defineGenerator({
   description: "The layer's text in Special Elite, with a typing reveal, shake, slice stutter and blur.",
   kind: "canvas2d",
   usesText: true,
+  colors: [{ name: "text", label: "Text", default: "ink" }],
   params: [
     { name: "size", label: "Size (of layer height)", min: 0.05, max: 1, default: 0.35 },
     { name: "reveal", label: "Typed (0–1)", min: 0, max: 1, default: 1 },
@@ -27,7 +28,7 @@ export default defineGenerator({
     ctx.font = `${size}px ${g.font}`;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-    ctx.fillStyle = ink(g.palette);
+    ctx.fillStyle = rgba(g.color("text"));
     if (blur > 0.05) ctx.filter = `blur(${blur.toFixed(2)}px)`;
     const sx = (g.rng() - 0.5) * 2 * shake, sy = (g.rng() - 0.5) * 2 * shake;
     const caret = reveal < 1 && Math.floor(g.t * 2) % 2 === 0 ? "_" : "";

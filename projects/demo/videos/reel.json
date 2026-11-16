@@ -3,9 +3,7 @@
   "version": 2,
   "name": "Reel: the break",
   "base": "full",
-  "profiles": [
-    "reels"
-  ],
+  "format": "reels",
   "range": {
     "from": 21,
     "to": 31

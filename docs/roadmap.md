@@ -7,12 +7,8 @@ Rough priority within each section is top to bottom. Decisions behind items live
 
 Colour engine first (so it can be tested in renders before the UI exists):
 
-- [ ] Five-slot palette (background, ink, accent + two spares; `acid` → `accent`); colour parameters declared by
-      generators, defaulting to palette slots; layer-own colours
-- [ ] Colour lanes with colour breakpoints, blended in OKLCH; palette slots automatable
-- [ ] Hue-shift and brightness modulation targets per layer
-- [ ] Test in real renders; revisit separate hue/brightness/saturation lanes if needed
-- [ ] One `format` per video (replaces `profiles`); convert existing files
+- [ ] Try colour automation on the maleficus in real renders; revisit separate hue/brightness/saturation lanes
+      if colour breakpoints + hue shift + lightness aren't expressive enough
 
 Editor milestones:
 
@@ -102,3 +98,6 @@ Editor milestones:
 - [x] JSON Schemas; `pnpm validate`; `pnpm analyze` (tempo, bar 1, where tracks play, section suggestions);
       docs/projects.md
 - [x] Drums (no kick) and chorus stems exported for the maleficus; drums and chorus layers in use
+- [x] Colour engine (ADR 0008): five-slot palette (`acid` → `accent`); colours declared by generators, following
+      palette slots or the layer's own; colour lanes blended in OKLCH; `hueShift` and `lightness` per layer
+- [x] One `format` per video (replaces `profiles`); `pnpm upgrade` updates old project files

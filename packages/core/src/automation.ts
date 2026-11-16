@@ -1,4 +1,5 @@
 import { barToSeconds, type Grid } from "./grid.ts";
+import { mixHex } from "./color.ts";
 /**
  * Automation, modelled on Ableton's: a lane is a list of breakpoints for one target parameter.
  * A breakpoint is placed either in seconds (`t`) or in bars (`bar`, 1-based like Live: bar 33 = the first beat
@@ -7,8 +8,10 @@ import { barToSeconds, type Grid } from "./grid.ts";
 export type Curve = "linear" | "hold" | "smooth";
 
 export interface Breakpoint { t: number; v: number; curve?: Curve } // curve applies to the segment AFTER this point
-/** A breakpoint as written in a project file. */
-export interface BreakpointInput { t?: number; bar?: number; v: number; curve?: Curve }
+/** A breakpoint as written in a project file: a number `v`, or for colour lanes a colour `c` ("#rrggbb"). */
+export interface BreakpointInput { t?: number; bar?: number; v?: number; c?: string; curve?: Curve }
+export interface ColorBreakpoint { t: number; c: string; curve?: Curve }
+export interface ColorLane { target: string; points: ColorBreakpoint[] }
 export interface LaneInput { target: string; points: BreakpointInput[] }
 
 /** Resolve a position given as `t` (seconds) or `bar` to seconds. */
@@ -22,7 +25,31 @@ export function positionToSeconds(p: { t?: number; bar?: number }, grid?: Grid):
 }
 
 export function laneToSeconds(lane: LaneInput, grid?: Grid): Lane {
-  return { target: lane.target, points: lane.points.map((p) => ({ t: positionToSeconds(p, grid), v: p.v, ...(p.curve ? { curve: p.curve } : {}) })) };
+  return { target: lane.target, points: lane.points.map((p) => ({ t: positionToSeconds(p, grid), v: p.v ?? 0, ...(p.curve ? { curve: p.curve } : {}) })) };
+}
+
+export const isColorLane = (lane: LaneInput) => lane.points.some((p) => p.c !== undefined);
+
+export function colorLaneToSeconds(lane: LaneInput, grid?: Grid): ColorLane {
+  const points = lane.points.map((p) => ({ t: positionToSeconds(p, grid), c: p.c ?? "#000000", ...(p.curve ? { curve: p.curve } : {}) }));
+  return { target: lane.target, points: points.sort((a, b) => a.t - b.t) };
+}
+
+/** Colour at time t: breakpoints blended in OKLCH, with the same curves as number lanes. */
+export function evaluateColorLane(lane: ColorLane, t: number): string | undefined {
+  const pts = lane.points;
+  if (!pts.length) return undefined;
+  if (t <= pts[0]!.t) return pts[0]!.c;
+  const last = pts[pts.length - 1]!;
+  if (t >= last.t) return last.c;
+  let lo = 0, hi = pts.length - 1;
+  while (hi - lo > 1) { const mid = (lo + hi) >> 1; if (pts[mid]!.t <= t) lo = mid; else hi = mid; }
+  const a = pts[lo]!, b = pts[hi]!;
+  const curve = a.curve ?? "linear";
+  if (curve === "hold") return a.c;
+  let u = (t - a.t) / (b.t - a.t);
+  if (curve === "smooth") u = u * u * (3 - 2 * u);
+  return mixHex(a.c, b.c, u);
 }
 export interface Lane { target: string; points: Breakpoint[] }
 
