@@ -12,4 +12,4 @@ so a performance becomes editable automation and re-renders exactly.
 Breakpoints and sections can be placed in bars (`bar`, 1-based, fractional) using the project's `tempo`, or in
 seconds (`t`). Bars are converted to seconds on load, so the renderer only ever sees seconds.
 
-**Next.** A full tempo map (from a Live export) behind the same `bar` syntax; importing MIDI CC lanes from a control track.
+**Next.** See ADR 0006: tempo becomes a list and the grid gets an anchor in the audio.
