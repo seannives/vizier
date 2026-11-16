@@ -420,7 +420,9 @@ export class Renderer {
 
   bench(start: number, count: number): BenchStats {
     const gl = this.gl;
-    for (let f = start; f < start + 10; f++) this.renderFrame(f); // warm up shaders, caches and JIT
+    // Warm up shaders, caches and JIT on the frames just before `start`, so the timed run is continuous
+    // (otherwise the first timed frame would include the feedback lead-in after the jump).
+    for (let f = Math.max(0, start - 10); f < start; f++) this.renderFrame(f);
     gl.finish();
     this.timing = {};
     const times: { f: number; ms: number }[] = [];

@@ -6,7 +6,11 @@ Rough priority within each section is top to bottom. Decisions behind items live
 ## Phase 1: Visual variety (so the editor has something to edit)
 
 - [ ] Export the drums (no kick) and chorus stems for the-maleficus; tune the drums and chorus layers to them
-- [ ] Measure the effects' cost on the Mac GPU (`--bench`); if glow is heavy, blur at half resolution
+- [ ] Colour as automatable parameters: per-layer colour (and project palette) that can change per section or
+      drift over time; interpolate in a perceptual colour space (OKLCH) so fades don't go muddy; colour
+      pickers in the editor
+- [ ] Live headroom at 60 fps: p99 is 13 ms of the 16.7 ms budget with five layers and effects (M1 Pro). Before
+      gigs: half-resolution glow, cheaper ridgeline drawing, or the live720 profile
 - [ ] More generators and effects over time (candidates: radial/Truchet rhythm grid, kaleidoscope, RGB-split glitch)
 
 ## Phase 2: Importer and project organisation (discuss requirements first)
@@ -82,3 +86,4 @@ Rough priority within each section is top to bottom. Decisions behind items live
       automation targets and the editor's controls); docs/adding-a-generator.md
 - [x] Shader (GLSL) generators alongside Canvas 2D; per-layer effect chains with feedback and lead-in
 - [x] New generators: ridgeline (chorus), flow field (drums, GLSL). Effects: glow, trails
+- [x] Effects measured on the M1 Pro: 3.8 ms avg / 13.1 ms p99 per frame; full-song export still ~185 fps (0.9 min)
