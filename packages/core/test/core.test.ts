@@ -88,3 +88,31 @@ describe("H.264 level selection", () => {
     expect(avcCodecFor(3840, 2160, 30)).toBe("avc1.640033"); // 5.1
   });
 });
+
+describe("plugins", () => {
+  it("every generator and effect declares sane parameters", async () => {
+    const { GENERATORS, EFFECTS } = await import("../src/index.ts");
+    for (const plug of [...Object.values(GENERATORS), ...Object.values(EFFECTS)]) {
+      expect(plug.label.length).toBeGreaterThan(0);
+      const names = new Set<string>();
+      for (const s of plug.params) {
+        expect(names.has(s.name), `${plug.id}.${s.name} duplicated`).toBe(false);
+        names.add(s.name);
+        expect(s.min, `${plug.id}.${s.name}`).toBeLessThanOrEqual(s.default);
+        expect(s.default, `${plug.id}.${s.name}`).toBeLessThanOrEqual(s.max);
+      }
+    }
+  });
+  it("validates parameters and effect targets against the declarations", () => {
+    const p: Project = {
+      ...project, modulations: [],
+      layers: [{ ...project.layers[0]!, params: { radius: 1, nope: 2 }, effects: [{ type: "trails" }, { type: "sparkle" }] }],
+      automation: [{ target: "bass.trails.zoom", points: [{ t: 0, v: 1 }] }, { target: "bass.trails.nope", points: [{ t: 0, v: 1 }] }],
+    };
+    const errs = validateProject(p).join("\n");
+    expect(errs).toMatch(/"nope" is not a parameter of acidRing/);
+    expect(errs).toMatch(/unknown effect "sparkle"/);
+    expect(errs).toMatch(/"bass.trails.nope" doesn't exist/);
+    expect(errs).not.toMatch(/bass.trails.zoom/);
+  });
+});

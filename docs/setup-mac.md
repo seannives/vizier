@@ -59,7 +59,8 @@ open examples/the-maleficus/media
 ```
 
 Copy your exported WAVs into the folder and name them as the project's `stems` section expects
-(for `the-maleficus`: the full mix as `main.wav`, the bass stem as `bass.wav`).
+(for `the-maleficus`: the full mix as `main.wav`, and the stems as `bass.wav`, `drums.wav` (drums without
+the kick) and `chorus.wav`).
 
 ## 5. Render one frame
 

@@ -47,8 +47,9 @@ assets/fonts        Special Elite (Apache 2.0, see LICENSE-SpecialElite.txt)
 See [`examples/the-maleficus/project.json`](examples/the-maleficus/project.json). Positions are in bars (1-based, like Live;
 `33.5` = halfway through bar 33) when the project has a `tempo`, or in seconds with `t`.
 
-- `layers[]`: `generator` (`acidRing`, `pulseGrid`, `typeText`), `stem`, `z`, `blend`, `opacity`, `params`, `layout`.
-- `automation[]`: lanes of breakpoints, `{ "target": "bass.radius", "points": [{ "bar": 49, "v": 1.0, "curve": "smooth" }, ...] }`.
+- `layers[]`: `generator` (`acidRing`, `pulseGrid`, `typeText`, `ridgeline`, `flowField`), `stem`, `z`, `blend`,
+  `opacity`, `params`, `layout`, `effects` (`glow`, `trails`). Adding visuals: [`docs/adding-a-generator.md`](docs/adding-a-generator.md).
+- `automation[]`: lanes of breakpoints; targets are `<layer>.<param>`, `<layer>.<effect>.<param>` or `post.<param>`, `{ "target": "bass.radius", "points": [{ "bar": 49, "v": 1.0, "curve": "smooth" }, ...] }`.
   Curves: `linear`, `hold`, `smooth`. Layer transform (`x y w h rotation`) and `opacity` are automatable too.
 - `modulations[]`: `{ "target": "bass.lineWidth", "source": "bass.env", "amount": 3, "curve": "square" }`.
 

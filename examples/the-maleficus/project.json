@@ -4,7 +4,9 @@
   "seed": 303,
   "stems": {
     "main": "media/main.wav",
-    "bass": "media/bass.wav"
+    "bass": "media/bass.wav",
+    "drums": "media/drums.wav",
+    "chorus": "media/chorus.wav"
   },
   "palette": {
     "bg": "#2B2420",
@@ -72,10 +74,83 @@
       }
     },
     {
+      "id": "drums",
+      "stem": "drums",
+      "generator": "flowField",
+      "z": 1,
+      "blend": "add",
+      "resolutionScale": 0.75,
+      "params": {
+        "scale": 2.0,
+        "density": 9,
+        "brightness": 0.45,
+        "thickness": 0.06,
+        "acid": 0.25
+      },
+      "effects": [
+        {
+          "type": "glow",
+          "params": {
+            "amount": 0.5,
+            "radius": 6
+          }
+        }
+      ],
+      "layout": {
+        "landscape": {
+          "x": 0.5,
+          "y": 0.5,
+          "w": 1,
+          "h": 1
+        },
+        "portrait": {
+          "x": 0.5,
+          "y": 0.5,
+          "w": 1,
+          "h": 1
+        }
+      }
+    },
+    {
+      "id": "chorus",
+      "stem": "chorus",
+      "generator": "ridgeline",
+      "z": 2,
+      "opacity": 0,
+      "params": {
+        "rows": 36,
+        "height": 0.8,
+        "depth": 0.55
+      },
+      "effects": [
+        {
+          "type": "glow",
+          "params": {
+            "amount": 0.5,
+            "radius": 4
+          }
+        }
+      ],
+      "layout": {
+        "landscape": {
+          "x": 0.5,
+          "y": 0.74,
+          "w": 1,
+          "h": 0.52
+        },
+        "portrait": {
+          "x": 0.5,
+          "y": 0.8,
+          "w": 1,
+          "h": 0.4
+        }
+      }
+    },
+    {
       "id": "bass",
       "stem": "bass",
       "generator": "acidRing",
-      "z": 1,
+      "z": 3,
       "blend": "add",
       "params": {
         "radius": 0.7,
@@ -98,13 +173,23 @@
           "w": 1,
           "h": 0.5625
         }
-      }
+      },
+      "effects": [
+        {
+          "type": "trails",
+          "params": {
+            "persistence": 0.5,
+            "zoom": 1.25,
+            "rotate": 12
+          }
+        }
+      ]
     },
     {
       "id": "title",
       "stem": "bass",
       "generator": "typeText",
-      "z": 2,
+      "z": 4,
       "text": "the maleficus",
       "params": {
         "size": 0.6,
@@ -124,33 +209,6 @@
           "y": 0.78,
           "w": 0.9,
           "h": 0.07
-        }
-      }
-    },
-    {
-      "id": "breakText",
-      "stem": "main",
-      "generator": "typeText",
-      "z": 3,
-      "text": "OzM 3.1",
-      "opacity": 0,
-      "params": {
-        "size": 0.7,
-        "stutter": 0.8,
-        "blur": 0
-      },
-      "layout": {
-        "landscape": {
-          "x": 0.5,
-          "y": 0.47,
-          "w": 0.7,
-          "h": 0.25
-        },
-        "portrait": {
-          "x": 0.5,
-          "y": 0.45,
-          "w": 0.95,
-          "h": 0.12
         }
       }
     }
@@ -398,42 +456,6 @@
       ]
     },
     {
-      "target": "breakText.opacity",
-      "points": [
-        {
-          "bar": 81,
-          "v": 0,
-          "curve": "smooth"
-        },
-        {
-          "bar": 82,
-          "v": 1
-        },
-        {
-          "bar": 95,
-          "v": 1,
-          "curve": "smooth"
-        },
-        {
-          "bar": 97,
-          "v": 0
-        }
-      ]
-    },
-    {
-      "target": "breakText.reveal",
-      "points": [
-        {
-          "bar": 81.5,
-          "v": 0
-        },
-        {
-          "bar": 84,
-          "v": 1
-        }
-      ]
-    },
-    {
       "target": "post.vignette",
       "points": [
         {
@@ -449,6 +471,52 @@
         {
           "bar": 105.01,
           "v": 0.55
+        }
+      ]
+    },
+    {
+      "target": "bass.trails.persistence",
+      "points": [
+        {
+          "bar": 1,
+          "v": 0.5
+        },
+        {
+          "bar": 81,
+          "v": 0.5,
+          "curve": "smooth"
+        },
+        {
+          "bar": 83,
+          "v": 1.6
+        },
+        {
+          "bar": 97,
+          "v": 1.6,
+          "curve": "smooth"
+        },
+        {
+          "bar": 105,
+          "v": 0.5
+        }
+      ]
+    },
+    {
+      "target": "bass.trails.zoom",
+      "points": [
+        {
+          "bar": 1,
+          "v": 1.25,
+          "curve": "hold"
+        },
+        {
+          "bar": 105,
+          "v": 1.5,
+          "curve": "hold"
+        },
+        {
+          "bar": 137,
+          "v": 1.15
         }
       ]
     }
@@ -469,6 +537,12 @@
       "target": "post.grain",
       "source": "main.flux",
       "amount": 0.05
+    },
+    {
+      "target": "chorus.opacity",
+      "source": "chorus.env",
+      "amount": 1.4,
+      "curve": "square"
     }
   ],
   "tempo": {

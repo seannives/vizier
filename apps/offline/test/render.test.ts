@@ -28,6 +28,15 @@ const project: Project = {
   ],
 };
 
+const fxProject: Project = {
+  ...project,
+  layers: [
+    { id: "flow", stem: "main", generator: "flowField", z: 0, blend: "add", effects: [{ type: "glow" }], layout: { landscape: { x: 0.5, y: 0.5, w: 1, h: 1 } } },
+    { id: "ring", stem: "bass", generator: "acidRing", z: 1, blend: "add", effects: [{ type: "trails", params: { persistence: 1, zoom: 1.3, rotate: 20 } }], layout: { landscape: { x: 0.5, y: 0.5, w: 0.56, h: 1 } } },
+    { id: "chorus", stem: "main", generator: "ridgeline", z: 2, layout: { landscape: { x: 0.5, y: 0.75, w: 1, h: 0.5 } } },
+  ],
+};
+
 run("renderer in headless Chrome", () => {
   it("draws non-blank frames, and the same frame twice is byte-identical", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
@@ -43,6 +52,30 @@ run("renderer in headless Chrome", () => {
       expect(lit).toBeGreaterThan(500);   // something brighter than the background was drawn
     } finally { await r.close(); }
   }, 60_000);
+
+  it("renders shader generators and effect chains", async () => {
+    const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
+    const r = await openRenderer(fxProject, "draft", { main: track, bass: track }, { gpu: false });
+    try {
+      const px = await r.frame(40);
+      let lit = 0;
+      for (let i = 0; i < px.length; i += 4) if (px[i + 1]! > 100) lit++;
+      expect(lit).toBeGreaterThan(1000);
+    } finally { await r.close(); }
+  }, 60_000);
+
+  it("a frame with trails looks the same whether rendered in sequence or jumped to (lead-in)", async () => {
+    const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
+    const hash = (x: Buffer) => createHash("sha1").update(x).digest("hex");
+    const a = await openRenderer(fxProject, "draft", { main: track, bass: track }, { gpu: false });
+    const b = await openRenderer(fxProject, "draft", { main: track, bass: track }, { gpu: false });
+    try {
+      let seq = Buffer.alloc(0);
+      for (let f = 0; f <= 45; f++) seq = await a.frame(f); // sequential, as in a full render
+      const jumped = await b.frame(45);                       // straight to frame 45, as in an excerpt
+      expect(hash(jumped)).toBe(hash(seq));
+    } finally { await a.close(); await b.close(); }
+  }, 120_000);
 
   it("encodes H.264 in the browser (WebCodecs) as an Annex B stream with SPS/PPS and a keyframe", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });

@@ -3,31 +3,11 @@
 Features we've discussed but not built yet. Tick items off in the commit that implements them.
 Rough priority within each section is top to bottom. Decisions behind items live in [`adr/`](adr/).
 
-## Done
-
-- [x] Per-frame audio features (bands, envelope, onsets, centroid, spectrum), shared offline/live
-- [x] Renderer core: layers with position, size, rotation, z, opacity, blend; WebGL2 compositor; film grain/vignette
-- [x] Parameter stack: base → automation → audio modulation → live override
-- [x] Automation lanes in bars or seconds; sections; constant tempo
-- [x] Output profiles: YouTube (1080p30/60, 4K), Shorts, Reels (with 4:5 safe area), Instagram feed; per-profile layouts
-- [x] Offline export to MP4 via headless Chrome + ffmpeg; stills; render-only benchmark
-- [x] Text in Special Elite: fixed text, typing reveal, shake, stutter, blur
-- [x] Mac setup guide; CI on GitHub
-- [x] Benchmark reports p99, over-budget frames and the slowest frames
-- [x] Faster export (M1 Pro: ~200 fps, full song in under a minute): H.264 encoded inside Chrome (WebCodecs, hardware where available), muxed by ffmpeg without re-encoding; post-render frame/duration check
-- [x] Live window (playback mode): renders by the audio clock at the display's refresh rate; dropped-frame HUD; bar/section navigation; A/V offset
-
 ## Phase 1: Visual variety (so the editor has something to edit)
 
-- [ ] Generator plugin format: each generator declares its parameters (name, label, range, default, type),
-      lives in its own folder, and registers itself. The editor builds its controls from these declarations;
-      adding a visual means adding one folder
-- [ ] Shader generators (GLSL), alongside the Canvas 2D ones
-- [ ] Two or three new generators, including at least one shader generator and one for each new stem
-      (inspiration: Book of Shapes categories such as radial, flow, noise, Truchet; the D3 gallery)
-- [ ] Per-layer effect chains as GPU passes; first two or three effects (candidates: feedback trails, glow/blur,
-      kaleidoscope, RGB-split glitch). Feedback needs a fixed pre-roll so excerpts render identically
-- [ ] Add the two new stems to the-maleficus and use them
+- [ ] Export the drums (no kick) and chorus stems for the-maleficus; tune the drums and chorus layers to them
+- [ ] Measure the effects' cost on the Mac GPU (`--bench`); if glow is heavy, blur at half resolution
+- [ ] More generators and effects over time (candidates: radial/Truchet rhythm grid, kaleidoscope, RGB-split glitch)
 
 ## Phase 2: Importer and project organisation (discuss requirements first)
 
@@ -84,3 +64,21 @@ Rough priority within each section is top to bottom. Decisions behind items live
 - [ ] Camera layers: laptop camera and iPhone (Continuity Camera), with effects
 - [ ] Project file schema validation with clear error messages
 - [ ] Golden-image tests per machine (pixels differ between software GL and the Mac GPU)
+
+## Done
+
+- [x] Per-frame audio features (bands, envelope, onsets, centroid, spectrum), shared offline/live
+- [x] Renderer core: layers with position, size, rotation, z, opacity, blend; WebGL2 compositor; film grain/vignette
+- [x] Parameter stack: base → automation → audio modulation → live override
+- [x] Automation lanes in bars or seconds; sections; constant tempo
+- [x] Output profiles: YouTube (1080p30/60, 4K), Shorts, Reels (with 4:5 safe area), Instagram feed; per-profile layouts
+- [x] Offline export to MP4 via headless Chrome + ffmpeg; stills; render-only benchmark
+- [x] Text in Special Elite: fixed text, typing reveal, shake, stutter, blur
+- [x] Mac setup guide; CI on GitHub
+- [x] Benchmark reports p99, over-budget frames and the slowest frames
+- [x] Faster export (M1 Pro: ~200 fps, full song in under a minute): H.264 encoded inside Chrome (WebCodecs, hardware where available), muxed by ffmpeg without re-encoding; post-render frame/duration check
+- [x] Live window (playback mode): renders by the audio clock at the display's refresh rate; dropped-frame HUD; bar/section navigation; A/V offset
+- [x] Plugin format: generators and effects in their own folders, declaring their parameters (drives validation,
+      automation targets and the editor's controls); docs/adding-a-generator.md
+- [x] Shader (GLSL) generators alongside Canvas 2D; per-layer effect chains with feedback and lead-in
+- [x] New generators: ridgeline (chorus), flow field (drums, GLSL). Effects: glow, trails
