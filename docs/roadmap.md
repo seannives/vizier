@@ -3,23 +3,34 @@
 Features we've discussed but not built yet. Tick items off in the commit that implements them.
 Rough priority within each section is top to bottom. Decisions behind items live in [`adr/`](adr/).
 
-## Phase 3: Editor MVP (replaces hand-editing project files)
+## Phase 3: Editor (decided 2026-11-16; see ADR 0007 and ADR 0008)
 
-- [ ] Colour as automatable parameters (before the editor UI): per-layer colour (and project palette) that can change
-      per section or drift over time; interpolate in a perceptual colour space (OKLCH) so fades don't go muddy;
-      colour pickers in the editor
-- [ ] Local web app (same kind of server as the live window), saving to the project file
-- [ ] Transport: play, pause, scrub, loop a range; per-track waveforms; bar ruler; section markers
-- [ ] Beat grid overlaid on the waveforms, an optional audible click, drag to align; tempo typed in (auto-detected
-      value offered as a suggestion)
-- [ ] Tracks like Ableton's: create, name, drop a stem on it, replace or remove it; warn if a stem's length
-      or alignment differs from the mix
-- [ ] Preview canvas per output profile; layers dragged and resized like in OBS; z-order, opacity, blend
-- [ ] Layer list: add or remove layers, choose generator, track and effects
-- [ ] Parameter panel built from the generators' declarations
-- [ ] Automation lanes on the timeline: add, move and delete breakpoints; curve types
-- [ ] Render buttons per profile (calls the existing exporter)
-- [ ] Later: record control moves (mouse or MIDI) as automation; undo history
+Colour engine first (so it can be tested in renders before the UI exists):
+
+- [ ] Five-slot palette (background, ink, accent + two spares; `acid` → `accent`); colour parameters declared by
+      generators, defaulting to palette slots; layer-own colours
+- [ ] Colour lanes with colour breakpoints, blended in OKLCH; palette slots automatable
+- [ ] Hue-shift and brightness modulation targets per layer
+- [ ] Test in real renders; revisit separate hue/brightness/saturation lanes if needed
+- [ ] One `format` per video (replaces `profiles`); convert existing files
+
+Editor milestones:
+
+- [ ] 1. `pnpm edit <project>`: local server + Svelte app; shared session (project data + undo history outside the
+      UI); open a video; play/stop with audio; timeline with bar ruler, sections, per-track waveforms, beat grid;
+      preview (live renderer, reduced resolution, video's format and safe areas); range bracket; save, undo/redo;
+      shortcut table and `?` overlay
+- [ ] 2. Layer list (add, remove, reorder, choose generator, track, effects); parameter panel built from plugin
+      declarations; drag/resize layers on the preview per format; inherited markers, reset to inherited, Open base;
+      New / Duplicate / Detach video
+- [ ] 3. Automation lanes: one per parameter, add/drag/delete breakpoints, curve types, beat snapping;
+      audio-modulation editor (track + feature + amount)
+- [ ] 4. Tracks like Ableton's (create, name, drop/replace/remove a stem; warn on length or alignment mismatch);
+      tempo panel (typed BPM with detected suggestion, downbeat, drag the grid, audible click)
+- [ ] 5. Colour pickers, palette panel and colour lanes; Render button with progress; list of renders
+- [ ] Font comparison on screen: IBM Plex Sans Condensed + Plex Mono vs Space Grotesk + JetBrains Mono
+- [ ] Output window as a second view of the session (projector / second monitor), edits applied live
+- [ ] Later: pencil drawing of automation; finer snapping; record control moves (mouse or MIDI) as automation
 
 ## Phase 4: Platform polish (then: Reels/Shorts and the YouTube video for the maleficus)
 
