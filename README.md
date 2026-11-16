@@ -19,11 +19,15 @@ Needs Node 22+, pnpm, ffmpeg, and Google Chrome. On a Mac, follow [`docs/setup-m
 ```sh
 pnpm install
 pnpm test
-pnpm demo                                            # generates the demo project's audio
+pnpm demo                                            # generates the demo project's audio (see below)
 pnpm render projects/demo --video full --gpu         # → projects/demo/output/full-youtube.mp4
 pnpm render projects/demo --video reel --gpu         # a vertical Reel that builds on the full video
 pnpm live projects/demo --video full                 # then open http://localhost:5173 in Chrome
 ```
+
+The demo's music is synthesised by code (`scripts/demo-audio.ts`), so the repository needs no audio files: a
+32-bar, 128 BPM techno sketch with drums, an acid-style bass and a pad. It's the same every time `pnpm demo` runs
+(the "random" hi-hats come from a fixed seed), so renders and tests are repeatable.
 
 `--gpu` renders with the GPU (leave it out for software rendering, e.g. on a server).
 

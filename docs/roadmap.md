@@ -3,18 +3,11 @@
 Features we've discussed but not built yet. Tick items off in the commit that implements them.
 Rough priority within each section is top to bottom. Decisions behind items live in [`adr/`](adr/).
 
-## Phase 1: Visual variety (so the editor has something to edit)
+## Phase 3: Editor MVP (replaces hand-editing project files)
 
-- [ ] Export the drums (no kick) and chorus stems for the-maleficus; tune the drums and chorus layers to them
-- [ ] Colour as automatable parameters: per-layer colour (and project palette) that can change per section or
-      drift over time; interpolate in a perceptual colour space (OKLCH) so fades don't go muddy; colour
-      pickers in the editor
-- [ ] Live headroom at 60 fps: p99 is 13 ms of the 16.7 ms budget with five layers and effects (M1 Pro). Before
-      gigs: half-resolution glow, cheaper ridgeline drawing, or the live720 profile
-- [ ] More generators and effects over time (candidates: radial/Truchet rhythm grid, kaleidoscope, RGB-split glitch)
-
-## Phase 3: Editor MVP (replaces hand-editing project.json)
-
+- [ ] Colour as automatable parameters (before the editor UI): per-layer colour (and project palette) that can change
+      per section or drift over time; interpolate in a perceptual colour space (OKLCH) so fades don't go muddy;
+      colour pickers in the editor
 - [ ] Local web app (same kind of server as the live window), saving to the project file
 - [ ] Transport: play, pause, scrub, loop a range; per-track waveforms; bar ruler; section markers
 - [ ] Beat grid overlaid on the waveforms, an optional audible click, drag to align; tempo typed in (auto-detected
@@ -22,7 +15,7 @@ Rough priority within each section is top to bottom. Decisions behind items live
 - [ ] Tracks like Ableton's: create, name, drop a stem on it, replace or remove it; warn if a stem's length
       or alignment differs from the mix
 - [ ] Preview canvas per output profile; layers dragged and resized like in OBS; z-order, opacity, blend
-- [ ] Layer list: add or remove layers, choose generator, stem and effects
+- [ ] Layer list: add or remove layers, choose generator, track and effects
 - [ ] Parameter panel built from the generators' declarations
 - [ ] Automation lanes on the timeline: add, move and delete breakpoints; curve types
 - [ ] Render buttons per profile (calls the existing exporter)
@@ -41,6 +34,8 @@ Rough priority within each section is top to bottom. Decisions behind items live
 
 ## Later: live performance (on hold)
 
+- [ ] Live headroom at 60 fps: p99 is 13 ms of the 16.7 ms budget with five layers and effects (M1 Pro). Before
+      gigs: half-resolution glow, cheaper ridgeline drawing, or the live720 profile
 - [ ] Test the live window on the projector (fullscreen on the projector's display, dropped frames, A/V offset)
 - [ ] Remember the A/V offset per machine/output between sessions (set to −20 ms on the MacBook speakers)
 - [ ] Live audio input per track group (bass, drums, synths, main). First test: several stereo BlackHole devices in
@@ -60,7 +55,8 @@ Rough priority within each section is top to bottom. Decisions behind items live
 - [ ] Importing arrangement data from Live (`.als` file or MIDI export). Not the Extensions SDK: it may be
       missing or limited in Live 13
 
-- [ ] Choral-breakdown scene for the maleficus
+- [ ] More generators and effects over time (candidates: radial/Truchet rhythm grid, kaleidoscope, RGB-split glitch)
+- [ ] Imported video clips and still images as layers (alongside live camera layers), with the same effects
 - [ ] Live typing from the keyboard (recorded as events for replay)
 - [ ] SVG layers (D3/SVG rendered to a texture)
 - [ ] Camera layers: laptop camera and iPhone (Continuity Camera), with effects
@@ -94,3 +90,4 @@ Rough priority within each section is top to bottom. Decisions behind items live
       a snapshot `.json` beside each render; `--bars` and `--still-bar`
 - [x] JSON Schemas; `pnpm validate`; `pnpm analyze` (tempo, bar 1, where tracks play, section suggestions);
       docs/projects.md
+- [x] Drums (no kick) and chorus stems exported for the maleficus; drums and chorus layers in use

@@ -82,10 +82,10 @@ pnpm validate projects/<song-id>
 ## 6. Render
 
 ```sh
-pnpm render projects/the-maleficus --video youtube-full --gpu                   # whole video
-pnpm render projects/the-maleficus --video reel-breakdown --gpu                 # a Reel (its own bars and format)
-pnpm render projects/the-maleficus --video youtube-full --bars 81-97 --gpu      # any bar range
-pnpm render projects/the-maleficus --video youtube-full --still-bar 105 --gpu   # one frame as PNG
+pnpm render projects/demo --video full --gpu                    # whole video
+pnpm render projects/demo --video reel --gpu                    # a Reel (its own bars and format)
+pnpm render projects/demo --video full --bars 9-17 --gpu        # any bar range
+pnpm render projects/demo --video full --still-bar 13 --gpu     # one frame as PNG
 ```
 
 Renders go to the project's `output/` folder, named after the video, format and bar range. **A render replaces
@@ -103,7 +103,7 @@ Video export is slower than live playback, because every frame is copied out of 
 `--bench` measures only the drawing, which is what live playback costs:
 
 ```sh
-pnpm render projects/the-maleficus --video youtube-full --bars 105-137 --bench 300 --gpu
+pnpm render projects/demo --video full --bars 9-25 --bench 300 --gpu
 ```
 
 It reports milliseconds per frame (average, 95th percentile, worst), how much of the frame budget that uses at
@@ -117,7 +117,7 @@ Plays the song and renders the visuals in time with it, in a Chrome tab, with a 
 frame pacing. Audio plays through your Mac's current output device.
 
 ```sh
-pnpm live projects/the-maleficus --video youtube-full
+pnpm live projects/demo --video full
 ```
 
 When it prints `ready`, open http://localhost:5173 in Chrome and click the page. Keys:
