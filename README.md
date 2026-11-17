@@ -4,7 +4,8 @@ Audio-reactive visuals for music videos and live shows. One renderer, two driver
 
 - **Offline**: stems + a project → frame-exact MP4s for YouTube, Shorts, Instagram.
 - **Live**: the same renderer fullscreen on a projector. Today it plays a song with a dropped-frame HUD
-  (`pnpm live <project.json>`); live audio input and MIDI are next ([roadmap](docs/roadmap.md)).
+  (`pnpm live projects/<song> --video <video>`); live audio input and MIDI come later ([roadmap](docs/roadmap.md)).
+- **Editor** (in progress): a local web app for arranging layers, automation and colour without editing files.
 
 Everything that changes over a song (geometry parameters, colours, text, layer position) is a
 parameter. Its value comes from a stack, **base → automation lane → audio modulation → live override**,
@@ -31,13 +32,28 @@ The demo's music is synthesised by code (`scripts/demo-audio.ts`), so the reposi
 
 `--gpu` renders with the GPU (leave it out for software rendering, e.g. on a server).
 
+### Your own songs
+
+Each song is a folder in `projects/` with its stems in `media/` (set one up with
+[`docs/projects.md`](docs/projects.md#starting-a-new-project)). Then:
+
+```sh
+pnpm render projects/<song> --video <video> --gpu                # e.g. projects/the-maleficus --video youtube-full
+pnpm render projects/<song> --video <video> --still-bar 85 --gpu # one frame, to check a moment
+pnpm render projects/<song> --video <video> --bars 81-97 --gpu   # an excerpt
+pnpm validate projects/<song>                                    # check the project's files
+```
+
+Renders go to `projects/<song>/output/` as `<video>-<format>.mp4` and replace the previous render of that name
+(`--keep` adds a timestamp instead). `<video>` is a file name in `projects/<song>/videos/`, without `.json`.
+
 ## Layout
 
 ```
 packages/features   audio → per-frame features (bands, envelope, onsets, centroid, spectrum). Pure TS, causal.
 packages/core       formats (song/video), grid, automation, parameter stack, profiles, plugins (generators,
                     effects), JSON Schemas; browser/ holds the WebGL renderer and encoder
-apps/offline        render, validate, analyze: tracks → features → headless Chrome → MP4 (encoded in Chrome)
+apps/offline        render, validate, analyze, migrate: tracks → features → headless Chrome → MP4 (encoded in Chrome)
 apps/live           live window: local server + page that renders in time with the audio, frame-pacing HUD
 projects/           one folder per song (only projects/demo/ is part of this repo)
 scripts/            demo audio generator
@@ -47,11 +63,13 @@ docs/               projects.md (project files and commands), setup-mac.md, addi
 
 ## Projects
 
-Each song is a folder with a `song.json` (tracks, tempo, sections) and one file per video in `videos/`.
+Each song is a folder with a `song.json` (tracks, tempo, sections, palette) and one file per video in `videos/`.
 A video can build on another, so Reels reuse the full video's look with their own bar range and text.
 See [`docs/projects.md`](docs/projects.md).
 
 Generators: `acidRing`, `pulseGrid`, `typeText`, `ridgeline`, `flowField`. Effects: `glow`, `trails`.
+Colours follow a five-slot palette (or a layer's own colours) and can be automated; see
+[`docs/projects.md`](docs/projects.md#colour).
 Adding visuals: [`docs/adding-a-generator.md`](docs/adding-a-generator.md).
 
 ## Licence
