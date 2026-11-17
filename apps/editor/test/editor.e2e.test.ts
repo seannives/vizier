@@ -126,11 +126,8 @@ run("editor (headless Chrome)", () => {
   it("loops round and round, and Space stops a loop", async () => {
     const sec = (bar: number) => page.evaluate((b) => { const g = (window as any).vizierEditor.session().doc.song.grid; return g.downbeat + ((b - 1) * 4 * 60) / g.tempo[0].bpm; }, bar);
     const [a, b] = [await sec(2), await sec(3)]; // one bar, 1.875 s
-    await page.evaluate(({ a, b }) => {
-      const ed = (window as any).vizierEditor;
-      ed.session().apply("test range", (d: any) => { d.videos.full.range = { from: 2, to: 3 }; });
-      void a; void b;
-    }, { a, b });
+    await page.evaluate(() => (window as any).vizierEditor.session().apply("test range", (d: any) => { d.videos.full.range = { from: 2, to: 3 }; }));
+    try {
     const x = await page.evaluate((t) => (window as any).vizierEditor.timeline().pageX(t), a + 0.2);
     const y = await page.evaluate(() => (window as any).vizierEditor.timeline().laneY());
     await page.mouse.click(x, y);
@@ -141,6 +138,7 @@ run("editor (headless Chrome)", () => {
     // watch for three times round: always playing, always inside the range
     const t0 = Date.now();
     let wraps = 0, last = 0;
+    const seen: number[] = [];
     while (Date.now() - t0 < 6500) {
       const s = await state();
       expect(s.playing).toBe(true);
@@ -149,14 +147,20 @@ run("editor (headless Chrome)", () => {
       expect(s.time).toBeLessThan(b + 0.15);
       if (s.time < last - 0.5) wraps++;
       last = s.time;
+      seen.push(Math.round((s.time - a) * 100) / 100);
       await page.waitForTimeout(100);
     }
-    expect(wraps).toBeGreaterThanOrEqual(2);
+    const clock = await page.evaluate(() => (window as any).vizierEditor.clock());
+    expect(wraps, `positions seen (s into the loop): ${seen.join(" ")}\naudio clock: ${JSON.stringify(clock)}`).toBeGreaterThanOrEqual(2);
     await page.keyboard.press("Space");
     await page.waitForTimeout(400);
     expect((await state()).playing).toBe(false);
-    await page.keyboard.press("l");
-    await page.keyboard.press("ControlOrMeta+z"); // remove the test range
+    } finally {
+      // leave things as they were for the next tests, even if this one failed
+      if ((await state()).playing) await page.keyboard.press("Space");
+      if ((await state()).loop) await page.keyboard.press("l");
+      await page.evaluate(() => (window as any).vizierEditor.session().apply("clear test range", (d: any) => { delete d.videos.full.range; }));
+    }
   }, 90_000);
 
   it("snap off (⌘4) puts range edges exactly at the playhead", async () => {

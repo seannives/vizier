@@ -16,14 +16,33 @@ export class Transport {
   }
   get duration() { return this.buffer?.duration ?? 0; }
   private latency() { return (this.ctx.outputLatency || 0) + (this.ctx.baseLatency || 0); }
-  /** What Chrome says the output delay is (ms); the playhead already allows for this. */
-  get reportedLatencyMs() { return Math.round(this.latency() * 1000); }
+  /** How far what you hear trails the audio clock, as Chrome measures it (ms); the playhead allows for this. */
+  get reportedLatencyMs() { return Math.round((this.ctx.currentTime - this.heardTime()) * 1000); }
 
-  /** Song position in seconds. */
+  /**
+   * The audio-clock time of the sound reaching the speakers right now. Chrome's getOutputTimestamp says which
+   * context time was being played at which moment; that's more reliable than its reported latency, which some
+   * outputs overstate. Falls back to currentTime − latency when the timestamp isn't available.
+   */
+  private heardTime(): number {
+    const ts = this.ctx.getOutputTimestamp?.();
+    if (ts && ts.contextTime && ts.performanceTime) return ts.contextTime + (performance.now() - ts.performanceTime) / 1000;
+    return this.ctx.currentTime - this.latency();
+  }
+  /** Song position in seconds (of what you're hearing). */
   time(): number {
     if (!this.playing) return this.offset;
-    // never report a time before where playback started (a positive offset would otherwise run the playhead backwards)
-    return Math.max(this.offset, this.offset + (this.ctx.currentTime - this.startedAt) - this.latency() - this.extraDelay);
+    // never report a time before where playback started (a positive sync offset would otherwise run it backwards)
+    return Math.max(this.offset, this.offset + (this.heardTime() - this.startedAt) - this.extraDelay);
+  }
+  /** Readings of the audio clock, for diagnosing sync. */
+  clockInfo() {
+    const ts = this.ctx.getOutputTimestamp?.();
+    return {
+      currentTime: this.ctx.currentTime, outputLatency: this.ctx.outputLatency, baseLatency: this.ctx.baseLatency,
+      outputTimestamp: ts ? { contextTime: ts.contextTime, ageMs: ts.performanceTime ? performance.now() - ts.performanceTime : null } : null,
+      heardLagMs: Math.round((this.ctx.currentTime - this.heardTime()) * 1000), state: this.ctx.state,
+    };
   }
   async play(from = this.offset) {
     if (!this.buffer) return;

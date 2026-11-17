@@ -246,6 +246,7 @@
     (window as any).vizierEditor = {
       get state() { return { status, error: loadError, playing, transportPlaying: transport.playing, loop, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
       timeline: () => timeline,
+      clock: () => transport.clockInfo(),
       session: () => session,
     };
   });
@@ -307,7 +308,7 @@
     <span>{message || status}</span>
     {#if !serverOnline}<span class="offline">editor server not running: start it again to save (your changes are kept)</span>{/if}
     <span class="spacer"></span>
-    <span class="delay" title={`Lines the playhead and picture up with what you hear. If the sound comes after the playhead, press +; if it comes before, press −. (Chrome reports ${reportedLatency} ms of output delay, already allowed for.)`}>
+    <span class="delay" title={`Lines the playhead and picture up with what you hear. If the sound comes after the playhead, press +; if it comes before, press −. (Chrome measures ${reportedLatency} ms between the audio clock and the speakers, already allowed for.)`}>
       sync
       <button onclick={() => (syncMs = Math.max(-500, syncMs - 10))}>−</button>
       <span class="mono">{syncMs > 0 ? "+" : ""}{syncMs} ms</span>
