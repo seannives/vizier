@@ -3,10 +3,12 @@
   import { getProfile, type Project } from "../../../../../packages/core/src/index.ts";
   import type { FeatureTrack } from "../../../../../packages/features/src/index.ts";
 
-  let { project, profileId, features, time, scaleOverride = null }: {
+  let { project, profileId, features, time, scaleOverride = null, loopWraps = 0 }: {
     project: Project | null; profileId: string; features: Record<string, FeatureTrack> | null; time: number;
-    scaleOverride?: number | null;
+    scaleOverride?: number | null; loopWraps?: number;
   } = $props();
+  // a loop wrapping is a jump back in time; let trails flow on through it rather than re-render a lead-in
+  let seenWraps = 0;
 
   let host: HTMLDivElement;
   let renderer: Renderer | null = null;
@@ -32,7 +34,11 @@
     return () => { r?.dispose(); if (renderer === r) renderer = null; };
   });
 
-  $effect(() => { const t = time; renderer?.renderAtTime(t); });
+  $effect(() => {
+    const t = time;
+    if (renderer && loopWraps !== seenWraps) { seenWraps = loopWraps; renderer.continueThroughJump = true; }
+    renderer?.renderAtTime(t);
+  });
 
   const safe = $derived(profile.safeArea);
 </script>

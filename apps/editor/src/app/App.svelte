@@ -77,12 +77,13 @@
   });
 
   // ---- clock ----
+  let loopWraps = $state(0);
   onMount(() => {
     let raf = 0;
     const tick = () => {
       let t = transport.time();
       const r = rangeSec;
-      if (playing && loop && r && t >= r.to) { transport.seek(r.from); t = r.from; }
+      if (playing && loop && r && t >= r.to) { transport.seek(r.from); t = r.from; loopWraps++; }
       if (playing && !transport.playing) playing = false;
       time = t;
       raf = requestAnimationFrame(tick);
@@ -244,7 +245,7 @@
   // window API for end-to-end tests
   $effect(() => {
     (window as any).vizierEditor = {
-      get state() { return { status, error: loadError, playing, transportPlaying: transport.playing, loop, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
+      get state() { return { status, error: loadError, playing, transportPlaying: transport.playing, loop, loopWraps, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
       timeline: () => timeline,
       clock: () => transport.clockInfo(),
       session: () => session,
@@ -279,7 +280,7 @@
 
   <main>
     <section class="stage">
-      <Preview {project} {profileId} {features} {time} scaleOverride={previewScale} />
+      <Preview {project} {profileId} {features} {time} scaleOverride={previewScale} {loopWraps} />
       {#if projectErr}<div class="err">{projectErr}</div>{/if}
       {#if !features}<div class="note">analysing audio…</div>{/if}
     </section>

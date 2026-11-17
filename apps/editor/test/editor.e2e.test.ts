@@ -135,9 +135,10 @@ run("editor (headless Chrome)", () => {
     expect((await state()).loop).toBe(true);
     await page.keyboard.press("Space");
     await page.waitForFunction(() => (window as any).vizierEditor.state.playing, null, { timeout: 10_000 });
-    // watch for three times round: always playing, always inside the range
+    // watch for three times round: always playing, always inside the range (the editor counts the wraps itself,
+    // so a slow test machine sampling only now and then can't miss them)
+    const wraps0 = (await state()).loopWraps;
     const t0 = Date.now();
-    let wraps = 0, last = 0;
     const seen: number[] = [];
     while (Date.now() - t0 < 6500) {
       const s = await state();
@@ -145,12 +146,11 @@ run("editor (headless Chrome)", () => {
       expect(s.transportPlaying).toBe(true);
       expect(s.time).toBeGreaterThanOrEqual(a - 0.01);
       expect(s.time).toBeLessThan(b + 0.15);
-      if (s.time < last - 0.5) wraps++;
-      last = s.time;
       seen.push(Math.round((s.time - a) * 100) / 100);
       await page.waitForTimeout(100);
     }
     const clock = await page.evaluate(() => (window as any).vizierEditor.clock());
+    const wraps = (await state()).loopWraps - wraps0;
     expect(wraps, `positions seen (s into the loop): ${seen.join(" ")}\naudio clock: ${JSON.stringify(clock)}`).toBeGreaterThanOrEqual(2);
     await page.keyboard.press("Space");
     await page.waitForTimeout(400);

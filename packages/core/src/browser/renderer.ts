@@ -130,6 +130,8 @@ export class Renderer {
    */
   /** Seconds of lead-in after a jump (see renderFrame). Exact renders use 3 s; previews can use less. */
   prerollSeconds = PREROLL_SECONDS;
+  /** Set before a jump that should flow on without lead-in (a loop wrapping): feedback effects just continue. */
+  continueThroughJump = false;
 
   constructor(private project: Project, profileId: string, private tracks: Record<string, FeatureTrack>, private font = "'Special Elite'", scale = 1) {
     const full = getProfile(profileId);
@@ -289,7 +291,9 @@ export class Renderer {
    */
   renderFrame(frame: number): void {
     const step = frame - this.lastFrame;
-    if (this.hasFeedback && !(step > 0 && step <= this.profile.fps)) {
+    const flowOn = this.continueThroughJump && Number.isFinite(this.lastFrame);
+    this.continueThroughJump = false;
+    if (this.hasFeedback && !flowOn && !(step > 0 && step <= this.profile.fps)) {
       for (const L of this.layers) for (const e of L.effects) if (e.fb) for (const t of e.fb) this.clear(t, L.w, L.h);
       const pre = Math.round(this.prerollSeconds * this.profile.fps);
       for (let f = Math.max(0, frame - pre); f < frame; f++) this.drawLayers(f, false);
