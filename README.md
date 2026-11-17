@@ -20,12 +20,13 @@ Needs Node 22+, pnpm, ffmpeg, and Google Chrome. On a Mac, follow [`docs/setup-m
 
 ```sh
 pnpm install
-pnpm test
+pnpm test                                              # all tests (editor components in jsdom, the editor in Chrome)
+pnpm typecheck                                         # TypeScript, including the editor's Svelte files
 vizier demo                                            # generates the demo project's audio (see below)
 vizier render projects/demo --video full --gpu         # → projects/demo/output/full-youtube.mp4
 vizier render projects/demo --video reel --gpu         # a vertical Reel that builds on the full video
 vizier live projects/demo --video full                 # then open http://localhost:5173 in Chrome
-vizier editor projects/demo                              # the editor: open http://localhost:5174 in Chrome
+vizier editor projects/demo                            # the editor, in a Chrome window of its own
 ```
 
 The demo's music is synthesised by code (`scripts/demo-audio.ts`), so the repository needs no audio files: a

@@ -25,6 +25,7 @@
     let r: Renderer | null = null;
     try {
       r = new Renderer(p, id, f, "'Special Elite'", s);
+      stats.counts.renderersBuilt++;
       r.prerollSeconds = 1; // seeking should feel instant; trails are close enough after a second
       r.canvas.className = "frame";
       host.querySelector("canvas")?.remove();

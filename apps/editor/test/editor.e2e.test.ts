@@ -192,6 +192,28 @@ run("editor (headless Chrome)", () => {
     expect((await state()).snap).toBe(true);
   }, 60_000);
 
+  it("the preview builds its renderer once and draws one frame per video frame while playing, not one per refresh", async () => {
+    // a second page with a tiny preview (enough to count the work, cheap enough for a GPU-less machine)
+    const p2 = await browser.newPage({ viewport: { width: 1200, height: 800 } });
+    try {
+      await p2.goto(`http://localhost:${PORT}/?previewScale=0.1`);
+      await p2.waitForFunction(() => (window as any).vizierEditor?.state.status === "ready", null, { timeout: 60_000 });
+      await p2.waitForFunction(() => (window as any).vizierEditor.stats().renderersBuilt > 0, null, { timeout: 30_000 });
+      const before = await p2.evaluate(() => (window as any).vizierEditor.stats());
+      await p2.keyboard.press("Space");
+      const t0 = Date.now();
+      await p2.waitForTimeout(2500);
+      const after = await p2.evaluate(() => ({ ...(window as any).vizierEditor.stats(), time: (window as any).vizierEditor.state.time }));
+      const secs = (Date.now() - t0) / 1000;
+      await p2.keyboard.press("Space");
+      expect(after.renderersBuilt - before.renderersBuilt, "renderers built while playing").toBe(0);
+      expect(after.time).toBeGreaterThan(0.5);
+      // the demo is 30 fps: at most one frame per video frame (+ a couple for the start)
+      expect(after.previewFrames - before.previewFrames).toBeLessThanOrEqual(Math.ceil(secs * 30) + 3);
+      expect(after.previewFrames - before.previewFrames).toBeGreaterThan(0);
+    } finally { await p2.close(); }
+  }, 120_000);
+
   it("I shows frame timing", async () => {
     await page.keyboard.press("i");
     await page.waitForTimeout(800);

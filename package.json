@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "typecheck": "tsc -b --noEmit -p tsconfig.json",
+    "typecheck": "tsc --noEmit -p tsconfig.json && node scripts/svelte-check.cjs",
     "render": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts render",
     "live": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts live",
     "validate": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts validate",
@@ -16,13 +16,19 @@
     "demo": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts demo",
     "migrate": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts migrate",
     "editor": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts editor",
-    "vizier": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts"
+    "vizier": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts",
+    "check:svelte": "node scripts/svelte-check.cjs"
   },
   "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
+    "@testing-library/svelte": "^5.4.2",
     "@types/node": "^26.6.6",
     "esbuild": "^0.28.2",
+    "jsdom": "^31.0.1",
     "playwright-core": "^1.65.1",
+    "svelte-check": "4.7.8",
     "typescript": "^7.0.2",
+    "typescript6": "npm:typescript@6.0.3",
     "vitest": "^5.1.0"
   },
   "dependencies": {

@@ -22,7 +22,7 @@
   let status = $state("loading…");
   let loadError = $state<string | null>(null);
 
-  const doc = $derived((version, session?.doc ?? null));
+  const doc = $derived.by(() => { void version; return session?.doc ?? null; });
   const videoNames = $derived(doc ? Object.keys(doc.videos).sort() : []);
   const ownVideo = $derived(doc && videoName ? doc.videos[videoName] ?? null : null);
   let project = $state<Project | null>(null);
@@ -38,9 +38,9 @@
     if (!session || !videoName) return "youtube";
     try { return videoFormat(session.video(videoName)) ?? "youtube"; } catch { return "youtube"; }
   });
-  const dirtyFiles = $derived((version, session?.dirtyFiles() ?? []));
-  const undoLabel = $derived((version, session?.undoLabel ?? null));
-  const redoLabel = $derived((version, session?.redoLabel ?? null));
+  const dirtyFiles = $derived.by(() => { void version; return session?.dirtyFiles() ?? []; });
+  const undoLabel = $derived.by(() => { void version; return session?.undoLabel ?? null; });
+  const redoLabel = $derived.by(() => { void version; return session?.redoLabel ?? null; });
 
   // ---- audio, waveforms, features ----
   const transport = new Transport();
@@ -182,7 +182,7 @@
   let messageTimer = 0;
   function flash(m: string) { message = m; clearTimeout(messageTimer); messageTimer = window.setTimeout(() => (message = ""), 2500); }
 
-  let timeline: Timeline;
+  let timeline = $state<Timeline>();
   let help = $state(false);
   const shortcuts: Shortcut[] = [
     { keys: "Space", label: "Play / stop (stop returns to the start marker)", group: "Transport", run: togglePlay },
@@ -252,7 +252,7 @@
   // window API for end-to-end tests
   $effect(() => {
     (window as any).vizierEditor = {
-      stats: () => stats.summary(),
+      stats: () => ({ ...stats.summary(), ...stats.counts }),
       get state() { return { status, error: loadError, playing, transportPlaying: transport.playing, loop, loopWraps, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
       timeline: () => timeline,
       clock: () => transport.clockInfo(),

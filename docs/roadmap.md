@@ -22,7 +22,6 @@ Editor milestones:
 - [ ] 5. Colour pickers, palette panel and colour lanes; Render button with progress; list of renders
 - [ ] Output window as a second view of the session (projector / second monitor), edits applied live
 - [ ] Later: pencil drawing of automation; finer snapping; record control moves (mouse or MIDI) as automation
-- [ ] Type-check Svelte files (svelte-check needs a TypeScript 6 + 7 setup today)
 
 ## Phase 4: Platform polish (then: Reels/Shorts and the YouTube video for the maleficus)
 
@@ -67,6 +66,8 @@ Editor milestones:
 - [ ] Live window: a seek renders up to 3 s of feedback lead-in (about half a second on the M1 Pro); shorten
       it live, or render the lead-in at a lower frame rate
 - [ ] Golden-image tests per machine (pixels differ between software GL and the Mac GPU)
+- [ ] Test the editor's sync control with Bluetooth headphones and external speakers (it lines up at 0 ms on the
+      MacBook's built-in speakers), to check it works as expected
 
 ## Done
 
@@ -110,3 +111,6 @@ Editor milestones:
       loops keep looping (seeking no longer briefly stops the transport); ⇧Space no longer caught by Space; "+" key
       shown and working; signed sync setting; simpler quit message; Space Grotesk + JetBrains Mono chosen
 - [x] `vizier` command (bin/vizier) with `vizier help` and per-command help; pnpm scripts run through it
+- [x] Editor round 3: snapping clicks, own Chrome window, smooth playhead (the preview had been rebuilding its
+      renderer every frame; it now draws at the video's fps), frame-timing readout (I)
+- [x] Svelte files type-checked (svelte-check with TypeScript 6 alongside TypeScript 7) and component tests (jsdom)
