@@ -3,7 +3,7 @@
  *   pnpm validate projects/the-maleficus     check song.json and every video (schema + references + files)
  *   pnpm analyze projects/the-maleficus      tempo, bar 1, where tracks play, likely section changes
  *   pnpm analyze <folder of stems>           the same, for a folder that has no song.json yet
- *   pnpm upgrade projects/the-maleficus      rewrite old names in a project's files (shows what changed)
+ *   pnpm migrate projects/the-maleficus      rewrite old names in a project's files (shows what changed)
  *   options for analyze: --json, --bpm 155 (if the guess is off), --mix <track id or file name>
  */
 import { parseArgs } from "node:util";
@@ -21,7 +21,7 @@ const { values, positionals } = parseArgs({
   options: { json: { type: "boolean", default: false }, bpm: { type: "string" }, mix: { type: "string" } },
 });
 const [cmd, target] = positionals;
-if (!cmd || !target) die("usage: pnpm validate <project> | pnpm analyze <project or folder of stems> | pnpm upgrade <project>");
+if (!cmd || !target) die("usage: pnpm validate <project> | pnpm analyze <project or folder of stems> | pnpm migrate <project>");
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 
 if (cmd === "validate") {
@@ -40,6 +40,7 @@ if (cmd === "validate") {
   for (const r of checkProject(dir)) report(r.video === "(song)" ? "song.json" : `videos/${r.video}.json`, r.errors);
   const warnings = projectWarnings(dir);
   for (const w of warnings) console.log(`⚠ ${w}`);
+  if (warnings.length) console.log("  (pnpm migrate <project> updates these)");
   if (problems) { console.log(`\n${problems} problem(s)`); process.exit(1); }
 } else if (cmd === "analyze") {
   const dir = resolve(target);
@@ -73,7 +74,7 @@ if (cmd === "validate") {
   }
   console.log(`\nlikely section changes (bar: strength): ${a.sectionChanges.map((c) => `${c.bar}: ${c.strength}`).join(", ") || "none found"}`);
   console.log(`\nsuggested grid for song.json:\n  "grid": { "tempo": [{ "bar": 1, "bpm": ${a.bpm}, "beatsPerBar": ${a.beatsPerBar} }], "downbeat": ${a.downbeat} }`);
-} else if (cmd === "upgrade") {
+} else if (cmd === "migrate") {
   const dir = projectDir(target);
   // Rename keys in place, keeping their order, so git diffs stay small.
   const rename = (o: Record<string, unknown>, from: string, to: string, value = (v: unknown) => v) =>

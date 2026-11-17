@@ -100,4 +100,4 @@ Editor milestones:
 - [x] Drums (no kick) and chorus stems exported for the maleficus; drums and chorus layers in use
 - [x] Colour engine (ADR 0008): five-slot palette (`acid` → `accent`); colours declared by generators, following
       palette slots or the layer's own; colour lanes blended in OKLCH; `hueShift` and `lightness` per layer
-- [x] One `format` per video (replaces `profiles`); `pnpm upgrade` updates old project files
+- [x] One `format` per video (replaces `profiles`); `pnpm migrate` updates old project files

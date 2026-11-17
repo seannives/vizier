@@ -116,7 +116,7 @@ pnpm render projects/demo --video full --keep --gpu                # keep: adds 
 pnpm live   projects/demo --video full
 pnpm validate projects/demo
 pnpm analyze  projects/demo              # or a folder of stems with no song.json yet
-pnpm upgrade  projects/demo              # update old names in a project's files (e.g. "profiles" → "format")
+pnpm migrate  projects/demo              # update old names in a project's files (e.g. "profiles" → "format")
 ```
 
 `--video` can be left out when a project has only one video.

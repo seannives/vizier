@@ -14,7 +14,7 @@
     "validate": "node --experimental-strip-types apps/offline/src/tools.ts validate",
     "analyze": "node --experimental-strip-types apps/offline/src/tools.ts analyze",
     "demo": "node --experimental-strip-types scripts/make-demo-audio.ts",
-    "upgrade": "node --experimental-strip-types apps/offline/src/tools.ts upgrade"
+    "migrate": "node --experimental-strip-types apps/offline/src/tools.ts migrate"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
