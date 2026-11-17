@@ -176,6 +176,9 @@
     return () => { removeEventListener("keydown", onkey); removeEventListener("beforeunload", onbeforeunload); };
   });
 
+  /** ?previewScale=0.25 renders a smaller preview (slow machines, automated tests). */
+  const previewScale = (() => { const v = Number(new URLSearchParams(location.search).get("previewScale")); return v > 0 && v <= 1 ? v : null; })();
+
   // ---- display ----
   const sections = $derived(project && grid ? sectionTimes(project) : []);
   const position = $derived(grid ? barLabel(Math.max(-1, secondsToBar(time, grid)), grid) : "–");
@@ -222,7 +225,7 @@
 
   <main>
     <section class="stage">
-      <Preview {project} {profileId} {features} {time} />
+      <Preview {project} {profileId} {features} {time} scaleOverride={previewScale} />
       {#if projectErr}<div class="err">{projectErr}</div>{/if}
       {#if !features}<div class="note">analysing audio…</div>{/if}
     </section>

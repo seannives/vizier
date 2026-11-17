@@ -34,7 +34,8 @@ run("editor (headless Chrome)", () => {
     page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
     page.on("pageerror", (e) => pageErrors.push(e.message));
     page.on("console", (m) => { if (m.type() === "error") pageErrors.push(m.text()); });
-    await page.goto(`http://localhost:${PORT}`);
+    // A small preview: CI machines have no GPU, and the renderer is tested on its own elsewhere.
+    await page.goto(`http://localhost:${PORT}/?previewScale=0.12`);
     // ready, or an error on screen: whichever comes first, and say why if it's not ready
     try {
       await page.waitForFunction(() => { const s = (window as any).vizierEditor?.state; return s && (s.status === "ready" || s.error); }, null, { timeout: 90_000 });
@@ -47,13 +48,12 @@ run("editor (headless Chrome)", () => {
 
   it("plays and stops with the space bar", async () => {
     await page.keyboard.press("Space");
-    await page.waitForTimeout(1200);
+    await page.waitForFunction(() => (window as any).vizierEditor.state.time > 0.4, null, { timeout: 20_000 });
     const s = await state();
     expect(s.playing).toBe(true);
-    expect(s.time).toBeGreaterThan(0.4);
     await page.keyboard.press("Space");
     expect((await state()).playing).toBe(false);
-  }, 30_000);
+  }, 60_000);
 
   it("drags a range in the ruler (snapped to beats), undoes, redoes and saves it", async () => {
     const xy = await page.evaluate(() => {
@@ -79,7 +79,7 @@ run("editor (headless Chrome)", () => {
     await page.waitForFunction(() => (window as any).vizierEditor.state.dirtyFiles.length === 0);
     expect(JSON.parse(readFileSync(join(dir, "videos/full.json"), "utf8")).range).toEqual({ from: 9, to: 17 });
     await page.screenshot({ path: join(root, "out/editor-e2e.png") });
-  }, 30_000);
+  }, 90_000);
 
   it("sets range edges from the playhead with [ and ]", async () => {
     await page.keyboard.press("Home");

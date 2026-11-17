@@ -3,8 +3,9 @@
   import { getProfile, type Project } from "../../../../../packages/core/src/index.ts";
   import type { FeatureTrack } from "../../../../../packages/features/src/index.ts";
 
-  let { project, profileId, features, time }: {
+  let { project, profileId, features, time, scaleOverride = null }: {
     project: Project | null; profileId: string; features: Record<string, FeatureTrack> | null; time: number;
+    scaleOverride?: number | null;
   } = $props();
 
   let host: HTMLDivElement;
@@ -12,7 +13,7 @@
   let error = $state<string | null>(null);
   const profile = $derived(getProfile(profileId));
   // preview at about half size: plenty for judging, and cheap
-  const scale = $derived(Math.min(1, 960 / Math.max(profile.width, profile.height)));
+  const scale = $derived(scaleOverride ?? Math.min(1, 960 / Math.max(profile.width, profile.height)));
 
   $effect(() => {
     if (!project || !features) return;
