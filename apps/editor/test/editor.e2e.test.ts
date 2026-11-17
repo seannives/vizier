@@ -1,4 +1,5 @@
 // Drives the editor in headless Chrome against a temporary copy of the demo project.
+// Shortcuts use ControlOrMeta: ⌘ on a Mac, Ctrl elsewhere, matching the editor.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
 import { mkdtempSync, mkdirSync, cpSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
@@ -69,13 +70,13 @@ run("editor (headless Chrome)", () => {
     let s = await state();
     expect(s.range).toEqual({ from: 9, to: 17 });
     expect(s.dirtyFiles).toEqual(["videos/full.json"]);
-    await page.keyboard.press("Control+z");
+    await page.keyboard.press("ControlOrMeta+z");
     s = await state();
     expect(s.range).toBeNull();
     expect(s.dirtyFiles).toEqual([]);
-    await page.keyboard.press("Control+Shift+z");
+    await page.keyboard.press("ControlOrMeta+Shift+z");
     expect((await state()).range).toEqual({ from: 9, to: 17 });
-    await page.keyboard.press("Control+s");
+    await page.keyboard.press("ControlOrMeta+s");
     await page.waitForFunction(() => (window as any).vizierEditor.state.dirtyFiles.length === 0);
     expect(JSON.parse(readFileSync(join(dir, "videos/full.json"), "utf8")).range).toEqual({ from: 9, to: 17 });
     await page.screenshot({ path: join(root, "out/editor-e2e.png") });
