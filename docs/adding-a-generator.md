@@ -76,5 +76,5 @@ renderer first renders a few seconds of lead-in, so the frame matches the same m
 ## Checklist
 
 - `pnpm test`: the plugin test checks every parameter declaration (unique names, `min ≤ default ≤ max`).
-- Render a still at a busy moment and a quiet one: `pnpm render projects/demo --video full --still-bar 13 --gpu`.
-- `pnpm render projects/demo --video full --bench 300 --gpu` to check the cost per frame.
+- Render a still at a busy moment and a quiet one: `vizier render projects/demo --video full --still-bar 13 --gpu`.
+- `vizier render projects/demo --video full --bench 300 --gpu` to check the cost per frame.

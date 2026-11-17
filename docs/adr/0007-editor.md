@@ -6,7 +6,7 @@ Status: accepted (2026-11-16), to be built in Phase 3
 a music tool, and later grow into a way to *play* the visuals live.
 
 **Decisions.**
-- **A local web app** (`pnpm editor <project>`), served by a small local server that reads and writes the project
+- **A local web app** (`vizier editor <project>`), served by a small local server that reads and writes the project
   folder (and copies stems into `media/`). Opened in Chrome. Not a desktop app for now.
 - **One shared session, several views.** The project data and undo history live in plain TypeScript, outside the
   UI framework. The editor and any output window (projector, second monitor) are views of the same session,
@@ -27,7 +27,7 @@ a music tool, and later grow into a way to *play* the visuals live.
 - **Timeline:** whole song always visible; bar ruler, sections, per-track waveforms, beat grid (optional click);
   the video's range is a draggable bracket on the ruler. One automation lane per parameter; snapping to the beat;
   add/drag/delete breakpoints and curve types (pencil drawing later).
-- **Look:** dark, dense, Ableton-like, with some character. IBM Plex Sans Condensed + IBM Plex Mono (to be compared
-  on screen with Space Grotesk + JetBrains Mono). Neutral dark greys, one amber accent (configurable).
+- **Look:** dark, dense, Ableton-like, with some character. Space Grotesk for the interface and JetBrains Mono for
+  numbers (chosen over IBM Plex after an on-screen comparison: easier to read). Neutral dark greys, one amber accent.
 - **Milestones:** (1) open, play, timeline + preview; (2) layers, parameters, layout; (3) automation lanes;
   (4) tracks/stems and tempo panel; (5) colour UI and Render.

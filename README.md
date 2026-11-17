@@ -4,9 +4,9 @@ Audio-reactive visuals for music videos and live shows. One renderer, two driver
 
 - **Offline**: stems + a project → frame-exact MP4s for YouTube, Shorts, Instagram.
 - **Live**: the same renderer fullscreen on a projector. Today it plays a song with a dropped-frame HUD
-  (`pnpm live projects/<song> --video <video>`); live audio input and MIDI come later ([roadmap](docs/roadmap.md)).
+  (`vizier live projects/<song> --video <video>`); live audio input and MIDI come later ([roadmap](docs/roadmap.md)).
 - **Editor** (in progress): a local web app for arranging a video without editing files
-  (`pnpm editor projects/<song>`; see [`docs/editor.md`](docs/editor.md)).
+  (`vizier editor projects/<song>`; see [`docs/editor.md`](docs/editor.md)).
 
 Everything that changes over a song (geometry parameters, colours, text, layer position) is a
 parameter. Its value comes from a stack, **base → automation lane → audio modulation → live override**,
@@ -21,15 +21,15 @@ Needs Node 22+, pnpm, ffmpeg, and Google Chrome. On a Mac, follow [`docs/setup-m
 ```sh
 pnpm install
 pnpm test
-pnpm demo                                            # generates the demo project's audio (see below)
-pnpm render projects/demo --video full --gpu         # → projects/demo/output/full-youtube.mp4
-pnpm render projects/demo --video reel --gpu         # a vertical Reel that builds on the full video
-pnpm live projects/demo --video full                 # then open http://localhost:5173 in Chrome
-pnpm editor projects/demo                              # the editor: open http://localhost:5174 in Chrome
+vizier demo                                            # generates the demo project's audio (see below)
+vizier render projects/demo --video full --gpu         # → projects/demo/output/full-youtube.mp4
+vizier render projects/demo --video reel --gpu         # a vertical Reel that builds on the full video
+vizier live projects/demo --video full                 # then open http://localhost:5173 in Chrome
+vizier editor projects/demo                              # the editor: open http://localhost:5174 in Chrome
 ```
 
 The demo's music is synthesised by code (`scripts/demo-audio.ts`), so the repository needs no audio files: a
-32-bar, 128 BPM techno sketch with drums, an acid-style bass and a pad. It's the same every time `pnpm demo` runs
+32-bar, 128 BPM techno sketch with drums, an acid-style bass and a pad. It's the same every time `vizier demo` runs
 (the "random" hi-hats come from a fixed seed), so renders and tests are repeatable.
 
 `--gpu` renders with the GPU (leave it out for software rendering, e.g. on a server).
@@ -40,10 +40,10 @@ Each song is a folder in `projects/` with its stems in `media/` (set one up with
 [`docs/projects.md`](docs/projects.md#starting-a-new-project)). Then:
 
 ```sh
-pnpm render projects/<song> --video <video> --gpu                # e.g. projects/the-maleficus --video youtube-full
-pnpm render projects/<song> --video <video> --still-bar 85 --gpu # one frame, to check a moment
-pnpm render projects/<song> --video <video> --bars 81-97 --gpu   # an excerpt
-pnpm validate projects/<song>                                    # check the project's files
+vizier render projects/<song> --video <video> --gpu                # e.g. projects/the-maleficus --video youtube-full
+vizier render projects/<song> --video <video> --still-bar 85 --gpu # one frame, to check a moment
+vizier render projects/<song> --video <video> --bars 81-97 --gpu   # an excerpt
+vizier validate projects/<song>                                    # check the project's files
 ```
 
 Renders go to `projects/<song>/output/` as `<video>-<format>.mp4` and replace the previous render of that name

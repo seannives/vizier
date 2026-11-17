@@ -20,8 +20,6 @@ Editor milestones:
 - [ ] 4. Tracks like Ableton's (create, name, drop/replace/remove a stem; warn on length or alignment mismatch);
       tempo panel (typed BPM with detected suggestion, downbeat, drag the grid, audible click)
 - [ ] 5. Colour pickers, palette panel and colour lanes; Render button with progress; list of renders
-- [ ] Font comparison on screen: IBM Plex Sans Condensed + Plex Mono vs Space Grotesk + JetBrains Mono (switch is in
-      the status bar; decide, then remove the other)
 - [ ] Output window as a second view of the session (projector / second monitor), edits applied live
 - [ ] Later: pencil drawing of automation; finer snapping; record control moves (mouse or MIDI) as automation
 - [ ] Type-check Svelte files (svelte-check needs a TypeScript 6 + 7 setup today)
@@ -93,13 +91,13 @@ Editor milestones:
 - [x] Beat grid: tempo list (tempo and time-signature changes), downbeat offset for lead-ins, display offset
 - [x] Per-project cache and `output/`; names `<video>-<profile>[-b<from>-<to>]` (overwrite; `--keep` timestamps);
       a snapshot `.json` beside each render; `--bars` and `--still-bar`
-- [x] JSON Schemas; `pnpm validate`; `pnpm analyze` (tempo, bar 1, where tracks play, section suggestions);
+- [x] JSON Schemas; `vizier validate`; `vizier analyze` (tempo, bar 1, where tracks play, section suggestions);
       docs/projects.md
 - [x] Drums (no kick) and chorus stems exported for the maleficus; drums and chorus layers in use
 - [x] Colour engine (ADR 0008): five-slot palette (`acid` → `accent`); colours declared by generators, following
       palette slots or the layer's own; colour lanes blended in OKLCH; `hueShift` and `lightness` per layer
-- [x] One `format` per video (replaces `profiles`); `pnpm migrate` updates old project files
-- [x] Editor milestone 1: `pnpm editor`; Svelte 5 app with the session (project data, undo/redo, unsaved files) in plain
+- [x] One `format` per video (replaces `profiles`); `vizier migrate` updates old project files
+- [x] Editor milestone 1: `vizier editor`; Svelte 5 app with the session (project data, undo/redo, unsaved files) in plain
       TypeScript; video menu; play/stop; timeline (bar ruler, sections, waveforms, beat grid, zoom, scroll, follow);
       preview in the video's format with safe areas; range bracket (snap to beat); save; shortcut table and `?` overlay;
       end-to-end tests in headless Chrome
@@ -108,3 +106,7 @@ Editor milestones:
 - [x] Editor feedback round 1: Ableton-style transport (start marker, ⇧Space continue), Snap toggle (⌘4), range in
       minutes:seconds, ← and ⇧← fixed, Return/fn← for go-to-start, shortcut list tidied, window shrinking fixed,
       ⌘-swipe zoom direction, audio delay setting, auto-open Chrome, server heartbeat and quit warning
+- [x] Editor feedback round 2: Stop leaves the playhead where it is (Play jumps to the marker, ⇧Space continues);
+      loops keep looping (seeking no longer briefly stops the transport); ⇧Space no longer caught by Space; "+" key
+      shown and working; signed sync setting; simpler quit message; Space Grotesk + JetBrains Mono chosen
+- [x] `vizier` command (bin/vizier) with `vizier help` and per-command help; pnpm scripts run through it

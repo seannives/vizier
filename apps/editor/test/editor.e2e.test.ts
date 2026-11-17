@@ -101,19 +101,62 @@ run("editor (headless Chrome)", () => {
     expect((await state()).time).toBeCloseTo(await sec(10), 3);
   }, 60_000);
 
-  it("Play starts from the start marker and Stop returns to it; ⇧Space continues from where it stopped", async () => {
+  it("Stop leaves the playhead where it stopped; Play jumps back to the start marker; ⇧Space continues", async () => {
     const marker = (await state()).marker;
     await page.keyboard.press("Space");
     await page.waitForFunction((m) => (window as any).vizierEditor.state.time > m + 0.5, marker, { timeout: 20_000 });
     await page.keyboard.press("Space");
     let s = await state();
     expect(s.playing).toBe(false);
-    expect(s.time).toBeCloseTo(marker, 3);
-    await page.keyboard.press("Shift+Space");
-    await page.waitForFunction((m) => (window as any).vizierEditor.state.time > m + 0.6, marker, { timeout: 20_000 });
+    const stoppedAt = s.time;
+    expect(stoppedAt).toBeGreaterThan(marker + 0.4);               // stays where it stopped
+    await page.waitForTimeout(300);
+    expect((await state()).time).toBeCloseTo(stoppedAt, 3);         // and doesn't move
+    await page.keyboard.press("Space");                             // Play: back to the marker
+    await page.waitForFunction((st) => { const s = (window as any).vizierEditor.state; return s.playing && s.time < st - 0.2; }, stoppedAt, { timeout: 10_000 });
     await page.keyboard.press("Space");
-    s = await state();
-    expect(s.time).toBeCloseTo(marker, 3);
+    const second = (await state()).time;
+    await page.keyboard.press("Shift+Space");                       // continue from the stop point
+    await page.waitForTimeout(200);
+    expect((await state()).time).toBeGreaterThanOrEqual(second - 0.01);
+    await page.keyboard.press("Space");
+    expect((await state()).playing).toBe(false);
+  }, 90_000);
+
+  it("loops round and round, and Space stops a loop", async () => {
+    const sec = (bar: number) => page.evaluate((b) => { const g = (window as any).vizierEditor.session().doc.song.grid; return g.downbeat + ((b - 1) * 4 * 60) / g.tempo[0].bpm; }, bar);
+    const [a, b] = [await sec(2), await sec(3)]; // one bar, 1.875 s
+    await page.evaluate(({ a, b }) => {
+      const ed = (window as any).vizierEditor;
+      ed.session().apply("test range", (d: any) => { d.videos.full.range = { from: 2, to: 3 }; });
+      void a; void b;
+    }, { a, b });
+    const x = await page.evaluate((t) => (window as any).vizierEditor.timeline().pageX(t), a + 0.2);
+    const y = await page.evaluate(() => (window as any).vizierEditor.timeline().laneY());
+    await page.mouse.click(x, y);
+    await page.keyboard.press("l");
+    expect((await state()).loop).toBe(true);
+    await page.keyboard.press("Space");
+    await page.waitForFunction(() => (window as any).vizierEditor.state.playing, null, { timeout: 10_000 });
+    // watch for three times round: always playing, always inside the range
+    const t0 = Date.now();
+    let wraps = 0, last = 0;
+    while (Date.now() - t0 < 6500) {
+      const s = await state();
+      expect(s.playing).toBe(true);
+      expect(s.transportPlaying).toBe(true);
+      expect(s.time).toBeGreaterThanOrEqual(a - 0.01);
+      expect(s.time).toBeLessThan(b + 0.15);
+      if (s.time < last - 0.5) wraps++;
+      last = s.time;
+      await page.waitForTimeout(100);
+    }
+    expect(wraps).toBeGreaterThanOrEqual(2);
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(400);
+    expect((await state()).playing).toBe(false);
+    await page.keyboard.press("l");
+    await page.keyboard.press("ControlOrMeta+z"); // remove the test range
   }, 90_000);
 
   it("snap off (⌘4) puts range edges exactly at the playhead", async () => {
@@ -143,7 +186,10 @@ run("editor (headless Chrome)", () => {
     const z1 = await tl();
     expect(z1).toBeGreaterThan(z0);
     await wheel(-40, false, true); // pinch spread
-    expect(await tl()).toBeGreaterThan(z1);
+    const z2 = await tl();
+    expect(z2).toBeGreaterThan(z1);
+    await page.keyboard.press("Shift+Equal"); // "+"
+    expect(await tl()).toBeGreaterThan(z2);
     await page.keyboard.press("0");
   }, 30_000);
 
@@ -164,6 +210,7 @@ run("editor (headless Chrome)", () => {
     expect(await page.locator("text=Keyboard shortcuts").count()).toBeGreaterThan(0);
     expect(await page.locator("text=Close the shortcuts window").count()).toBe(1);
     expect(await page.locator(".row", { hasText: "Zoom in" }).count()).toBe(1);
+    expect((await page.locator(".row", { hasText: "Zoom in" }).locator(".keys").textContent())?.trim()).toBe("+");
     await page.keyboard.press("Escape");
     expect(await page.locator("text=Keyboard shortcuts").count()).toBe(0);
   }, 60_000);

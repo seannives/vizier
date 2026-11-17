@@ -108,15 +108,15 @@ plus its own changes. Improve the full video and every Reel built on it follows.
 ## Commands
 
 ```sh
-pnpm render projects/demo --video full --gpu                       # its own range and first profile
-pnpm render projects/demo --video reel --profile shorts --gpu
-pnpm render projects/demo --video full --bars 21-31 --profile reels --gpu
-pnpm render projects/demo --video full --still-bar 13 --gpu
-pnpm render projects/demo --video full --keep --gpu                # keep: adds a timestamp
-pnpm live   projects/demo --video full
-pnpm validate projects/demo
-pnpm analyze  projects/demo              # or a folder of stems with no song.json yet
-pnpm migrate  projects/demo              # update old names in a project's files (e.g. "profiles" → "format")
+vizier render projects/demo --video full --gpu                       # its own range and first profile
+vizier render projects/demo --video reel --profile shorts --gpu
+vizier render projects/demo --video full --bars 21-31 --profile reels --gpu
+vizier render projects/demo --video full --still-bar 13 --gpu
+vizier render projects/demo --video full --keep --gpu                # keep: adds a timestamp
+vizier live   projects/demo --video full
+vizier validate projects/demo
+vizier analyze  projects/demo              # or a folder of stems with no song.json yet
+vizier migrate  projects/demo              # update old names in a project's files (e.g. "profiles" → "format")
 ```
 
 `--video` can be left out when a project has only one video.
@@ -129,10 +129,10 @@ vizier version, so it can be reproduced later. Watch disk space: a full 1080p so
 ## Starting a new project
 
 1. `mkdir -p projects/<id>/media` and copy in the mix and stems.
-2. `pnpm analyze projects/<id>` suggests the tempo, where bar 1 starts, where each stem plays and likely
+2. `vizier analyze projects/<id>` suggests the tempo, where bar 1 starts, where each stem plays and likely
    section changes (suggestions to check, not answers).
 3. Write `song.json` and a first video, or ask Claude: "here are my stems and the vizier repo; take a first pass
-   at the project". `pnpm validate projects/<id>` checks the result.
+   at the project". `vizier validate projects/<id>` checks the result.
 4. Refine by rendering stills (`--still-bar`) and short excerpts (`--bars`), and soon in the editor.
 
 The JSON Schemas in `packages/core/schema/` describe both files; editors such as VS Code use them for

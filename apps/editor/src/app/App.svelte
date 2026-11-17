@@ -110,8 +110,9 @@
   }
 
   // ---- transport, Ableton-style ----
-  // Play starts from the start marker; Stop returns to it. Clicking the timeline (or the arrow keys) moves the
-  // marker. ⇧Space continues from where playback stopped. With loop on, playback wraps at the range's end.
+  // Play starts from the start marker. Stop leaves the playhead where playback stopped; the next Play jumps back to
+  // the marker, ⇧Space continues from the stop point. Clicking the timeline (or the arrow keys) moves the marker.
+  // With loop on, playback wraps at the range's end every time round.
   let marker = $state(0);
   let stoppedAt = 0;
   async function startFrom(from: number) {
@@ -120,7 +121,7 @@
     await transport.play(from); playing = true;
   }
   async function togglePlay() {
-    if (playing) { stoppedAt = transport.time(); transport.stop(); playing = false; transport.seek(marker); time = marker; return; }
+    if (playing) { stoppedAt = transport.time(); transport.stop(); playing = false; time = stoppedAt; return; }
     await startFrom(marker);
   }
   async function continuePlay() {
@@ -143,13 +144,11 @@
   let snap = $state(load("vizier.snap", "1") === "1");
   $effect(() => save_("vizier.snap", snap ? "1" : "0"));
 
-  // ---- audio delay: how far the sound you hear lags behind (e.g. Bluetooth headphones) ----
-  let audioDelayMs = $state(Number(load("vizier.audioDelayMs", "0")) || 0);
-  $effect(() => { transport.extraDelay = audioDelayMs / 1000; save_("vizier.audioDelayMs", String(audioDelayMs)); });
-
-  // ---- UI font (comparison: IBM Plex vs Space Grotesk + JetBrains Mono) ----
-  let font = $state(load("vizier.font", "plex"));
-  $effect(() => { document.documentElement.dataset.font = font; save_("vizier.font", font); });
+  // ---- picture/sound sync: + moves the playhead and picture later, − earlier (remembered per browser) ----
+  let syncMs = $state(Number(load("vizier.syncMs", "0")) || 0);
+  let reportedLatency = $state(0);
+  onMount(() => { const id = setInterval(() => (reportedLatency = transport.reportedLatencyMs), 1000); return () => clearInterval(id); });
+  $effect(() => { transport.extraDelay = syncMs / 1000; save_("vizier.syncMs", String(syncMs)); });
 
   // per-browser settings; storage can be unavailable, so never let it break anything
   function load(k: string, d: string) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }
@@ -167,7 +166,7 @@
     if (!session || !session.dirty) { flash("nothing to save"); return; }
     let res: { written?: string[]; error?: string };
     try { res = await api.save(session.savePayload()); }
-    catch { serverOnline = false; flash("can't reach the editor server: start it again (pnpm editor …), then save; your changes are kept"); return; }
+    catch { serverOnline = false; flash("can't reach the editor server: start it again (vizier editor …), then save; your changes are kept"); return; }
     if (res.error) { flash(`save failed: ${res.error}`); return; }
     session.markSaved();
     flash(`saved ${res.written?.join(", ")}`);
@@ -245,7 +244,7 @@
   // window API for end-to-end tests
   $effect(() => {
     (window as any).vizierEditor = {
-      get state() { return { status, error: loadError, playing, loop, time, marker, snap, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
+      get state() { return { status, error: loadError, playing, transportPlaying: transport.playing, loop, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
       timeline: () => timeline,
       session: () => session,
     };
@@ -308,13 +307,13 @@
     <span>{message || status}</span>
     {#if !serverOnline}<span class="offline">editor server not running: start it again to save (your changes are kept)</span>{/if}
     <span class="spacer"></span>
-    <span class="delay" title="How far the sound you hear lags behind the playhead (e.g. Bluetooth headphones add 150–250 ms). Raise it if the sound comes after the picture.">
-      audio delay
-      <button onclick={() => (audioDelayMs = Math.max(0, audioDelayMs - 10))}>−</button>
-      <span class="mono">{audioDelayMs} ms</span>
-      <button onclick={() => (audioDelayMs = Math.min(1000, audioDelayMs + 10))}>+</button>
+    <span class="delay" title={`Lines the playhead and picture up with what you hear. If the sound comes after the playhead, press +; if it comes before, press −. (Chrome reports ${reportedLatency} ms of output delay, already allowed for.)`}>
+      sync
+      <button onclick={() => (syncMs = Math.max(-500, syncMs - 10))}>−</button>
+      <span class="mono">{syncMs > 0 ? "+" : ""}{syncMs} ms</span>
+      <button onclick={() => (syncMs = Math.min(500, syncMs + 10))}>+</button>
+      {#if syncMs !== 0}<button onclick={() => (syncMs = 0)} title="Reset to 0">0</button>{/if}
     </span>
-    <button class="font" onclick={() => (font = font === "plex" ? "grotesk" : "plex")} title="Compare UI fonts">{font === "plex" ? "IBM Plex" : "Space Grotesk"}</button>
     {#if dirtyFiles.length}<span class="unsaved">unsaved: {dirtyFiles.join(", ")}</span>{/if}
     <span class="dim">{projectId}/{videoName}</span>
   </footer>
@@ -332,7 +331,7 @@
   .transport .snap { width: auto; padding: 3px 7px; font-size: 11px; }
   .offline { color: var(--danger); }
   .delay { display: flex; align-items: center; gap: 4px; }
-  .delay button, .status .font { padding: 0 6px; font-size: 11px; line-height: 16px; }
+  .delay button { padding: 0 6px; font-size: 11px; line-height: 16px; }
   .brand { font-weight: 600; letter-spacing: .04em; color: var(--accent); }
   .proj { font-weight: 500; }
   .badge { font-size: 11px; color: var(--dim); border: 1px solid var(--line2); border-radius: 3px; padding: 1px 6px; }

@@ -1,15 +1,12 @@
-// Global styles: dark, dense, Ableton-like; IBM Plex Sans Condensed for UI, Plex Mono for numbers; amber accent.
+// Global styles: dark, dense, Ableton-like; Space Grotesk for the UI, JetBrains Mono for numbers; amber accent.
 const css = `
 :root {
   --bg0: #111111; --bg1: #181818; --bg2: #202020; --bg3: #2a2a2a; --line: #303030; --line2: #3c3c3c;
   --text: #d9d9d6; --dim: #8b8b86; --faint: #5c5c58;
   --accent: #f5a524; --accent-dim: #f5a52433; --danger: #e5484d;
-  --ui: 'Plex Condensed', 'IBM Plex Sans Condensed', system-ui, sans-serif;
-  --mono: 'Plex Mono', 'IBM Plex Mono', ui-monospace, monospace;
+  --ui: 'Space Grotesk', system-ui, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, monospace;
 }
-/* the font comparison: the status bar's font button switches */
-:root[data-font="grotesk"] { --ui: 'Space Grotesk', system-ui, sans-serif; --mono: 'JetBrains Mono', ui-monospace, monospace; }
-html, body { font-family: var(--ui); }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg0); color: var(--text); font: 13px/1.3 var(--ui);
   -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; }

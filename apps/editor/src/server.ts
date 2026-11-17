@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 /**
  * The editor: a local web app for a project folder.
- *   pnpm editor projects/demo [--video full] [--port 5174]   then open http://localhost:5174 in Chrome.
+ *   vizier editor projects/demo [--video full] [--port 5174] [--no-open]   opens http://localhost:5174 in Chrome.
  * The server reads and writes the project's files; the page holds the session (project data + undo history).
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { spawn } from "node:child_process";
 import { parseArgs } from "node:util";
 import { readFileSync, writeFileSync, statSync, createReadStream, existsSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { join, resolve, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { build } from "esbuild";
 import sveltePluginModule from "esbuild-svelte";
@@ -27,7 +27,7 @@ const { values, positionals } = parseArgs({
     "no-open": { type: "boolean", default: false },
   },
 });
-if (!positionals[0]) die("usage: pnpm editor <project folder> [--video name] [--port 5174]");
+if (!positionals[0]) die("usage: vizier editor <project folder> [--video name] [--port 5174] [--no-open]");
 let dir: string;
 try { dir = projectDir(positionals[0]); } catch (e) { die((e as Error).message); }
 const song0 = loadSong(dir);
@@ -47,11 +47,6 @@ const appJs = bundle.outputFiles.find((f) => f.path.endsWith(".js"))!.text;
 log(`built in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 
 const fonts: Record<string, string> = {
-  "plex-sans-condensed-400.woff2": "node_modules/@ibm/plex-sans-condensed/fonts/complete/woff2/IBMPlexSansCondensed-Regular.woff2",
-  "plex-sans-condensed-500.woff2": "node_modules/@ibm/plex-sans-condensed/fonts/complete/woff2/IBMPlexSansCondensed-Medium.woff2",
-  "plex-sans-condensed-600.woff2": "node_modules/@ibm/plex-sans-condensed/fonts/complete/woff2/IBMPlexSansCondensed-SemiBold.woff2",
-  "plex-mono-400.woff2": "node_modules/@ibm/plex-mono/fonts/complete/woff2/IBMPlexMono-Regular.woff2",
-  "plex-mono-500.woff2": "node_modules/@ibm/plex-mono/fonts/complete/woff2/IBMPlexMono-Medium.woff2",
   "special-elite.ttf": "assets/fonts/SpecialElite-Regular.ttf",
   "space-grotesk-400.woff2": "node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-400-normal.woff2",
   "space-grotesk-500.woff2": "node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-500-normal.woff2",
@@ -62,11 +57,6 @@ const fonts: Record<string, string> = {
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>vizier · ${esc(song0.title)}</title>
 <link rel="icon" href="data:,">
 <style>
-@font-face { font-family: 'Plex Condensed'; src: url(/fonts/plex-sans-condensed-400.woff2) format('woff2'); font-weight: 400; }
-@font-face { font-family: 'Plex Condensed'; src: url(/fonts/plex-sans-condensed-500.woff2) format('woff2'); font-weight: 500; }
-@font-face { font-family: 'Plex Condensed'; src: url(/fonts/plex-sans-condensed-600.woff2) format('woff2'); font-weight: 600; }
-@font-face { font-family: 'Plex Mono'; src: url(/fonts/plex-mono-400.woff2) format('woff2'); font-weight: 400; }
-@font-face { font-family: 'Plex Mono'; src: url(/fonts/plex-mono-500.woff2) format('woff2'); font-weight: 500; }
 @font-face { font-family: 'Special Elite'; src: url(/fonts/special-elite.ttf) format('truetype'); }
 @font-face { font-family: 'Space Grotesk'; src: url(/fonts/space-grotesk-400.woff2) format('woff2'); font-weight: 400; }
 @font-face { font-family: 'Space Grotesk'; src: url(/fonts/space-grotesk-500.woff2) format('woff2'); font-weight: 500 600; }
@@ -163,14 +153,10 @@ const server = createServer(async (req, res) => {
 });
 // The page reports every few seconds whether it has unsaved changes, so quitting can warn about them.
 let browser = { lastSeen: 0, dirty: false };
-let warnedAt = 0;
 process.on("SIGINT", () => {
-  const recent = Date.now() - browser.lastSeen < 10_000;
-  if (recent && browser.dirty && Date.now() - warnedAt > 5000) {
-    warnedAt = Date.now();
-    log("there are unsaved changes in the browser. Save them (⌘S), or press Ctrl+C again within 5 seconds to quit anyway.");
-    log("(if you quit, the changes stay in the open browser tab: start the editor again and save.)");
-    return;
+  if (Date.now() - browser.lastSeen < 10_000 && browser.dirty) {
+    log("You've quit with unsaved changes. They're still in the open browser tab:");
+    log(`restart the editor with   vizier editor ${relative(process.cwd(), dir) || "."} --no-open   and save (⌘S) in that tab.`);
   }
   process.exit(0);
 });

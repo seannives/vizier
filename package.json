@@ -9,13 +9,14 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc -b --noEmit -p tsconfig.json",
-    "render": "node --experimental-strip-types apps/offline/src/cli.ts",
-    "live": "node --experimental-strip-types apps/live/src/server.ts",
-    "validate": "node --experimental-strip-types apps/offline/src/tools.ts validate",
-    "analyze": "node --experimental-strip-types apps/offline/src/tools.ts analyze",
-    "demo": "node --experimental-strip-types scripts/make-demo-audio.ts",
-    "migrate": "node --experimental-strip-types apps/offline/src/tools.ts migrate",
-    "editor": "node --experimental-strip-types apps/editor/src/server.ts"
+    "render": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts render",
+    "live": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts live",
+    "validate": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts validate",
+    "analyze": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts analyze",
+    "demo": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts demo",
+    "migrate": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts migrate",
+    "editor": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts editor",
+    "vizier": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
@@ -27,8 +28,6 @@
   "dependencies": {
     "@fontsource/jetbrains-mono": "^5.3.0",
     "@fontsource/space-grotesk": "^5.3.0",
-    "@ibm/plex-mono": "^2.5.0",
-    "@ibm/plex-sans-condensed": "^2.0.0",
     "@types/d3-scale": "^4.0.9",
     "@types/d3-shape": "^3.2.0",
     "ajv": "^8.20.0",

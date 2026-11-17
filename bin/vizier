@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# The vizier command. Put this folder on your PATH (see docs/setup-mac.md), then run `vizier help`.
+set -e
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+exec node --experimental-strip-types --disable-warning=ExperimentalWarning "$DIR/../scripts/vizier.ts" "$@"

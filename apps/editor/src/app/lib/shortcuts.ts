@@ -15,21 +15,32 @@ export interface Shortcut {
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
+/** "Shift+Mod+Z" → modifiers + key. The key itself may be "+" ("+", "Mod++"). */
+function parse(spec: string): { mods: string[]; key: string } {
+  if (spec === "+") return { mods: [], key: "+" };
+  if (spec.endsWith("++")) return { mods: spec.slice(0, -2).split("+"), key: "+" };
+  const parts = spec.split("+");
+  const key = parts.pop()!;
+  return { mods: parts, key };
+}
+
 /** Display form: "Shift+Mod+Z" → "⇧⌘Z". */
 export function displayKeys(spec: string): string {
-  if (!isMac) return spec.replace("Mod", "Ctrl");
-  return spec.split("+").map((k) => ({ Mod: "⌘", Shift: "⇧", Alt: "⌥", ArrowLeft: "←", ArrowRight: "→", Space: "Space", Enter: "Return", Backspace: "⌫", Escape: "Esc" } as Record<string, string>)[k] ?? k).join("");
+  const { mods, key } = parse(spec);
+  const names: Record<string, string> = isMac
+    ? { Mod: "⌘", Shift: "⇧", Alt: "⌥", ArrowLeft: "←", ArrowRight: "→", Enter: "Return", Backspace: "⌫", Escape: "Esc" }
+    : { Mod: "Ctrl+", Shift: "Shift+", Alt: "Alt+", ArrowLeft: "←", ArrowRight: "→", Escape: "Esc" };
+  return [...mods, key].map((k) => names[k] ?? k).join("");
 }
 
 export function matches(spec: string, e: KeyboardEvent): boolean {
-  const parts = spec.split("+");
-  const key = parts.pop()!;
+  const { mods: parts, key } = parse(spec);
   const want = { mod: parts.includes("Mod"), shift: parts.includes("Shift"), alt: parts.includes("Alt") };
   const mod = isMac ? e.metaKey : e.ctrlKey;
   if (mod !== want.mod || e.altKey !== want.alt) return false;
   const k = key === "Space" ? " " : key;
-  // For symbols typed with Shift (?, +) don't require Shift to be declared.
-  if (k.length === 1 && !/[a-z0-9]/i.test(k)) return e.key === k;
+  // For symbols typed with Shift (?, +) don't require Shift to be declared. Space isn't one: ⇧Space is its own shortcut.
+  if (k.length === 1 && k !== " " && !/[a-z0-9]/i.test(k)) return e.key === k;
   if (e.shiftKey !== want.shift) return false;
   return e.key.toLowerCase() === k.toLowerCase();
 }

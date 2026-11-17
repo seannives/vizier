@@ -48,11 +48,24 @@ pnpm test
 
 All tests should pass (the same checks GitHub runs on every push).
 
+### Put the `vizier` command on your PATH
+
+Run this once, from the `vizier` folder (it adds the folder's `bin/` to your shell's PATH):
+
+```sh
+echo "export PATH=\"$(pwd)/bin:\$PATH\"" >> ~/.zshrc
+source ~/.zshrc
+vizier help
+```
+
+`vizier help` lists the commands; `vizier help render` (or `vizier render --help`) explains one.
+Every command also works as `pnpm <command>` from the `vizier` folder.
+
 ## 4. Try the demo
 
 ```sh
-pnpm demo                                      # generates the demo's audio (a 32-bar techno sketch)
-pnpm render projects/demo --video full --gpu
+vizier demo                                      # generates the demo's audio (a 32-bar techno sketch)
+vizier render projects/demo --video full --gpu
 open projects/demo/output
 ```
 
@@ -69,23 +82,23 @@ open projects/<song-id>/media
 Copy in the mix and the stems (all exported from the same start point), then:
 
 ```sh
-pnpm analyze projects/<song-id>     # suggests tempo, where bar 1 starts, where each stem plays, sections
+vizier analyze projects/<song-id>     # suggests tempo, where bar 1 starts, where each stem plays, sections
 ```
 
 Write `song.json` and a video in `videos/` (copy the demo's as a starting point, or ask Claude to take a first
 pass), then check them:
 
 ```sh
-pnpm validate projects/<song-id>
+vizier validate projects/<song-id>
 ```
 
 ## 6. Render
 
 ```sh
-pnpm render projects/demo --video full --gpu                    # whole video
-pnpm render projects/demo --video reel --gpu                    # a Reel (its own bars and format)
-pnpm render projects/demo --video full --bars 9-17 --gpu        # any bar range
-pnpm render projects/demo --video full --still-bar 13 --gpu     # one frame as PNG
+vizier render projects/demo --video full --gpu                    # whole video
+vizier render projects/demo --video reel --gpu                    # a Reel (its own bars and format)
+vizier render projects/demo --video full --bars 9-17 --gpu        # any bar range
+vizier render projects/demo --video full --still-bar 13 --gpu     # one frame as PNG
 ```
 
 Renders go to the project's `output/` folder, named after the video, format and bar range. **A render replaces
@@ -100,7 +113,7 @@ speed (fps), where the time goes, and the time remaining.
 ## 6½. The editor
 
 ```sh
-pnpm editor projects/the-maleficus
+vizier editor projects/the-maleficus
 ```
 
 Open **http://localhost:5174** in Chrome. See [editor.md](editor.md) for what it does so far and its shortcuts.
@@ -111,7 +124,7 @@ Video export is slower than live playback, because every frame is copied out of 
 `--bench` measures only the drawing, which is what live playback costs:
 
 ```sh
-pnpm render projects/demo --video full --bars 9-25 --bench 300 --gpu
+vizier render projects/demo --video full --bars 9-25 --bench 300 --gpu
 ```
 
 It reports milliseconds per frame (average, 95th percentile, worst), how much of the frame budget that uses at
@@ -125,7 +138,7 @@ Plays the song and renders the visuals in time with it, in a Chrome tab, with a 
 frame pacing. Audio plays through your Mac's current output device.
 
 ```sh
-pnpm live projects/demo --video full
+vizier live projects/demo --video full
 ```
 
 When it prints `ready`, open http://localhost:5173 in Chrome and click the page. Keys:
