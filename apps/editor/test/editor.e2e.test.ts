@@ -26,7 +26,7 @@ run("editor (headless Chrome)", () => {
     cpSync(join(root, "projects/demo/videos"), join(dir, "videos"), { recursive: true });
     mkdirSync(join(dir, "media"));
     for (const [n, s] of Object.entries(makeDemoTracks())) writeFileSync(join(dir, "media", `${n}.wav`), wav(s, DEMO.sampleRate));
-    server = spawn(process.execPath, ["--experimental-strip-types", join(root, "apps/editor/src/server.ts"), dir, "--video", "full", "--port", String(PORT)], { stdio: ["ignore", "ignore", "pipe"] });
+    server = spawn(process.execPath, ["--experimental-strip-types", join(root, "apps/editor/src/server.ts"), dir, "--video", "full", "--port", String(PORT), "--no-open"], { stdio: ["ignore", "ignore", "pipe"] });
     await new Promise<void>((ok, fail) => {
       server.stderr!.on("data", (d) => { serverLog += d; if (serverLog.includes("ready:")) ok(); });
       server.on("exit", () => fail(new Error(serverLog)));
@@ -90,9 +90,80 @@ run("editor (headless Chrome)", () => {
     expect((await state()).range.from).toBe(11);
   }, 90_000);
 
+  it("← and ⇧← move back a bar and a beat (and → forward)", async () => {
+    const sec = (bar: number) => page.evaluate((b) => { const g = (window as any).vizierEditor.session().doc.song.grid; return g.downbeat + ((b - 1) * 4 * 60) / g.tempo[0].bpm; }, bar);
+    // the previous test left the playhead on bar 11
+    await page.keyboard.press("ArrowLeft");
+    expect((await state()).time).toBeCloseTo(await sec(10), 3);
+    await page.keyboard.press("Shift+ArrowLeft");
+    expect((await state()).time).toBeCloseTo(await sec(9.75), 3);
+    await page.keyboard.press("ArrowRight");
+    expect((await state()).time).toBeCloseTo(await sec(10), 3);
+  }, 60_000);
+
+  it("Play starts from the start marker and Stop returns to it; ⇧Space continues from where it stopped", async () => {
+    const marker = (await state()).marker;
+    await page.keyboard.press("Space");
+    await page.waitForFunction((m) => (window as any).vizierEditor.state.time > m + 0.5, marker, { timeout: 20_000 });
+    await page.keyboard.press("Space");
+    let s = await state();
+    expect(s.playing).toBe(false);
+    expect(s.time).toBeCloseTo(marker, 3);
+    await page.keyboard.press("Shift+Space");
+    await page.waitForFunction((m) => (window as any).vizierEditor.state.time > m + 0.6, marker, { timeout: 20_000 });
+    await page.keyboard.press("Space");
+    s = await state();
+    expect(s.time).toBeCloseTo(marker, 3);
+  }, 90_000);
+
+  it("snap off (⌘4) puts range edges exactly at the playhead", async () => {
+    const t = await page.evaluate(() => { const g = (window as any).vizierEditor.session().doc.song.grid; return g.downbeat + ((12.37 - 1) * 4 * 60) / g.tempo[0].bpm; });
+    const x = await page.evaluate((tt) => (window as any).vizierEditor.timeline().pageX(tt), t);
+    const y = await page.evaluate(() => (window as any).vizierEditor.timeline().laneY());
+    await page.mouse.click(x, y);
+    await page.keyboard.press("ControlOrMeta+4");
+    expect((await state()).snap).toBe(false);
+    await page.keyboard.press("BracketLeft");
+    const from = (await state()).range.from;
+    expect(Math.abs(from - 12.37)).toBeLessThan(0.02);
+    expect(Math.abs(from * 4 - Math.round(from * 4))).toBeGreaterThan(0.01); // not on a beat
+    await page.keyboard.press("ControlOrMeta+4");
+    expect((await state()).snap).toBe(true);
+  }, 60_000);
+
+  it("⌘ + swipe up zooms in (as in Ableton on a Mac); pinch-spread zooms in", async () => {
+    const tl = () => page.evaluate(() => (window as any).vizierEditor.timeline().zoomLevel());
+    const y = await page.evaluate(() => (window as any).vizierEditor.timeline().laneY());
+    const x = await page.evaluate(() => (window as any).vizierEditor.timeline().pageX(10));
+    const wheel = (deltaY: number, metaKey: boolean, ctrlKey: boolean) => page.evaluate(({ x, y, deltaY, metaKey, ctrlKey }) => {
+      document.elementFromPoint(x, y)!.dispatchEvent(new WheelEvent("wheel", { deltaY, metaKey, ctrlKey, clientX: x, clientY: y, bubbles: true, cancelable: true }));
+    }, { x, y, deltaY, metaKey, ctrlKey });
+    const z0 = await tl();
+    await wheel(40, true, false);
+    const z1 = await tl();
+    expect(z1).toBeGreaterThan(z0);
+    await wheel(-40, false, true); // pinch spread
+    expect(await tl()).toBeGreaterThan(z1);
+    await page.keyboard.press("0");
+  }, 30_000);
+
+  it("keeps the header and side panel in view when the window gets smaller again", async () => {
+    await page.setViewportSize({ width: 1800, height: 900 });
+    await page.waitForTimeout(300);
+    await page.setViewportSize({ width: 1100, height: 800 });
+    await page.waitForTimeout(500);
+    const save = await page.locator("header button", { hasText: "Save" }).boundingBox();
+    expect(save!.x + save!.width).toBeLessThanOrEqual(1100);
+    const aside = await page.locator("aside.inspector").boundingBox();
+    expect(aside!.x + aside!.width).toBeLessThanOrEqual(1101);
+    await page.setViewportSize({ width: 1440, height: 860 });
+  }, 30_000);
+
   it("shows the shortcuts with ?", async () => {
     await page.keyboard.press("Shift+Slash");
     expect(await page.locator("text=Keyboard shortcuts").count()).toBeGreaterThan(0);
+    expect(await page.locator("text=Close the shortcuts window").count()).toBe(1);
+    expect(await page.locator(".row", { hasText: "Zoom in" }).count()).toBe(1);
     await page.keyboard.press("Escape");
     expect(await page.locator("text=Keyboard shortcuts").count()).toBe(0);
   }, 60_000);

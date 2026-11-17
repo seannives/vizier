@@ -5,6 +5,7 @@
  * The server reads and writes the project's files; the page holds the session (project data + undo history).
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { spawn } from "node:child_process";
 import { parseArgs } from "node:util";
 import { readFileSync, writeFileSync, statSync, createReadStream, existsSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -21,7 +22,10 @@ import { listVideos, loadSong, loadVideoFile, projectDir } from "../../offline/s
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const { values, positionals } = parseArgs({
   allowPositionals: true,
-  options: { video: { type: "string" }, port: { type: "string", default: "5174" }, host: { type: "string", default: "127.0.0.1" } },
+  options: {
+    video: { type: "string" }, port: { type: "string", default: "5174" }, host: { type: "string", default: "127.0.0.1" },
+    "no-open": { type: "boolean", default: false },
+  },
 });
 if (!positionals[0]) die("usage: pnpm editor <project folder> [--video name] [--port 5174]");
 let dir: string;
@@ -49,6 +53,10 @@ const fonts: Record<string, string> = {
   "plex-mono-400.woff2": "node_modules/@ibm/plex-mono/fonts/complete/woff2/IBMPlexMono-Regular.woff2",
   "plex-mono-500.woff2": "node_modules/@ibm/plex-mono/fonts/complete/woff2/IBMPlexMono-Medium.woff2",
   "special-elite.ttf": "assets/fonts/SpecialElite-Regular.ttf",
+  "space-grotesk-400.woff2": "node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-400-normal.woff2",
+  "space-grotesk-500.woff2": "node_modules/@fontsource/space-grotesk/files/space-grotesk-latin-500-normal.woff2",
+  "jetbrains-mono-400.woff2": "node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-400-normal.woff2",
+  "jetbrains-mono-500.woff2": "node_modules/@fontsource/jetbrains-mono/files/jetbrains-mono-latin-500-normal.woff2",
 };
 
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>vizier · ${esc(song0.title)}</title>
@@ -60,6 +68,10 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>
 @font-face { font-family: 'Plex Mono'; src: url(/fonts/plex-mono-400.woff2) format('woff2'); font-weight: 400; }
 @font-face { font-family: 'Plex Mono'; src: url(/fonts/plex-mono-500.woff2) format('woff2'); font-weight: 500; }
 @font-face { font-family: 'Special Elite'; src: url(/fonts/special-elite.ttf) format('truetype'); }
+@font-face { font-family: 'Space Grotesk'; src: url(/fonts/space-grotesk-400.woff2) format('woff2'); font-weight: 400; }
+@font-face { font-family: 'Space Grotesk'; src: url(/fonts/space-grotesk-500.woff2) format('woff2'); font-weight: 500 600; }
+@font-face { font-family: 'JetBrains Mono'; src: url(/fonts/jetbrains-mono-400.woff2) format('woff2'); font-weight: 400; }
+@font-face { font-family: 'JetBrains Mono'; src: url(/fonts/jetbrains-mono-500.woff2) format('woff2'); font-weight: 500; }
 </style></head><body><div id="app"></div><script type="module" src="/app.js"></script></body></html>`;
 
 // ---- caches ----
@@ -126,6 +138,11 @@ const server = createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "audio/wav", "content-length": statSync(path).size });
       return void createReadStream(path).pipe(res);
     }
+    if (p === "/api/heartbeat" && req.method === "POST") {
+      const b = JSON.parse((await readBody(req)) || "{}") as { dirty?: boolean };
+      browser = { lastSeen: Date.now(), dirty: !!b.dirty };
+      return json(res, { ok: true });
+    }
     if (p === "/api/save" && req.method === "POST") {
       const body = JSON.parse(await readBody(req)) as { song?: SongFile; videos?: Record<string, VideoFile> };
       const written: string[] = [];
@@ -144,7 +161,37 @@ const server = createServer(async (req, res) => {
     json(res, { error: (e as Error).message }, 500);
   }
 });
-server.listen(Number(values.port), values.host, () => log(`ready: open http://localhost:${values.port} in Chrome · ${dir}`));
+// The page reports every few seconds whether it has unsaved changes, so quitting can warn about them.
+let browser = { lastSeen: 0, dirty: false };
+let warnedAt = 0;
+process.on("SIGINT", () => {
+  const recent = Date.now() - browser.lastSeen < 10_000;
+  if (recent && browser.dirty && Date.now() - warnedAt > 5000) {
+    warnedAt = Date.now();
+    log("there are unsaved changes in the browser. Save them (⌘S), or press Ctrl+C again within 5 seconds to quit anyway.");
+    log("(if you quit, the changes stay in the open browser tab: start the editor again and save.)");
+    return;
+  }
+  process.exit(0);
+});
+
+server.listen(Number(values.port), values.host, () => {
+  const url = `http://localhost:${values.port}`;
+  log(`ready: ${url} · ${dir}`);
+  if (!values["no-open"] && !process.env.CI) openBrowser(url);
+});
+
+/** Open the editor in Chrome (falls back to the default browser). macOS and Linux desktops. */
+function openBrowser(url: string) {
+  const tryRun = (cmd: string, args: string[], fallback?: () => void) => {
+    const p = spawn(cmd, args, { stdio: "ignore", detached: true });
+    p.on("error", () => fallback?.());
+    p.on("exit", (code) => { if (code !== 0) fallback?.(); });
+    p.unref();
+  };
+  if (process.platform === "darwin") tryRun("open", ["-a", "Google Chrome", url], () => tryRun("open", [url]));
+  else if (process.platform === "linux" && process.env.DISPLAY) tryRun("xdg-open", [url]);
+}
 
 function esc(s: string) { return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!); }
 function log(s: string) { process.stderr.write(`[vizier edit] ${s}\n`); }

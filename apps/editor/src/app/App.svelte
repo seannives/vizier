@@ -109,33 +109,65 @@
     });
   }
 
-  // ---- actions ----
-  async function togglePlay() {
-    if (playing) { transport.stop(); playing = false; return; }
-    let from = transport.time();
-    if (loop && rangeSec && (from < rangeSec.from || from >= rangeSec.to)) from = rangeSec.from;
+  // ---- transport, Ableton-style ----
+  // Play starts from the start marker; Stop returns to it. Clicking the timeline (or the arrow keys) moves the
+  // marker. ⇧Space continues from where playback stopped. With loop on, playback wraps at the range's end.
+  let marker = $state(0);
+  let stoppedAt = 0;
+  async function startFrom(from: number) {
+    if (loop && rangeSec && from >= rangeSec.to) from = rangeSec.from;
     if (from >= duration - 0.05) from = rangeSec?.from ?? 0;
     await transport.play(from); playing = true;
   }
-  const seek = (t: number) => { transport.seek(t); time = t; };
+  async function togglePlay() {
+    if (playing) { stoppedAt = transport.time(); transport.stop(); playing = false; transport.seek(marker); time = marker; return; }
+    await startFrom(marker);
+  }
+  async function continuePlay() {
+    if (playing) return;
+    await startFrom(stoppedAt);
+  }
+  const seek = (t: number) => { marker = t; stoppedAt = t; transport.seek(t); time = t; };
   function nudge(dir: number, beat: boolean) {
-    const t = transport.time();
-    if (!grid) return seek(t + dir * 2);
+    const t = playing ? transport.time() : marker;
+    if (!grid) return seek(Math.max(0, t + dir * 2));
     const step = beat ? 1 / (grid.tempo[0]?.beatsPerBar ?? 4) : 1;
-    const bar = secondsToBar(t + 1e-4, grid);
-    const next = dir > 0 ? Math.floor(bar / step + 1e-6) * step + step : Math.ceil(bar / step - 1e-6) * step - step;
+    const eps = 1e-4;
+    const bar = secondsToBar(t, grid);
+    // the next bar/beat line strictly after (or before) the current position
+    const next = dir > 0 ? (Math.floor((bar + eps) / step) + 1) * step : (Math.ceil((bar - eps) / step) - 1) * step;
     seek(Math.max(0, barToSeconds(next, grid)));
   }
+
+  // ---- snap to the beat (⌘4, like Ableton's "Snap to Grid") ----
+  let snap = $state(load("vizier.snap", "1") === "1");
+  $effect(() => save_("vizier.snap", snap ? "1" : "0"));
+
+  // ---- audio delay: how far the sound you hear lags behind (e.g. Bluetooth headphones) ----
+  let audioDelayMs = $state(Number(load("vizier.audioDelayMs", "0")) || 0);
+  $effect(() => { transport.extraDelay = audioDelayMs / 1000; save_("vizier.audioDelayMs", String(audioDelayMs)); });
+
+  // ---- UI font (comparison: IBM Plex vs Space Grotesk + JetBrains Mono) ----
+  let font = $state(load("vizier.font", "plex"));
+  $effect(() => { document.documentElement.dataset.font = font; save_("vizier.font", font); });
+
+  // per-browser settings; storage can be unavailable, so never let it break anything
+  function load(k: string, d: string) { try { return localStorage.getItem(k) ?? d; } catch { return d; } }
+  function save_(k: string, v: string) { try { localStorage.setItem(k, v); } catch { /* not available */ } }
+
   function rangeEdgeAtPlayhead(edge: "from" | "to") {
     if (!grid) return;
-    const t = snapTime(transport.time(), grid);
+    const now = playing ? transport.time() : marker;
+    const t = snap ? snapTime(now, grid) : now;
     const cur = rangeSec ?? { from: 0, to: duration };
     const r = edge === "from" ? { from: t, to: Math.max(t + beatSeconds(t, grid), cur.to) } : { from: Math.min(cur.from, t - beatSeconds(t, grid)), to: t };
     setRange(r);
   }
   async function save() {
     if (!session || !session.dirty) { flash("nothing to save"); return; }
-    const res = await api.save(session.savePayload());
+    let res: { written?: string[]; error?: string };
+    try { res = await api.save(session.savePayload()); }
+    catch { serverOnline = false; flash("can't reach the editor server: start it again (pnpm editor …), then save; your changes are kept"); return; }
     if (res.error) { flash(`save failed: ${res.error}`); return; }
     session.markSaved();
     flash(`saved ${res.written?.join(", ")}`);
@@ -149,26 +181,42 @@
   let timeline: Timeline;
   let help = $state(false);
   const shortcuts: Shortcut[] = [
-    { keys: "Space", label: "Play / stop", group: "Transport", run: togglePlay },
+    { keys: "Space", label: "Play / stop (stop returns to the start marker)", group: "Transport", run: togglePlay },
+    { keys: "Shift+Space", label: "Continue from where playback stopped", group: "Transport", run: continuePlay },
     { keys: "L", label: "Loop the range", group: "Transport", run: () => (loop = !loop) },
     { keys: "ArrowRight", label: "Forward a bar", group: "Transport", run: () => nudge(1, false) },
     { keys: "ArrowLeft", label: "Back a bar", group: "Transport", run: () => nudge(-1, false) },
     { keys: "Shift+ArrowRight", label: "Forward a beat", group: "Transport", run: () => nudge(1, true) },
     { keys: "Shift+ArrowLeft", label: "Back a beat", group: "Transport", run: () => nudge(-1, true) },
-    { keys: "Home", label: "Go to range start (or song start)", group: "Transport", run: () => seek(rangeSec?.from ?? 0) },
+    { keys: "Enter", alt: ["Home"], display: "Return  or fn←", label: "Go to the range start (or the song start)", group: "Transport", run: () => seek(rangeSec?.from ?? 0) },
     { keys: "[", label: "Range starts at playhead", group: "Range", run: () => rangeEdgeAtPlayhead("from") },
     { keys: "]", label: "Range ends at playhead", group: "Range", run: () => rangeEdgeAtPlayhead("to") },
     { keys: "Shift+Backspace", label: "Clear the range (whole song)", group: "Range", run: () => setRange(null) },
-    { keys: "+", label: "Zoom in", group: "View", run: () => timeline?.zoomIn() },
-    { keys: "=", label: "Zoom in", group: "View", run: () => timeline?.zoomIn() },
+    { keys: "+", alt: ["="], label: "Zoom in", group: "View", run: () => timeline?.zoomIn() },
     { keys: "-", label: "Zoom out", group: "View", run: () => timeline?.zoomOut() },
     { keys: "0", label: "Zoom to fit the song", group: "View", run: () => timeline?.fit() },
     { keys: "Mod+Z", label: "Undo", group: "Edit", run: undo },
     { keys: "Shift+Mod+Z", label: "Redo", group: "Edit", run: redo },
     { keys: "Mod+S", label: "Save", group: "Edit", run: save },
+    { keys: "Mod+4", label: "Snap to the beat on / off", group: "Edit", run: () => { snap = !snap; flash(`snap to beat ${snap ? "on" : "off"}`); } },
     { keys: "?", label: "Show / hide shortcuts", group: "View", run: () => (help = !help) },
-    { keys: "Escape", label: "Close", group: "View", run: () => (help = false) },
+    { keys: "Escape", label: "Close the shortcuts window", group: "View", run: () => (help = false) },
   ];
+  // Tell the server we're here and whether there are unsaved changes (it warns before quitting), and notice
+  // when the server isn't running (saving needs it; changes stay in the browser meanwhile).
+  let serverOnline = $state(true);
+  onMount(() => {
+    const beat = async () => {
+      try {
+        await fetch("/api/heartbeat", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ dirty: !!session?.dirty }) });
+        serverOnline = true;
+      } catch { serverOnline = false; }
+    };
+    const id = setInterval(beat, 3000);
+    void beat();
+    return () => clearInterval(id);
+  });
+
   onMount(() => {
     const onkey = (e: KeyboardEvent) => handleKey(shortcuts, e);
     const onbeforeunload = (e: BeforeUnloadEvent) => { if (session?.dirty) { e.preventDefault(); e.returnValue = ""; } };
@@ -188,11 +236,16 @@
   const tracks = $derived(doc ? doc.song.tracks.map((t) => ({ id: t.id, name: t.name, mix: t.mix, wave: waves[t.id] ?? null })) : []);
   const layers = $derived(project ? [...project.layers].sort((a, b) => b.z - a.z) : []);
   const rangeLabel = $derived(rangeBars && grid ? `bars ${barLabel(rangeBars.from ?? 1, grid)} – ${barLabel(rangeBars.to ?? secondsToBar(duration, grid), grid)}` : "whole song");
+  const mmss = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
+  const rangeTime = $derived.by(() => {
+    const r = rangeSec ?? { from: 0, to: duration };
+    return `${mmss(r.from)} – ${mmss(r.to)} · ${(r.to - r.from).toFixed(1)} s`;
+  });
 
   // window API for end-to-end tests
   $effect(() => {
     (window as any).vizierEditor = {
-      get state() { return { status, error: loadError, playing, loop, time, videoName, dirtyFiles, range: rangeBars, undoLabel }; },
+      get state() { return { status, error: loadError, playing, loop, time, marker, snap, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
       timeline: () => timeline,
       session: () => session,
     };
@@ -213,6 +266,7 @@
     <div class="transport">
       <button class:on={playing} onclick={togglePlay} title="Play / stop ({displayKeys("Space")})">{playing ? "■" : "▶"}</button>
       <button class:on={loop} onclick={() => (loop = !loop)} title="Loop the range ({displayKeys("L")})">⟲</button>
+      <button class="snap" class:on={snap} onclick={() => (snap = !snap)} title="Snap to the beat ({displayKeys("Mod+4")})">Snap</button>
     </div>
     <div class="pos mono"><span class="bar">{position}</span><span class="dim">{clock(time)}</span>{#if bpm}<span class="dim">{bpm} BPM</span>{/if}</div>
     <div class="sect">{section}</div>
@@ -240,18 +294,27 @@
       <p class="soon">Editing layers, parameters and layout comes in milestone 2.</p>
       <h3>Range</h3>
       <div class="range">{rangeLabel}{#if rangeInherited}<span class="inh" title="from the base video">inherited</span>{/if}</div>
-      <p class="hint">Drag in the bar ruler to set the range; drag its edges to adjust. Hold ⇧ to turn off snapping to the beat.</p>
+      <div class="range dim">{rangeTime}</div>
+      <p class="hint">Drag in the bar ruler to set the range; drag its edges to adjust. Snap ({displayKeys("Mod+4")}) lines it up with beats; hold ⇧ while dragging to do the opposite.</p>
     </aside>
   </main>
 
   <section class="tl">
     <Timeline bind:this={timeline} {grid} {sections} {tracks} {duration} {time} range={rangeSec} {rangeInherited}
-      follow={playing} onseek={seek} onrange={setRange} />
+      follow={playing} {marker} {snap} onseek={seek} onrange={setRange} />
   </section>
 
   <footer class="status">
     <span>{message || status}</span>
+    {#if !serverOnline}<span class="offline">editor server not running: start it again to save (your changes are kept)</span>{/if}
     <span class="spacer"></span>
+    <span class="delay" title="How far the sound you hear lags behind the playhead (e.g. Bluetooth headphones add 150–250 ms). Raise it if the sound comes after the picture.">
+      audio delay
+      <button onclick={() => (audioDelayMs = Math.max(0, audioDelayMs - 10))}>−</button>
+      <span class="mono">{audioDelayMs} ms</span>
+      <button onclick={() => (audioDelayMs = Math.min(1000, audioDelayMs + 10))}>+</button>
+    </span>
+    <button class="font" onclick={() => (font = font === "plex" ? "grotesk" : "plex")} title="Compare UI fonts">{font === "plex" ? "IBM Plex" : "Space Grotesk"}</button>
     {#if dirtyFiles.length}<span class="unsaved">unsaved: {dirtyFiles.join(", ")}</span>{/if}
     <span class="dim">{projectId}/{videoName}</span>
   </footer>
@@ -261,8 +324,15 @@
 {#if help}<Help {shortcuts} onclose={() => (help = false)} />{/if}
 
 <style>
-  .app { display: grid; grid-template-rows: 42px minmax(0, 1fr) minmax(170px, 34vh) 24px; height: 100vh; }
-  .top { display: flex; align-items: center; gap: 10px; padding: 0 10px; background: var(--bg2); border-bottom: 1px solid var(--line2); }
+  .app { display: grid; grid-template-rows: 42px minmax(0, 1fr) minmax(170px, 34vh) 24px; grid-template-columns: minmax(0, 1fr);
+    height: 100vh; width: 100vw; overflow: hidden; }
+  .top { display: flex; align-items: center; gap: 10px; padding: 0 10px; background: var(--bg2); border-bottom: 1px solid var(--line2);
+    min-width: 0; overflow: hidden; }
+  .top select { min-width: 0; max-width: 220px; }
+  .transport .snap { width: auto; padding: 3px 7px; font-size: 11px; }
+  .offline { color: var(--danger); }
+  .delay { display: flex; align-items: center; gap: 4px; }
+  .delay button, .status .font { padding: 0 6px; font-size: 11px; line-height: 16px; }
   .brand { font-weight: 600; letter-spacing: .04em; color: var(--accent); }
   .proj { font-weight: 500; }
   .badge { font-size: 11px; color: var(--dim); border: 1px solid var(--line2); border-radius: 3px; padding: 1px 6px; }
@@ -285,7 +355,7 @@
   .soon, .hint { color: var(--faint); font-size: 11px; margin: 8px 0 14px; }
   .range { font-family: var(--mono); display: flex; gap: 8px; align-items: center; }
   .inh { font: 10px var(--ui); color: var(--dim); border: 1px dashed var(--line2); border-radius: 2px; padding: 0 4px; }
-  .tl { min-height: 0; }
+  .tl { min-height: 0; min-width: 0; overflow: hidden; }
   .status { display: flex; gap: 12px; align-items: center; padding: 0 10px; font-size: 11px; background: var(--bg2); border-top: 1px solid var(--line2); color: var(--dim); }
   .unsaved { color: var(--accent); }
   .fatal { padding: 40px; color: var(--danger); font: 14px var(--mono); }

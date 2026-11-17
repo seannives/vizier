@@ -6,6 +6,8 @@ export class Transport {
   private startedAt = 0;
   private offset = 0;
   playing = false;
+  /** Extra delay (seconds) between the audio clock and what you hear, e.g. Bluetooth headphones. */
+  extraDelay = 0;
 
   async load(url: string): Promise<number> {
     const data = await (await fetch(url)).arrayBuffer();
@@ -18,7 +20,8 @@ export class Transport {
   /** Song position in seconds. */
   time(): number {
     if (!this.playing) return this.offset;
-    return Math.max(0, this.offset + (this.ctx.currentTime - this.startedAt) - this.latency());
+    // never report a time before where playback started (the delay would otherwise run the playhead backwards)
+    return Math.max(this.offset, this.offset + (this.ctx.currentTime - this.startedAt) - this.latency() - this.extraDelay);
   }
   async play(from = this.offset) {
     if (!this.buffer) return;

@@ -7,6 +7,9 @@ const css = `
   --ui: 'Plex Condensed', 'IBM Plex Sans Condensed', system-ui, sans-serif;
   --mono: 'Plex Mono', 'IBM Plex Mono', ui-monospace, monospace;
 }
+/* the font comparison: the status bar's font button switches */
+:root[data-font="grotesk"] { --ui: 'Space Grotesk', system-ui, sans-serif; --mono: 'JetBrains Mono', ui-monospace, monospace; }
+html, body { font-family: var(--ui); }
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--bg0); color: var(--text); font: 13px/1.3 var(--ui);
   -webkit-font-smoothing: antialiased; overflow: hidden; user-select: none; }

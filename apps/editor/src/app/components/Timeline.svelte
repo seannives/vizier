@@ -5,9 +5,9 @@
 
   export interface TrackRow { id: string; name: string; mix?: boolean; wave: Waveform | null }
 
-  let { grid, sections, tracks, duration, time, range, rangeInherited, follow, onseek, onrange }: {
+  let { grid, sections, tracks, duration, time, range, rangeInherited, follow, marker = 0, snap = true, onseek, onrange }: {
     grid?: Grid; sections: { t: number; name: string }[]; tracks: TrackRow[]; duration: number; time: number;
-    range: { from: number; to: number } | null; rangeInherited: boolean; follow: boolean;
+    range: { from: number; to: number } | null; rangeInherited: boolean; follow: boolean; marker?: number; snap?: boolean;
     onseek: (t: number) => void; onrange: (r: { from: number; to: number } | null) => void;
   } = $props();
 
@@ -41,12 +41,17 @@
   /** For tests and tools: where a moment is drawn, in page coordinates. */
   export function pageX(t: number) { return canvas.getBoundingClientRect().left + xOf(t, view); }
   export function rulerY() { return canvas.getBoundingClientRect().top + H_RULER / 2; }
+  export function laneY() { return canvas.getBoundingClientRect().top + H_RULER + H_SECT + H_TRACK / 2; }
+  export function zoomLevel() { return view.pxPerSec; }
 
   $effect(() => { if (!fitted && duration > 0 && width > 100) { fitted = true; fit(); } });
 
   function onwheel(e: WheelEvent) {
     e.preventDefault();
-    if (e.ctrlKey || e.metaKey) zoomAt(Math.exp(-e.deltaY * 0.01), e.offsetX);
+    // ⌘ + two-finger swipe up zooms in, as in Ableton on a Mac (with natural scrolling a swipe up has deltaY > 0).
+    // Pinch (reported as Ctrl + wheel) and Ctrl + mouse wheel elsewhere: spreading / wheel up zooms in.
+    if (e.metaKey) zoomAt(Math.exp(e.deltaY * 0.01), e.offsetX);
+    else if (e.ctrlKey) zoomAt(Math.exp(-e.deltaY * 0.01), e.offsetX);
     else view = clampView({ ...view, start: view.start + (e.shiftKey ? e.deltaY : e.deltaX || e.deltaY) / view.pxPerSec });
   }
 
@@ -159,6 +164,12 @@
       }
     });
 
+    // start marker (where Play starts and Stop returns), when it differs from the playhead
+    if (Math.abs(marker - time) > 1e-3) {
+      const xm = Math.round(xOf(marker, v)) + 0.5;
+      ctx.strokeStyle = C.accent; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(xm - 5, H_RULER - 9); ctx.lineTo(xm + 5, H_RULER - 9); ctx.lineTo(xm, H_RULER - 2); ctx.closePath(); ctx.stroke();
+    }
     // playhead
     const xp = Math.round(xOf(time, v)) + 0.5;
     ctx.fillStyle = C.accent; ctx.fillRect(xp - 0.5, 0, 1.5, H);
@@ -168,7 +179,8 @@
   // ---- mouse: seek, scrub, create / move / resize the range ----
   type Drag = { kind: "seek" | "edgeL" | "edgeR" | "move" | "maybe"; x0: number; t0: number; orig: { from: number; to: number } | null; moved: boolean };
   let drag: Drag | null = null;
-  const snap = (t: number, e: MouseEvent) => (grid && !e.shiftKey ? snapTime(Math.min(Math.max(0, t), duration), grid) : Math.min(Math.max(0, t), duration));
+  // snapping follows the Snap setting; holding Shift while dragging does the opposite
+  const snapT = (t: number, e: MouseEvent) => (grid && snap !== e.shiftKey ? snapTime(Math.min(Math.max(0, t), duration), grid) : Math.min(Math.max(0, t), duration));
 
   function onpointerdown(e: PointerEvent) {
     canvas.setPointerCapture(e.pointerId);
@@ -193,11 +205,11 @@
     if (Math.abs(x - drag.x0) > 3) drag.moved = true;
     if (!drag.moved) return;
     if (drag.kind === "seek") return onseek(Math.min(Math.max(0, t), duration));
-    if (drag.kind === "maybe") drag.kind = drag.orig ? "move" : "edgeR", drag.orig ??= { from: snap(drag.t0, e), to: snap(drag.t0, e) };
+    if (drag.kind === "maybe") drag.kind = drag.orig ? "move" : "edgeR", drag.orig ??= { from: snapT(drag.t0, e), to: snapT(drag.t0, e) };
     const o = drag.orig!;
-    if (drag.kind === "edgeL") dragRange = { from: Math.min(snap(t, e), o.to), to: o.to };
-    else if (drag.kind === "edgeR") { const a = snap(t, e); dragRange = { from: Math.min(o.from, a), to: Math.max(o.from, a) }; }
-    else if (drag.kind === "move") { const len = o.to - o.from; const from = snap(o.from + (t - drag.t0), e); dragRange = { from, to: Math.min(duration, from + len) }; }
+    if (drag.kind === "edgeL") dragRange = { from: Math.min(snapT(t, e), o.to), to: o.to };
+    else if (drag.kind === "edgeR") { const a = snapT(t, e); dragRange = { from: Math.min(o.from, a), to: Math.max(o.from, a) }; }
+    else if (drag.kind === "move") { const len = o.to - o.from; const from = snapT(o.from + (t - drag.t0), e); dragRange = { from, to: Math.min(duration, from + len) }; }
   }
   function onpointerup(e: PointerEvent) {
     canvas.releasePointerCapture(e.pointerId);
@@ -231,6 +243,6 @@
   .h.track { text-transform: none; letter-spacing: 0; font-size: 12px; color: var(--text); }
   .h.track span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .h.track em { font-style: normal; font-size: 10px; color: var(--accent); border: 1px solid var(--accent-dim); border-radius: 2px; padding: 0 3px; }
-  .wrap { flex: 1; min-width: 0; position: relative; }
+  .wrap { flex: 1; min-width: 0; position: relative; overflow: hidden; }
   canvas { display: block; touch-action: none; }
 </style>

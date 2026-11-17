@@ -20,7 +20,8 @@ Editor milestones:
 - [ ] 4. Tracks like Ableton's (create, name, drop/replace/remove a stem; warn on length or alignment mismatch);
       tempo panel (typed BPM with detected suggestion, downbeat, drag the grid, audible click)
 - [ ] 5. Colour pickers, palette panel and colour lanes; Render button with progress; list of renders
-- [ ] Font comparison on screen: IBM Plex Sans Condensed + Plex Mono vs Space Grotesk + JetBrains Mono
+- [ ] Font comparison on screen: IBM Plex Sans Condensed + Plex Mono vs Space Grotesk + JetBrains Mono (switch is in
+      the status bar; decide, then remove the other)
 - [ ] Output window as a second view of the session (projector / second monitor), edits applied live
 - [ ] Later: pencil drawing of automation; finer snapping; record control moves (mouse or MIDI) as automation
 - [ ] Type-check Svelte files (svelte-check needs a TypeScript 6 + 7 setup today)
@@ -104,3 +105,6 @@ Editor milestones:
       end-to-end tests in headless Chrome
 - [x] Feedback lead-in only after backward jumps or leaps over 1 s (slow frames no longer cascade); 1 s lead-in in the
       editor and live window
+- [x] Editor feedback round 1: Ableton-style transport (start marker, ⇧Space continue), Snap toggle (⌘4), range in
+      minutes:seconds, ← and ⇧← fixed, Return/fn← for go-to-start, shortcut list tidied, window shrinking fixed,
+      ⌘-swipe zoom direction, audio delay setting, auto-open Chrome, server heartbeat and quit warning

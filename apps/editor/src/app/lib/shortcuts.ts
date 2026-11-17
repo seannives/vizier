@@ -2,14 +2,23 @@
  * Keyboard shortcuts, in one table so they're easy to change and to list (press ?).
  * "Mod" is ⌘ on a Mac, Ctrl elsewhere. Chrome keeps ⌘W, ⌘T, ⌘N and ⌘Q for itself, so they're never used.
  */
-export interface Shortcut { keys: string; label: string; group: string; run: () => void }
+export interface Shortcut {
+  keys: string;
+  label: string;
+  group: string;
+  run: () => void;
+  /** Other key combinations that do the same (not listed separately). */
+  alt?: string[];
+  /** How to show the keys in the list, when the default isn't clear (e.g. "Return or fn←"). */
+  display?: string;
+}
 
 const isMac = typeof navigator !== "undefined" && /Mac|iPhone|iPad/.test(navigator.platform);
 
 /** Display form: "Shift+Mod+Z" → "⇧⌘Z". */
 export function displayKeys(spec: string): string {
   if (!isMac) return spec.replace("Mod", "Ctrl");
-  return spec.split("+").map((k) => ({ Mod: "⌘", Shift: "⇧", Alt: "⌥", ArrowLeft: "←", ArrowRight: "→", Space: "Space" } as Record<string, string>)[k] ?? k).join("");
+  return spec.split("+").map((k) => ({ Mod: "⌘", Shift: "⇧", Alt: "⌥", ArrowLeft: "←", ArrowRight: "→", Space: "Space", Enter: "Return", Backspace: "⌫", Escape: "Esc" } as Record<string, string>)[k] ?? k).join("");
 }
 
 export function matches(spec: string, e: KeyboardEvent): boolean {
@@ -28,6 +37,6 @@ export function matches(spec: string, e: KeyboardEvent): boolean {
 export function handleKey(table: Shortcut[], e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement | null;
   if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return false;
-  for (const s of table) if (matches(s.keys, e)) { e.preventDefault(); s.run(); return true; }
+  for (const s of table) if ([s.keys, ...(s.alt ?? [])].some((k) => matches(k, e))) { e.preventDefault(); s.run(); return true; }
   return false;
 }
