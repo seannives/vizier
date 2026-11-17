@@ -23,6 +23,9 @@ server isn't running, the editor says so and keeps your changes: start it again 
   the playhead; scroll sideways with two fingers; zoom with ⌘ + two-finger swipe (up = in, as in Ableton) or pinch.
 - **Range**: drag in the bar ruler to set the video's range; drag its ends to adjust, or the bar to move it. The
   side panel shows it in bars and in minutes:seconds. A faint bar means the range is inherited from the base video.
+- **Preview**: shows whole frames at the video's frame rate (30 fps for most formats), as the export will.
+- **Frame timing** (I): shows the display rate, the share of late frames and what a preview frame costs, for
+  diagnosing a jerky playhead.
 - **Snap** (top bar, ⌘4): clicks and scrubbing on the timeline, and ranges, snap to beats, whether dragged or set with [ and ]. Hold ⇧ while dragging to do the
   opposite of the current setting.
 - **Sync** (status bar): lines the playhead and picture up with what you hear. If the sound comes after the playhead,

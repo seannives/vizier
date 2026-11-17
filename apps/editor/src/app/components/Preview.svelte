@@ -1,6 +1,8 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import { Renderer } from "../../../../../packages/core/src/browser/renderer.ts";
   import { getProfile, type Project } from "../../../../../packages/core/src/index.ts";
+  import { stats } from "../lib/stats.ts";
   import type { FeatureTrack } from "../../../../../packages/features/src/index.ts";
 
   let { project, profileId, features, time, scaleOverride = null, loopWraps = 0 }: {
@@ -29,15 +31,25 @@
       host.prepend(r.canvas);
       renderer = r;
       error = null;
-      r.renderAtTime(time);
+      // untracked: this effect builds the renderer, and must rerun only when the project or format changes, not
+      // whenever the playhead moves (reading `time` here used to rebuild the whole renderer on every frame)
+      shown = Math.floor(untrack(() => time) * r.profile.fps + 1e-6);
+      r.renderFrame(shown);
     } catch (e) { error = (e as Error).message; }
     return () => { r?.dispose(); if (renderer === r) renderer = null; };
   });
 
+  // The preview shows whole frames at the video's frame rate, as the export will: a new frame only when the playhead
+  // reaches it (30 a second for most formats), rather than one for every screen refresh (60 or 120 a second).
+  let shown = -1;
   $effect(() => {
-    const t = time;
-    if (renderer && loopWraps !== seenWraps) { seenWraps = loopWraps; renderer.continueThroughJump = true; }
-    renderer?.renderAtTime(t);
+    const frame = Math.floor(time * profile.fps + 1e-6);
+    if (!renderer || frame === shown) return;
+    if (loopWraps !== seenWraps) { seenWraps = loopWraps; renderer.continueThroughJump = true; }
+    const t0 = performance.now();
+    renderer.renderFrame(frame);
+    stats.preview(performance.now() - t0);
+    shown = frame;
   });
 
   const safe = $derived(profile.safeArea);

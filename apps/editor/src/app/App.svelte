@@ -8,6 +8,7 @@
   import Timeline from "./components/Timeline.svelte";
   import Preview from "./components/Preview.svelte";
   import Help from "./components/Help.svelte";
+  import { stats } from "./lib/stats.ts";
   import {
     barToSeconds, secondsToBar, barLabel, sectionTimes, videoFormat, getProfile, GENERATORS, type Project,
   } from "../../../../packages/core/src/index.ts";
@@ -78,10 +79,13 @@
 
   // ---- clock ----
   let loopWraps = $state(0);
+  let showStats = $state(false), perf = $state(stats.summary()), statsAt = 0;
   onMount(() => {
     let raf = 0;
-    const tick = () => {
-      let t = transport.time();
+    const tick = (ts: number) => {
+      stats.frame(ts);
+      if (showStats && ts - statsAt > 500) { statsAt = ts; perf = stats.summary(); }
+      let t = transport.time(ts);
       const r = rangeSec;
       if (playing && loop && r && t >= r.to) { transport.seek(r.from); t = r.from; loopWraps++; }
       if (playing && !transport.playing) playing = false;
@@ -199,6 +203,7 @@
     { keys: "Shift+Mod+Z", label: "Redo", group: "Edit", run: redo },
     { keys: "Mod+S", label: "Save", group: "Edit", run: save },
     { keys: "Mod+4", label: "Snap to the beat on / off", group: "Edit", run: () => { snap = !snap; flash(`snap to beat ${snap ? "on" : "off"}`); } },
+    { keys: "I", label: "Show / hide frame timing (for diagnosing a jerky playhead)", group: "View", run: () => (showStats = !showStats) },
     { keys: "?", label: "Show / hide shortcuts", group: "View", run: () => (help = !help) },
     { keys: "Escape", label: "Close the shortcuts window", group: "View", run: () => (help = false) },
   ];
@@ -247,6 +252,7 @@
   // window API for end-to-end tests
   $effect(() => {
     (window as any).vizierEditor = {
+      stats: () => stats.summary(),
       get state() { return { status, error: loadError, playing, transportPlaying: transport.playing, loop, loopWraps, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
       timeline: () => timeline,
       clock: () => transport.clockInfo(),
@@ -311,6 +317,7 @@
     <span>{message || status}</span>
     {#if !serverOnline}<span class="offline">editor server not running: start it again to save (your changes are kept)</span>{/if}
     <span class="spacer"></span>
+    {#if showStats}<span class="mono perf" title="Display refresh rate; frames that missed a refresh, and the longest gap; what one preview frame costs (avg / max)">{perf.hz} Hz · late {perf.latePct}% (worst {perf.worstFrameMs} ms) · preview {perf.previewAvgMs} / {perf.previewMaxMs} ms</span>{/if}
     <span class="delay" title={`Lines the playhead and picture up with what you hear. If the sound comes after the playhead, press +; if it comes before, press −. (Chrome measures ${reportedLatency} ms between the audio clock and the speakers, already allowed for.)`}>
       sync
       <button onclick={() => (syncMs = Math.max(-500, syncMs - 10))}>−</button>

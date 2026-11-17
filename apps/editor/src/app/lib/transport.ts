@@ -52,10 +52,11 @@ export class Transport {
   private smooth: { at: number; t: number } | null = null;
   /** Song position in seconds (of what you're hearing), smoothed for drawing: it advances with the display clock and
    *  is pulled gently towards the audio clock, so the playhead moves evenly and never steps backwards while playing.
-   *  A big difference (a seek, a large sync change) is taken at once. */
-  time(): number {
+   *  A big difference (a seek, a large sync change) is taken at once. Pass the animation frame's timestamp when
+   *  drawing, so every frame steps by exactly the time between refreshes, however busy the frame. */
+  time(now = performance.now()): number {
     if (!this.playing) return this.offset;
-    this.smooth = smoothClock(this.smooth, this.rawTime(), performance.now());
+    this.smooth = smoothClock(this.smooth, this.rawTime(), Math.max(now, this.smooth?.at ?? now));
     return this.smooth.t;
   }
   /** Readings of the audio clock, for diagnosing sync. */

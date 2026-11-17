@@ -192,6 +192,15 @@ run("editor (headless Chrome)", () => {
     expect((await state()).snap).toBe(true);
   }, 60_000);
 
+  it("I shows frame timing", async () => {
+    await page.keyboard.press("i");
+    await page.waitForTimeout(800);
+    expect(await page.locator(".perf").textContent()).toMatch(/\d+ Hz · late/);
+    expect((await page.evaluate(() => (window as any).vizierEditor.stats())).hz).toBeGreaterThan(0);
+    await page.keyboard.press("i");
+    expect(await page.locator(".perf").count()).toBe(0);
+  }, 30_000);
+
   it("⌘ + swipe up zooms in (as in Ableton on a Mac); pinch-spread zooms in", async () => {
     const tl = () => page.evaluate(() => (window as any).vizierEditor.timeline().zoomLevel());
     const y = await page.evaluate(() => (window as any).vizierEditor.timeline().laneY());
