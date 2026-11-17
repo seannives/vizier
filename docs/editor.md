@@ -1,10 +1,11 @@
 # The editor
 
 ```sh
-pnpm edit projects/<song> [--video <video>] [--port 5174]
+pnpm editor projects/<song> [--video <video>] [--port 5174]
 ```
 
-Then open **http://localhost:5174** in Chrome (add `?previewScale=0.25` for a smaller, cheaper preview on a slow machine). The editor reads and writes the project's files; nothing is
+(Any script also runs as `pnpm run <name>`, which always uses the project's own script even if pnpm has a command
+of the same name.) Then open **http://localhost:5174** in Chrome (add `?previewScale=0.25` for a smaller, cheaper preview on a slow machine). The editor reads and writes the project's files; nothing is
 uploaded anywhere. Stop it with Ctrl+C in Terminal.
 
 ## Milestone 1 (now)

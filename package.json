@@ -15,7 +15,7 @@
     "analyze": "node --experimental-strip-types apps/offline/src/tools.ts analyze",
     "demo": "node --experimental-strip-types scripts/make-demo-audio.ts",
     "migrate": "node --experimental-strip-types apps/offline/src/tools.ts migrate",
-    "edit": "node --experimental-strip-types apps/editor/src/server.ts"
+    "editor": "node --experimental-strip-types apps/editor/src/server.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",

@@ -6,7 +6,7 @@ Audio-reactive visuals for music videos and live shows. One renderer, two driver
 - **Live**: the same renderer fullscreen on a projector. Today it plays a song with a dropped-frame HUD
   (`pnpm live projects/<song> --video <video>`); live audio input and MIDI come later ([roadmap](docs/roadmap.md)).
 - **Editor** (in progress): a local web app for arranging a video without editing files
-  (`pnpm edit projects/<song>`; see [`docs/editor.md`](docs/editor.md)).
+  (`pnpm editor projects/<song>`; see [`docs/editor.md`](docs/editor.md)).
 
 Everything that changes over a song (geometry parameters, colours, text, layer position) is a
 parameter. Its value comes from a stack, **base → automation lane → audio modulation → live override**,
@@ -25,7 +25,7 @@ pnpm demo                                            # generates the demo projec
 pnpm render projects/demo --video full --gpu         # → projects/demo/output/full-youtube.mp4
 pnpm render projects/demo --video reel --gpu         # a vertical Reel that builds on the full video
 pnpm live projects/demo --video full                 # then open http://localhost:5173 in Chrome
-pnpm edit projects/demo                              # the editor: open http://localhost:5174 in Chrome
+pnpm editor projects/demo                              # the editor: open http://localhost:5174 in Chrome
 ```
 
 The demo's music is synthesised by code (`scripts/demo-audio.ts`), so the repository needs no audio files: a

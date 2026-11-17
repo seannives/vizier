@@ -98,7 +98,7 @@ Editor milestones:
 - [x] Colour engine (ADR 0008): five-slot palette (`acid` → `accent`); colours declared by generators, following
       palette slots or the layer's own; colour lanes blended in OKLCH; `hueShift` and `lightness` per layer
 - [x] One `format` per video (replaces `profiles`); `pnpm migrate` updates old project files
-- [x] Editor milestone 1: `pnpm edit`; Svelte 5 app with the session (project data, undo/redo, unsaved files) in plain
+- [x] Editor milestone 1: `pnpm editor`; Svelte 5 app with the session (project data, undo/redo, unsaved files) in plain
       TypeScript; video menu; play/stop; timeline (bar ruler, sections, waveforms, beat grid, zoom, scroll, follow);
       preview in the video's format with safe areas; range bracket (snap to beat); save; shortcut table and `?` overlay;
       end-to-end tests in headless Chrome

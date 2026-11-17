@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The editor: a local web app for a project folder.
- *   pnpm edit projects/demo [--video full] [--port 5174]   then open http://localhost:5174 in Chrome.
+ *   pnpm editor projects/demo [--video full] [--port 5174]   then open http://localhost:5174 in Chrome.
  * The server reads and writes the project's files; the page holds the session (project data + undo history).
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -23,7 +23,7 @@ const { values, positionals } = parseArgs({
   allowPositionals: true,
   options: { video: { type: "string" }, port: { type: "string", default: "5174" }, host: { type: "string", default: "127.0.0.1" } },
 });
-if (!positionals[0]) die("usage: pnpm edit <project folder> [--video name] [--port 5174]");
+if (!positionals[0]) die("usage: pnpm editor <project folder> [--video name] [--port 5174]");
 let dir: string;
 try { dir = projectDir(positionals[0]); } catch (e) { die((e as Error).message); }
 const song0 = loadSong(dir);

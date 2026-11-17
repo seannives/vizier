@@ -100,7 +100,7 @@ speed (fps), where the time goes, and the time remaining.
 ## 6½. The editor
 
 ```sh
-pnpm edit projects/the-maleficus
+pnpm editor projects/the-maleficus
 ```
 
 Open **http://localhost:5174** in Chrome. See [editor.md](editor.md) for what it does so far and its shortcuts.

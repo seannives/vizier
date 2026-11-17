@@ -6,7 +6,7 @@ Status: accepted (2026-11-16), to be built in Phase 3
 a music tool, and later grow into a way to *play* the visuals live.
 
 **Decisions.**
-- **A local web app** (`pnpm edit <project>`), served by a small local server that reads and writes the project
+- **A local web app** (`pnpm editor <project>`), served by a small local server that reads and writes the project
   folder (and copies stems into `media/`). Opened in Chrome. Not a desktop app for now.
 - **One shared session, several views.** The project data and undo history live in plain TypeScript, outside the
   UI framework. The editor and any output window (projector, second monitor) are views of the same session,
