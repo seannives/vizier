@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -6,6 +6,9 @@ const root = fileURLToPath(new URL("../../../", import.meta.url));
 const vizier = (...args: string[]) => spawnSync("bash", [root + "bin/vizier", ...args], { cwd: root, encoding: "utf8" });
 
 describe("the vizier command", () => {
+  // the demo's audio isn't in git; generate it (on a fresh machine, e.g. CI) so validate finds every file
+  beforeAll(() => { const r = vizier("demo"); expect(r.status).toBe(0); }, 60_000);
+
   it("lists its commands", () => {
     const r = vizier("help");
     expect(r.status).toBe(0);
