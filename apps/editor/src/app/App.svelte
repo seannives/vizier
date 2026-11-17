@@ -11,11 +11,11 @@
   import LayerList from "./components/LayerList.svelte";
   import LayerPanel from "./components/LayerPanel.svelte";
   import type { LayerRow, SpanS } from "./components/Timeline.svelte";
-  import { setSpans, splitLayerAt, duplicateLayer, layerOf } from "./lib/edits.ts";
+  import { setSpans, splitLayerAt, duplicateLayer, layerOf, setLayout } from "./lib/edits.ts";
   import type { Doc } from "./lib/session.ts";
   import { stats } from "./lib/stats.ts";
   import {
-    barToSeconds, secondsToBar, barLabel, sectionTimes, videoFormat, getProfile, spansToSeconds, type Project, type Span,
+    barToSeconds, secondsToBar, barLabel, sectionTimes, videoFormat, getProfile, spansToSeconds, type Project, type Span, type Transform,
   } from "../../../../packages/core/src/index.ts";
   import type { FeatureTrack } from "../../../../packages/features/src/index.ts";
 
@@ -285,6 +285,13 @@
     }));
     edit(sec.length > orig.length ? "add on-span" : "change on-span", (d) => setSpans(d, videoName!, id, next));
   }
+  const family = $derived(getProfile(profileId).layout);
+  function layoutFromPreview(id: string, t: Transform, final: boolean) {
+    const v = videoName, fam = family;
+    if (!v) return;
+    edit("move / resize layer", (d) => setLayout(d, v, id, fam, t), `layout:${id}`);
+    if (final) seal();
+  }
   function splitSelected() {
     if (!selectedLayer || playheadBar === null || !videoName) { flash("select a layer to split it at the playhead"); return; }
     const id = selectedLayer, at = playheadBar, sb = startBar, v = videoName;
@@ -352,7 +359,8 @@
 
   <main>
     <section class="stage">
-      {#if !previewOff}<Preview {project} {profileId} {features} {time} scaleOverride={previewScale} {loopWraps} />{/if}
+      {#if !previewOff}<Preview {project} {profileId} {features} {time} scaleOverride={previewScale} {loopWraps}
+        {selectedLayer} onselect={(id) => selectLayer(id)} onlayout={layoutFromPreview} />{/if}
       {#if projectErr}<div class="err">{projectErr}</div>{/if}
       {#if !features}<div class="note">analysing audio…</div>{/if}
     </section>
@@ -364,7 +372,7 @@
       {#if videoName}
         <LayerList {layers} video={videoName} selected={selectedLayer} defaultTrack={undefined} {trackName} {edit} onselect={(id) => selectLayer(id)} />
         {#if selectedLayer && doc}
-          <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} {edit} {seal}
+          <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} {edit} {seal} {family}
             onselect={(id) => selectLayer(id)} />
         {:else}
           <p class="hint">Select a layer to edit it. Each layer also has a row under its track in the timeline: drag there to set when it's on.</p>
@@ -419,7 +427,7 @@
   .sect { color: var(--accent); font-size: 12px; }
   .spacer { flex: 1; }
   main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; min-height: 0; }
-  .stage { position: relative; min-height: 0; background: var(--bg0); }
+  .stage { position: relative; min-height: 0; background: var(--bg0); overflow: hidden; }
   .note { position: absolute; top: 12px; left: 12px; color: var(--dim); font-size: 12px; }
   .err { position: absolute; bottom: 30px; left: 12px; right: 12px; color: var(--danger); font: 12px var(--mono); }
   .inspector { background: var(--bg1); border-left: 1px solid var(--line2); padding: 10px 12px; overflow: auto; }

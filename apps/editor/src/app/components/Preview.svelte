@@ -3,12 +3,17 @@
   import { Renderer } from "../../../../../packages/core/src/browser/renderer.ts";
   import { getProfile, type Project } from "../../../../../packages/core/src/index.ts";
   import { stats } from "../lib/stats.ts";
+  import LayoutOverlay from "./LayoutOverlay.svelte";
+  import { spansToSeconds, spanGain, type LayerDef, type Transform } from "../../../../../packages/core/src/index.ts";
   import type { FeatureTrack } from "../../../../../packages/features/src/index.ts";
 
-  let { project, profileId, features, time, scaleOverride = null, loopWraps = 0 }: {
+  let { project, profileId, features, time, scaleOverride = null, loopWraps = 0, selectedLayer = null, onselect = () => {}, onlayout = () => {} }: {
     project: Project | null; profileId: string; features: Record<string, FeatureTrack> | null; time: number;
     scaleOverride?: number | null; loopWraps?: number;
+    selectedLayer?: string | null; onselect?: (id: string | null) => void;
+    onlayout?: (id: string, t: Transform, final: boolean) => void;
   } = $props();
+  const isOn = (l: LayerDef) => !l.spans?.length || !project?.grid || spanGain(spansToSeconds(l.spans, project.grid), time) > 0;
   // a loop wrapping is a jump back in time; let trails flow on through it rather than re-render a lead-in
   let seenWraps = 0;
 
@@ -88,6 +93,9 @@
 
 <div class="preview">
   <div class="box" style:aspect-ratio="{profile.width} / {profile.height}" bind:this={host}>
+    {#if project}
+      <LayoutOverlay layers={project.layers} family={profile.layout} {safe} selected={selectedLayer} {isOn} {onselect} {onlayout} />
+    {/if}
     {#if safe}
       <div class="safe" title="Safe area: Instagram crops Reels to this in the feed"
         style:left="{safe.x * 100}%" style:top="{safe.y * 100}%" style:width="{safe.w * 100}%" style:height="{safe.h * 100}%"></div>

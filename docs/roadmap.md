@@ -16,8 +16,12 @@ Editor milestones:
   - [x] 2a. Layer list (add, remove, reorder, duplicate, rename); layer panel (generator, track, blend, text,
         parameters from plugin declarations, effect chain); when a layer is on (spans, rows on the timeline, ⌘E split);
         edits applied to the preview without restarting trails (ADR 0009)
-  - [ ] 2b. Drag/resize/rotate layers on the preview per layout family; snap to centre and safe-area edges
+  - [x] 2b. Drag/resize/rotate layers on the preview per layout family; snap to edges and centres of the frame
+        and safe area; Layout section in the panel; resizing keeps a layer's shaders
   - [ ] 2c. Inherited markers, reset to inherited, Open base; New / Duplicate / Detach video
+- [ ] Preview in its own window (after 2c, before 3): pop the preview out to a second window (the output window
+      below, with the same layout handles); the main window then splits Range/video settings from the layer panel
+      and gives the timeline more height for automation lanes
 - [ ] 3. Automation lanes: one per parameter, add/drag/delete breakpoints, curve types, beat snapping;
       audio-modulation editor (track + feature + amount)
 - [ ] 4. Tracks like Ableton's (create, name, drop/replace/remove a stem; warn on length or alignment mismatch);

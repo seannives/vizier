@@ -79,7 +79,7 @@ interface Target { tex: WebGLTexture; fbo: WebGLFramebuffer }
 interface EffectState { id: string; def: EffectDef; params: Record<string, number>; programs: WebGLProgram[]; fb: [Target, Target] | null }
 interface LayerState {
   def: LayerDef; gen: Generator; w: number; h: number;
-  /** What the GPU resources were built for: generator, size, effect chain. Same key → reuse on update. */
+  /** What the shaders were built for: generator and effect chain. Same key → reuse on update (resized if needed). */
   key: string;
   spans?: SpanSec[];
   /** Off (outside its spans) last frame: its trails are cleared when it comes back on. */
@@ -167,19 +167,32 @@ export class Renderer {
   }
 
   private layerKey(def: LayerDef): string {
+    return JSON.stringify([def.generator, (def.effects ?? []).map((e) => [e.type, e.id ?? e.type])]);
+  }
+  /** The layer's pixel size in this format. */
+  private layerSize(def: LayerDef): [number, number] {
     const tr = layoutFor(def, this.profile.layout);
     const s = def.resolutionScale ?? 1;
-    const w = Math.max(1, Math.round(tr.w * this.profile.width * s)), h = Math.max(1, Math.round(tr.h * this.profile.height * s));
-    return JSON.stringify([def.generator, w, h, (def.effects ?? []).map((e) => [e.type, e.id ?? e.type])]);
+    return [Math.max(1, Math.round(tr.w * this.profile.width * s)), Math.max(1, Math.round(tr.h * this.profile.height * s))];
+  }
+  /** New size: new textures (the shaders stay); its trails start fresh. */
+  private resizeLayer(L: LayerState, w: number, h: number) {
+    const gl = this.gl;
+    const freeT = (t?: Target) => { if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); } };
+    L.ping.forEach(freeT); freeT(L.src);
+    if (L.srcTex) gl.deleteTexture(L.srcTex);
+    for (const e of L.effects) e.fb?.forEach(freeT);
+    L.w = w; L.h = h;
+    L.ping = [this.target(w, h), this.target(w, h)];
+    if (L.canvas) { L.canvas.width = w; L.canvas.height = h; L.srcTex = this.texture(w, h); }
+    if (L.src) L.src = this.target(w, h);
+    for (const e of L.effects) if (e.fb) e.fb = [this.target(w, h), this.target(w, h)];
   }
 
   private buildLayer(def: LayerDef): LayerState {
-    const { width, height } = this.profile;
     const gen = GENERATORS[def.generator];
     if (!gen) throw new Error(`Unknown generator ${def.generator}`);
-    const tr = layoutFor(def, this.profile.layout);
-    const s = def.resolutionScale ?? 1;
-    const w = Math.max(1, Math.round(tr.w * width * s)), h = Math.max(1, Math.round(tr.h * height * s));
+    const [w, h] = this.layerSize(def);
     const L: LayerState = { def, gen, w, h, key: this.layerKey(def), spans: this.spansOf(def), off: false, ping: [this.target(w, h), this.target(w, h)], effects: [] };
     if (gen.kind === "canvas2d") {
       L.canvas = new OffscreenCanvas(w, h);
@@ -215,9 +228,10 @@ export class Renderer {
   }
 
   /**
-   * Apply an edited project without starting over: layers whose generator, size and effect chain are unchanged keep
-   * their GPU state (so trails flow on); parameters, colours, text, spans, order and automation take effect at
-   * once. Only new or rebuilt layers start fresh. Doesn't render; call renderFrame after.
+   * Apply an edited project without starting over: layers whose generator and effect chain are unchanged keep
+   * their shaders and state (so trails flow on); parameters, colours, text, spans, position, order and automation
+   * take effect at once. A resized layer gets new textures (its trails start fresh); only new layers, or ones with
+   * a new generator or effect chain, are built from scratch. Doesn't render; call renderFrame after.
    */
   update(project: Project): void {
     const prevProject = this.project;
@@ -240,6 +254,8 @@ export class Renderer {
     for (const L of next) {
       if (built.includes(L)) continue;
       const def = project.layers.find((d) => d.id === L.def.id)!;
+      const [w, h] = this.layerSize(def);
+      if (w !== L.w || h !== L.h) this.resizeLayer(L, w, h);
       L.def = def;
       L.spans = this.spansOf(def);
       L.effects.forEach((e, i) => { e.params = { ...defaults(e.def.params), ...def.effects?.[i]?.params }; });

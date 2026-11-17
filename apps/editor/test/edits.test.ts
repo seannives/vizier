@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Session, type Doc } from "../src/app/lib/session.ts";
 import {
-  addLayer, removeLayer, moveLayer, duplicateLayer, setParam, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
+  addLayer, removeLayer, moveLayer, duplicateLayer, setParam, setLayout, placement, hasOwnLayout, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
 } from "../src/app/lib/edits.ts";
 import { validateProject, buildProject, resolveVideo } from "../../../packages/core/src/index.ts";
 
@@ -131,5 +131,28 @@ describe("duplicating", () => {
     const id2 = duplicateLayer(d, "full", "ring");
     expect(z(id2)).toBeLessThan(z("ring"));
     expect(d.videos.full!.automation!.map((a) => a.target)).toContain(`${id2}.radius`);
+  });
+});
+
+describe("layout", () => {
+  it("sets one layout family, leaving the others; clears fixed layout parameters", () => {
+    const d = doc();
+    setParam(d, "full", "ring", "x", 0.2);
+    expect(placement(layerOf(d, "full", "ring")!, "landscape").x).toBe(0.2); // a fixed parameter wins
+    setLayout(d, "full", "ring", "landscape", { x: 0.3, y: 0.4, w: 0.5, h: 0.6, rotation: 15 });
+    const l = layerOf(d, "full", "ring")!;
+    expect(l.layout.landscape).toEqual({ x: 0.3, y: 0.4, w: 0.5, h: 0.6, rotation: 15 });
+    expect(l.params?.x).toBeUndefined();
+    expect(placement(l, "landscape").x).toBe(0.3);
+  });
+  it("a portrait video borrows the landscape layout until it's changed there", () => {
+    const d = doc();
+    const l = layerOf(d, "reel", "ring")!;
+    expect(hasOwnLayout(l, "portrait")).toBe(false);
+    expect(placement(l, "portrait")).toEqual({ x: 0.5, y: 0.5, w: 1, h: 1, rotation: 0 });
+    setLayout(d, "reel", "ring", "portrait", { x: 0.5, y: 0.3, w: 0.9, h: 0.4 });
+    expect(d.videos.reel!.layers).toEqual([{ id: "ring", layout: { portrait: { x: 0.5, y: 0.3, w: 0.9, h: 0.4 } } }]);
+    expect(layerOf(d, "reel", "ring")!.layout.landscape).toEqual({ x: 0.5, y: 0.5, w: 1, h: 1 }); // inherited, untouched
+    expect(layerOf(d, "full", "ring")!.layout.portrait).toBeUndefined();                       // the base untouched
   });
 });

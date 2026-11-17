@@ -219,6 +219,49 @@ run("editor (headless Chrome)", () => {
     } finally { await p2.close(); }
   }, 120_000);
 
+  it("moves, resizes and rotates a layer on the preview, one undo step per gesture", async () => {
+    const p3 = await browser.newPage({ viewport: { width: 1440, height: 860 } });
+    const layout = () => p3.evaluate(() => (window as any).vizierEditor.session().doc.videos.full.layers.find((l: any) => l.id === "ring").layout.landscape);
+    try {
+      await p3.goto(`http://localhost:${PORT}/?previewScale=0.1`);
+      await p3.waitForFunction(() => (window as any).vizierEditor?.state.status === "ready", null, { timeout: 60_000 });
+      await p3.waitForFunction(() => (window as any).vizierEditor.stats().renderersBuilt > 0, null, { timeout: 30_000 });
+      const orig = await layout();
+      await p3.click('[data-layer="ring"]');
+      const ov = (await p3.locator(".preview .overlay").boundingBox())!;
+      const cx = ov.x + ov.width / 2, cy = ov.y + ov.height / 2;
+      // drag the ring 100 px right (⇧: no snapping)
+      await p3.keyboard.down("Shift");
+      await p3.mouse.move(cx, cy); await p3.mouse.down();
+      await p3.mouse.move(cx + 50, cy, { steps: 4 }); await p3.mouse.move(cx + 100, cy, { steps: 4 }); await p3.mouse.up();
+      await p3.keyboard.up("Shift");
+      const a = await layout();
+      expect(a.x - orig.x).toBeCloseTo(100 / ov.width, 2);
+      expect(a.w).toBe(orig.w);
+      // widen it by 50 px from the right edge handle (the left edge stays put)
+      const rh = (await p3.locator('[data-handle="1,0"]').boundingBox())!;
+      await p3.keyboard.down("Shift");
+      await p3.mouse.move(rh.x + rh.width / 2, rh.y + rh.height / 2); await p3.mouse.down();
+      await p3.mouse.move(rh.x + rh.width / 2 + 50, rh.y + rh.height / 2, { steps: 5 }); await p3.mouse.up();
+      await p3.keyboard.up("Shift");
+      const b = await layout();
+      expect(b.w - a.w).toBeCloseTo(50 / ov.width, 2);
+      expect(b.x - b.w / 2).toBeCloseTo(a.x - a.w / 2, 3);
+      // rotate with the knob: a quarter turn counter-clockwise (snapped to 15° steps)
+      const k = (await p3.locator('[data-handle="rot"]').boundingBox())!;
+      const c = { x: ov.x + b.x * ov.width, y: ov.y + b.y * ov.height };
+      await p3.mouse.move(k.x + k.width / 2, k.y + k.height / 2); await p3.mouse.down();
+      await p3.mouse.move(c.x - 40, c.y - 40, { steps: 4 }); await p3.mouse.move(c.x - 80, c.y, { steps: 4 }); await p3.mouse.up();
+      expect((await layout()).rotation).toBe(90);
+      await p3.keyboard.press("ControlOrMeta+z");
+      expect((await layout()).rotation).toBeUndefined();
+      await p3.keyboard.press("ControlOrMeta+z");
+      expect((await layout()).w).toBe(a.w);
+      await p3.keyboard.press("ControlOrMeta+z");
+      expect(await layout()).toEqual(orig);
+    } finally { await p3.close(); }
+  }, 120_000);
+
   it("I shows frame timing", async () => {
     await page.keyboard.press("i");
     await page.waitForTimeout(800);

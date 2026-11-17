@@ -53,7 +53,22 @@ server isn't running, the editor says so and keeps your changes: start it again 
   layer from the base is marked "from base". Changing an inherited layer's generator replaces it with a new layer
   (same name, track, depth, layout and spans), because the base's settings wouldn't fit the new generator.
 
-Layout on the preview (drag and resize layers) comes next, then inherited markers, reset and video actions;
+### Layout on the preview
+
+- **Click a layer on the preview** to select it (only layers that are on at the playhead). Where layers overlap,
+  click again to select the next one down.
+- **Drag** the selected layer to move it; drag a **corner or edge handle** to resize it (the opposite side stays
+  put; hold ⌥ to resize about the centre); drag the **knob** on top to rotate it (in 15° steps; ⇧ for any angle).
+- **Snapping**: edges and centres snap to the frame's edges and centre, and to the safe area's for Reels (a dashed
+  pink line shows what it snapped to). Hold ⇧ to place freely. A rotated layer snaps its centre only.
+- **Each shape of format has its own layout**: landscape (YouTube), portrait (Shorts, Reels) and feed (Instagram
+  feed). A layer without a portrait layout borrows the landscape one until you change it in a portrait video.
+- The panel's **Layout** section shows the same numbers (position and size in % of the frame, rotation in degrees)
+  to type into, with **Fill frame** and **Centre**. A layer bigger than the frame has handles off the preview;
+  type its size there.
+- A drag is one undo step.
+
+Inherited markers, reset and video actions come next;
 automation lanes in milestone 3, tracks and tempo in 4, colour and render in 5 (see the [roadmap](roadmap.md)).
 
 ## Keyboard

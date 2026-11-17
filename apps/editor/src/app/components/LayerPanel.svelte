@@ -1,14 +1,14 @@
 <script lang="ts">
-  import { GENERATORS, EFFECTS, type Span, type ParamSpec, type BlendMode } from "../../../../../packages/core/src/index.ts";
+  import { GENERATORS, EFFECTS, type Span, type ParamSpec, type BlendMode, type LayoutFamily, type Transform } from "../../../../../packages/core/src/index.ts";
   import ParamControl from "./ParamControl.svelte";
   import {
     layerOf, isInherited, splitLayerAt, patchLayer, setParam, setGenerator, setSpans, addEffect, removeEffect, moveEffect, setEffectParam,
-    PANEL_LAYER_PARAMS, effectList, generatorList,
+    PANEL_LAYER_PARAMS, effectList, generatorList, placement, setLayout, hasOwnLayout,
   } from "../lib/edits.ts";
   import type { Doc } from "../lib/session.ts";
 
   /** The selected layer's settings: what draws it, its track, parameters, effects and when it's on. */
-  let { doc, video, layerId, tracks, playheadBar, startBar = 1, automated, edit, seal, onselect }: {
+  let { doc, video, layerId, tracks, playheadBar, startBar = 1, automated, edit, seal, onselect, family = "landscape" }: {
     doc: Doc; video: string; layerId: string; tracks: { id: string; name: string; mix?: boolean }[];
     /** The playhead's position in bars (for "split at playhead"), or null without a tempo. */
     playheadBar: number | null;
@@ -19,6 +19,8 @@
     edit: (label: string, fn: (d: Doc) => void, merge?: string) => void;
     seal: () => void;
     onselect: (id: string | null) => void;
+    /** The open video's layout family (its format's shape). */
+    family?: LayoutFamily;
   } = $props();
 
   const layer = $derived(layerOf(doc, video, layerId));
@@ -67,6 +69,17 @@
     if (playheadBar === null) return;
     edit("on from playhead", (d) => setSpans(d, video, layerId, [...spans, { from: round(playheadBar!) }]));
   }
+  // ---- layout (this format's shape) ----
+  const place = $derived(layer ? placement(layer, family) : null);
+  const ownLayout = $derived(layer ? hasOwnLayout(layer, family) : true);
+  const borrowed = $derived(layer && !ownLayout ? (["landscape", "portrait", "feed"] as const).find((f) => layer.layout[f]) : null);
+  function setPlace(patch: Partial<Transform>) {
+    if (!place) return;
+    const t = { ...place, ...patch };
+    edit("layout", (d) => setLayout(d, video, layerId, family, t));
+  }
+  const pct = (n: number) => String(Math.round(n * 1000) / 10);
+  const fromPct = (e: Event) => { const v = Number((e.currentTarget as HTMLInputElement).value); return Number.isFinite(v) ? v / 100 : undefined; };
   const removeSpan = (i: number) => edit("remove on-span", (d) => setSpans(d, video, layerId, spans.filter((_, j) => j !== i)));
 </script>
 
@@ -99,6 +112,22 @@
         oninput={(e) => { const t = e.currentTarget.value; edit("text", (d) => patchLayer(d, video, layerId, { text: t }), `${layerId}.text`); }}
         onchange={seal}></textarea>
     </label>
+  {/if}
+
+  <h4>Layout <span class="fam">{family}</span></h4>
+  {#if place}
+    <div class="lay mono">
+      <label>x <input type="text" value={pct(place.x)} aria-label="X (% of width)" onkeydown={(e) => e.stopPropagation()} onchange={(e) => { const v = fromPct(e); if (v !== undefined) setPlace({ x: v }); }} />%</label>
+      <label>y <input type="text" value={pct(place.y)} aria-label="Y (% of height)" onkeydown={(e) => e.stopPropagation()} onchange={(e) => { const v = fromPct(e); if (v !== undefined) setPlace({ y: v }); }} />%</label>
+      <label>w <input type="text" value={pct(place.w)} aria-label="Width (% of width)" onkeydown={(e) => e.stopPropagation()} onchange={(e) => { const v = fromPct(e); if (v !== undefined && v > 0) setPlace({ w: v }); }} />%</label>
+      <label>h <input type="text" value={pct(place.h)} aria-label="Height (% of height)" onkeydown={(e) => e.stopPropagation()} onchange={(e) => { const v = fromPct(e); if (v !== undefined && v > 0) setPlace({ h: v }); }} />%</label>
+      <label class="rot">rotation <input type="text" value={String(Math.round((place.rotation ?? 0) * 10) / 10)} aria-label="Rotation (degrees)" onkeydown={(e) => e.stopPropagation()} onchange={(e) => { const v = Number(e.currentTarget.value); if (Number.isFinite(v)) setPlace({ rotation: v }); }} />°</label>
+    </div>
+    {#if borrowed}<p class="note">Uses the {borrowed} layout. Changing it here gives this layer its own {family} layout.</p>{/if}
+    <div class="spanbtns">
+      <button onclick={() => setPlace({ x: 0.5, y: 0.5, w: 1, h: 1, rotation: 0 })}>Fill frame</button>
+      <button onclick={() => setPlace({ x: 0.5, y: 0.5 })}>Centre</button>
+    </div>
   {/if}
 
   <h4>On</h4>
@@ -170,6 +199,12 @@
   .field.col { flex-direction: column; align-items: stretch; }
   textarea { resize: vertical; font-family: 'Special Elite', var(--ui); }
   h4 { margin: 12px 0 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); font-weight: 500; border-top: 1px solid var(--line); padding-top: 8px; }
+  .fam { text-transform: none; letter-spacing: 0; color: var(--faint); margin-left: 4px; }
+  .lay { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 11px; color: var(--dim); }
+  .lay label { display: flex; align-items: center; gap: 4px; }
+  .lay input { width: 100%; min-width: 0; font-size: 11px; padding: 0 3px; text-align: right; }
+  .lay .rot { grid-column: span 2; }
+  .note { font-size: 11px; color: var(--faint); margin: 4px 0; }
   .whole { color: var(--dim); font-size: 12px; margin-bottom: 4px; }
   .span { font-size: 11px; color: var(--dim); padding: 3px 0; border-bottom: 1px solid var(--line); }
   .sr { display: grid; grid-template-columns: 38px 1fr 10px 1fr 34px; gap: 4px; align-items: center; margin: 2px 0; }

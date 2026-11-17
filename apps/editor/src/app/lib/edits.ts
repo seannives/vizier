@@ -4,7 +4,7 @@
  * (only what changed) to this video, and the base is never touched.
  */
 import {
-  resolveVideo, GENERATORS, EFFECTS, LAYER_PARAMS, type VideoFile, type VideoLayer, type LayerDef, type EffectRef, type Span, splitSpans,
+  resolveVideo, GENERATORS, EFFECTS, LAYER_PARAMS, type VideoFile, type VideoLayer, type LayerDef, type EffectRef, type Span, splitSpans, layoutFor, type LayoutFamily, type Transform,
 } from "../../../../../packages/core/src/index.ts";
 import type { Doc } from "./session.ts";
 
@@ -193,9 +193,36 @@ export function setSpans(doc: Doc, video: string, id: string, spans: Span[] | nu
   else delete e.spans;
 }
 
-/** Parameters the layer panel offers: the layer's own (opacity, rotation, hue, lightness) then the generator's.
- *  Position and size are set by dragging on the preview (layout) rather than here. */
-export const PANEL_LAYER_PARAMS = LAYER_PARAMS.filter((s) => !["x", "y", "w", "h"].includes(s.name));
+/** Layer parameters that, when set, override the layout (they're for automation). */
+export const LAYOUT_PARAMS = ["x", "y", "w", "h", "rotation"];
+/** Parameters the layer panel offers: the layer's own (opacity, hue, lightness) then the generator's. Position,
+ *  size and rotation are the layout: dragged on the preview, or typed in the panel's Layout section. */
+export const PANEL_LAYER_PARAMS = LAYER_PARAMS.filter((s) => !LAYOUT_PARAMS.includes(s.name));
+
+/** Where the layer is in a layout family, as drawn: its layout (falling back like the renderer: feed → portrait →
+ *  landscape), with any fixed x/y/w/h/rotation parameter on top. */
+export function placement(layer: LayerDef, family: LayoutFamily): Transform {
+  let base: Transform;
+  try { base = layoutFor(layer, family); } catch { base = { ...FULL_FRAME }; }
+  const p = layer.params ?? {};
+  return { x: p.x ?? base.x, y: p.y ?? base.y, w: p.w ?? base.w, h: p.h ?? base.h, rotation: p.rotation ?? base.rotation ?? 0 };
+}
+
+/** Set where a layer is in one layout family (the other families keep theirs). Fixed layout parameters on the
+ *  layer itself are cleared, so the layout is what you see. */
+export function setLayout(doc: Doc, video: string, id: string, family: LayoutFamily, t: Transform): void {
+  const r = (n: number) => Math.round(n * 10000) / 10000;
+  const tr: Transform = { x: r(t.x), y: r(t.y), w: r(t.w), h: r(t.h) };
+  if (t.rotation) tr.rotation = Math.round(t.rotation * 100) / 100;
+  const e = ownEntry(doc, video, id);
+  e.layout = { ...e.layout, [family]: tr };
+  if (e.params) {
+    for (const k of LAYOUT_PARAMS) delete e.params[k];
+    if (!Object.keys(e.params).length) delete e.params;
+  }
+}
+/** Whether the layer has a layout of its own for this family (otherwise it borrows another family's). */
+export const hasOwnLayout = (layer: LayerDef, family: LayoutFamily) => !!layer.layout[family];
 export const effectList = () => Object.values(EFFECTS);
 export const generatorList = () => Object.values(GENERATORS);
 
