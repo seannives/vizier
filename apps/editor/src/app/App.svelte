@@ -73,7 +73,7 @@
     const v = videoName;
     if (!v || v === featuresFor) return;
     featuresFor = v; features = null;
-    api.features(v).then((f) => { if (featuresFor === v) features = f; });
+    api.features(v).then((f) => { if (featuresFor === v) features = f; }).catch((e) => { projectErr = (e as Error).message; });
   });
 
   // ---- clock ----
@@ -189,7 +189,7 @@
   // window API for end-to-end tests
   $effect(() => {
     (window as any).vizierEditor = {
-      get state() { return { status, playing, loop, time, videoName, dirtyFiles, range: rangeBars, undoLabel }; },
+      get state() { return { status, error: loadError, playing, loop, time, videoName, dirtyFiles, range: rangeBars, undoLabel }; },
       timeline: () => timeline,
       session: () => session,
     };

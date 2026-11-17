@@ -4,17 +4,25 @@ import type { FeatureTrack } from "../../../../../packages/features/src/index.ts
 export interface SessionData extends Doc { id: string; initialVideo: string | null }
 export interface Waveform { rate: number; duration: number; peaks: Int8Array }
 
+/** Fetch JSON; a server error becomes an exception with the server's message. */
+async function getJson(url: string, init?: RequestInit) {
+  const r = await fetch(url, init);
+  const body = await r.json().catch(() => ({}));
+  if (!r.ok || body?.error) throw new Error(`${url.split("?")[0]}: ${body?.error ?? r.statusText}`);
+  return body;
+}
+
 export const api = {
-  async session(): Promise<SessionData> { return (await fetch("/api/session")).json(); },
+  async session(): Promise<SessionData> { return getJson("/api/session"); },
   async waveform(file: string): Promise<Waveform> {
-    const w = await (await fetch(`/api/waveform?file=${encodeURIComponent(file)}`)).json();
+    const w = await getJson(`/api/waveform?file=${encodeURIComponent(file)}`);
     const bin = atob(w.peaks);
     const peaks = new Int8Array(bin.length);
     for (let i = 0; i < bin.length; i++) peaks[i] = (bin.charCodeAt(i) << 24) >> 24;
     return { rate: w.rate, duration: w.duration, peaks };
   },
   async features(video: string): Promise<Record<string, FeatureTrack>> {
-    return (await fetch(`/api/features?video=${encodeURIComponent(video)}`)).json();
+    return getJson(`/api/features?video=${encodeURIComponent(video)}`);
   },
   audioUrl: (file: string) => `/api/audio?file=${encodeURIComponent(file)}`,
   async save(payload: object): Promise<{ written?: string[]; error?: string }> {
