@@ -19,6 +19,14 @@ run("editor (headless Chrome)", () => {
   let serverLog = "";
   const pageErrors: string[] = [];
   const state = () => page.evaluate(() => (window as any).vizierEditor.state);
+  /** Wait for a condition in the page; on timeout, fail with the editor's state, audio clock and page errors. */
+  async function waitUntil<A>(what: string, fn: (arg: A) => boolean, arg: A, timeout = 20_000) {
+    try { await page.waitForFunction(fn as any, arg, { timeout }); }
+    catch {
+      const info = await page.evaluate(() => ({ state: (window as any).vizierEditor.state, clock: (window as any).vizierEditor.clock() })).catch((e) => String(e));
+      throw new Error(`timed out waiting until ${what}\n${JSON.stringify(info)}\npage errors: ${pageErrors.join(" | ") || "none"}`);
+    }
+  }
 
   beforeAll(async () => {
     dir = mkdtempSync(join(tmpdir(), "vizier-editor-"));
@@ -35,8 +43,9 @@ run("editor (headless Chrome)", () => {
     page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
     page.on("pageerror", (e) => pageErrors.push(e.message));
     page.on("console", (m) => { if (m.type() === "error") pageErrors.push(m.text()); });
-    // A small preview: CI machines have no GPU, and the renderer is tested on its own elsewhere.
-    await page.goto(`http://localhost:${PORT}/?previewScale=0.12`);
+    // No preview: CI machines have no GPU, the renderer is tested on its own, and these tests are about the
+    // editor's transport and timeline, which must not compete with software rendering for the CPU.
+    await page.goto(`http://localhost:${PORT}/?previewScale=0`);
     // ready, or an error on screen: whichever comes first, and say why if it's not ready
     try {
       await page.waitForFunction(() => { const s = (window as any).vizierEditor?.state; return s && (s.status === "ready" || s.error); }, null, { timeout: 90_000 });
@@ -49,7 +58,7 @@ run("editor (headless Chrome)", () => {
 
   it("plays and stops with the space bar", async () => {
     await page.keyboard.press("Space");
-    await page.waitForFunction(() => (window as any).vizierEditor.state.time > 0.4, null, { timeout: 20_000 });
+    await waitUntil("time > 0.4", () => (window as any).vizierEditor.state.time > 0.4, null);
     const s = await state();
     expect(s.playing).toBe(true);
     await page.keyboard.press("Space");
@@ -104,7 +113,7 @@ run("editor (headless Chrome)", () => {
   it("Stop leaves the playhead where it stopped; Play jumps back to the start marker; ⇧Space continues", async () => {
     const marker = (await state()).marker;
     await page.keyboard.press("Space");
-    await page.waitForFunction((m) => (window as any).vizierEditor.state.time > m + 0.5, marker, { timeout: 20_000 });
+    await waitUntil("playing past marker + 0.5", (m: number) => (window as any).vizierEditor.state.time > m + 0.5, marker);
     await page.keyboard.press("Space");
     let s = await state();
     expect(s.playing).toBe(false);
@@ -113,7 +122,7 @@ run("editor (headless Chrome)", () => {
     await page.waitForTimeout(300);
     expect((await state()).time).toBeCloseTo(stoppedAt, 3);         // and doesn't move
     await page.keyboard.press("Space");                             // Play: back to the marker
-    await page.waitForFunction((st) => { const s = (window as any).vizierEditor.state; return s.playing && s.time < st - 0.2; }, stoppedAt, { timeout: 10_000 });
+    await waitUntil("playing again from the marker", (st: number) => { const s = (window as any).vizierEditor.state; return s.playing && s.time < st - 0.2; }, stoppedAt);
     await page.keyboard.press("Space");
     const second = (await state()).time;
     await page.keyboard.press("Shift+Space");                       // continue from the stop point
@@ -134,7 +143,7 @@ run("editor (headless Chrome)", () => {
     await page.keyboard.press("l");
     expect((await state()).loop).toBe(true);
     await page.keyboard.press("Space");
-    await page.waitForFunction(() => (window as any).vizierEditor.state.playing, null, { timeout: 10_000 });
+    await waitUntil("playing", () => (window as any).vizierEditor.state.playing, null);
     // watch for three times round: always playing, always inside the range (the editor counts the wraps itself,
     // so a slow test machine sampling only now and then can't miss them)
     const wraps0 = (await state()).loopWraps;

@@ -224,8 +224,10 @@
     return () => { removeEventListener("keydown", onkey); removeEventListener("beforeunload", onbeforeunload); };
   });
 
-  /** ?previewScale=0.25 renders a smaller preview (slow machines, automated tests). */
-  const previewScale = (() => { const v = Number(new URLSearchParams(location.search).get("previewScale")); return v > 0 && v <= 1 ? v : null; })();
+  /** ?previewScale=0.25 renders a smaller preview (slow machines); ?previewScale=0 turns it off (automated tests). */
+  const previewParam = new URLSearchParams(location.search).get("previewScale");
+  const previewOff = previewParam === "0";
+  const previewScale = (() => { const v = Number(previewParam); return v > 0 && v <= 1 ? v : null; })();
 
   // ---- display ----
   const sections = $derived(project && grid ? sectionTimes(project) : []);
@@ -280,7 +282,7 @@
 
   <main>
     <section class="stage">
-      <Preview {project} {profileId} {features} {time} scaleOverride={previewScale} {loopWraps} />
+      {#if !previewOff}<Preview {project} {profileId} {features} {time} scaleOverride={previewScale} {loopWraps} />{/if}
       {#if projectErr}<div class="err">{projectErr}</div>{/if}
       {#if !features}<div class="note">analysing audio…</div>{/if}
     </section>
