@@ -164,22 +164,12 @@
       }
     });
 
-    // start marker (where Play starts and Stop returns), when it differs from the playhead
-    if (Math.abs(marker - time) > 1e-3) {
-      const xm = Math.round(xOf(marker, v)) + 0.5;
-      ctx.strokeStyle = C.accent; ctx.lineWidth = 1.5;
-      ctx.beginPath(); ctx.moveTo(xm - 5, H_RULER - 9); ctx.lineTo(xm + 5, H_RULER - 9); ctx.lineTo(xm, H_RULER - 2); ctx.closePath(); ctx.stroke();
-    }
-    // playhead
-    const xp = Math.round(xOf(time, v)) + 0.5;
-    ctx.fillStyle = C.accent; ctx.fillRect(xp - 0.5, 0, 1.5, H);
-    ctx.beginPath(); ctx.moveTo(xp - 5, 0); ctx.lineTo(xp + 5, 0); ctx.lineTo(xp, 7); ctx.fill();
   });
 
   // ---- mouse: seek, scrub, create / move / resize the range ----
   type Drag = { kind: "seek" | "edgeL" | "edgeR" | "move" | "maybe"; x0: number; t0: number; orig: { from: number; to: number } | null; moved: boolean };
   let drag: Drag | null = null;
-  // snapping follows the Snap setting; holding Shift while dragging does the opposite
+  // snapping (clicks, scrubbing and range edges) follows the Snap setting; holding Shift does the opposite
   const snapT = (t: number, e: MouseEvent) => (grid && snap !== e.shiftKey ? snapTime(Math.min(Math.max(0, t), duration), grid) : Math.min(Math.max(0, t), duration));
 
   function onpointerdown(e: PointerEvent) {
@@ -192,7 +182,7 @@
       else drag = { kind: "maybe", x0: x, t0: t, orig: r && t > r.from && t < r.to ? r : null, moved: false };
     } else {
       drag = { kind: "seek", x0: x, t0: t, orig: null, moved: false };
-      onseek(Math.min(Math.max(0, t), duration));
+      onseek(snapT(t, e));
     }
   }
   function onpointermove(e: PointerEvent) {
@@ -204,7 +194,7 @@
     }
     if (Math.abs(x - drag.x0) > 3) drag.moved = true;
     if (!drag.moved) return;
-    if (drag.kind === "seek") return onseek(Math.min(Math.max(0, t), duration));
+    if (drag.kind === "seek") return onseek(snapT(t, e));
     if (drag.kind === "maybe") drag.kind = drag.orig ? "move" : "edgeR", drag.orig ??= { from: snapT(drag.t0, e), to: snapT(drag.t0, e) };
     const o = drag.orig!;
     if (drag.kind === "edgeL") dragRange = { from: Math.min(snapT(t, e), o.to), to: o.to };
@@ -215,7 +205,7 @@
     canvas.releasePointerCapture(e.pointerId);
     const d = drag; drag = null;
     if (!d) return;
-    if (!d.moved && (d.kind === "maybe" || d.kind === "edgeL" || d.kind === "edgeR")) { onseek(Math.min(Math.max(0, d.t0), duration)); return; }
+    if (!d.moved && (d.kind === "maybe" || d.kind === "edgeL" || d.kind === "edgeR")) { onseek(snapT(d.t0, e)); return; }
     if (dragRange) { const r = dragRange; dragRange = null; if (r.to - r.from > 0.05) onrange(r); }
   }
 </script>
@@ -231,6 +221,11 @@
   <div class="wrap" bind:this={wrap}>
     <canvas bind:this={canvas} style:height="{height}px" style:width="{width}px"
       {onwheel} {onpointerdown} {onpointermove} {onpointerup}></canvas>
+    <!-- the playhead and start marker sit on their own layer, so playing moves them without redrawing the waveforms -->
+    {#if Math.abs(marker - time) > 1e-3}
+      <div class="marker" style:transform="translateX({xOf(marker, view)}px)"></div>
+    {/if}
+    <div class="playhead" style:height="{height}px" style:transform="translateX({xOf(time, view)}px)"></div>
   </div>
 </div>
 
@@ -245,4 +240,8 @@
   .h.track em { font-style: normal; font-size: 10px; color: var(--accent); border: 1px solid var(--accent-dim); border-radius: 2px; padding: 0 3px; }
   .wrap { flex: 1; min-width: 0; position: relative; overflow: hidden; }
   canvas { display: block; touch-action: none; }
+  .playhead, .marker { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; }
+  .playhead { width: 1.5px; margin-left: -0.75px; background: var(--accent); }
+  .playhead::before { content: ""; position: absolute; top: 0; left: -4.25px; border: 5px solid transparent; border-top: 7px solid var(--accent); border-bottom: 0; }
+  .marker { top: 19px; left: -5px; width: 0; height: 0; border: 5px solid transparent; border-top: 7px solid var(--accent); border-bottom: 0; opacity: .7; }
 </style>

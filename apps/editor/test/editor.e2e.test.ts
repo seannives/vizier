@@ -172,13 +172,18 @@ run("editor (headless Chrome)", () => {
     }
   }, 90_000);
 
-  it("snap off (⌘4) puts range edges exactly at the playhead", async () => {
+  it("snap snaps clicks to beats; snap off (⌘4) puts clicks and range edges exactly where you click", async () => {
     const t = await page.evaluate(() => { const g = (window as any).vizierEditor.session().doc.song.grid; return g.downbeat + ((12.37 - 1) * 4 * 60) / g.tempo[0].bpm; });
     const x = await page.evaluate((tt) => (window as any).vizierEditor.timeline().pageX(tt), t);
     const y = await page.evaluate(() => (window as any).vizierEditor.timeline().laneY());
+    // with snap on, a click lands on the nearest beat (12.25)…
     await page.mouse.click(x, y);
+    expect(Math.abs((await state()).marker - (t - (0.12 * 4 * 60) / 128))).toBeLessThan(0.01);
+    // …and with it off, exactly where you click
     await page.keyboard.press("ControlOrMeta+4");
     expect((await state()).snap).toBe(false);
+    await page.mouse.click(x, y);
+    expect(Math.abs((await state()).marker - t)).toBeLessThan(0.02);
     await page.keyboard.press("BracketLeft");
     const from = (await state()).range.from;
     expect(Math.abs(from - 12.37)).toBeLessThan(0.02);

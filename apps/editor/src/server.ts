@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * The editor: a local web app for a project folder.
- *   vizier editor projects/demo [--video full] [--port 5174] [--no-open]   opens http://localhost:5174 in Chrome.
+ *   vizier editor projects/demo [--video full] [--port 5174] [--no-open]   opens http://localhost:5174 in a Chrome window of its own.
  * The server reads and writes the project's files; the page holds the session (project data + undo history).
  */
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
@@ -155,8 +155,8 @@ const server = createServer(async (req, res) => {
 let browser = { lastSeen: 0, dirty: false };
 process.on("SIGINT", () => {
   if (Date.now() - browser.lastSeen < 10_000 && browser.dirty) {
-    log("You've quit with unsaved changes. They're still in the open browser tab:");
-    log(`restart the editor with   vizier editor ${relative(process.cwd(), dir) || "."} --no-open   and save (⌘S) in that tab.`);
+    log("You've quit with unsaved changes. They're still in the open editor window:");
+    log(`restart the editor with   vizier editor ${relative(process.cwd(), dir) || "."} --no-open   and save (⌘S) in that window.`);
   }
   process.exit(0);
 });
@@ -175,7 +175,9 @@ function openBrowser(url: string) {
     p.on("exit", (code) => { if (code !== 0) fallback?.(); });
     p.unref();
   };
-  if (process.platform === "darwin") tryRun("open", ["-a", "Google Chrome", url], () => tryRun("open", [url]));
+  // A window of its own (Chrome's app mode: no tabs or address bar) rather than a tab in whichever window was last used.
+  // -n starts a second copy of Chrome, which passes the request to the one already running.
+  if (process.platform === "darwin") tryRun("open", ["-na", "Google Chrome", "--args", `--app=${url}`], () => tryRun("open", [url]));
   else if (process.platform === "linux" && process.env.DISPLAY) tryRun("xdg-open", [url]);
 }
 
