@@ -7,6 +7,7 @@ import { GENERATORS } from "../generators/index.ts";
 import { EFFECTS } from "../effects/index.ts";
 import { defaults, PALETTE_SLOTS, PALETTE_ALIASES, type DrawContext, type EffectDef, type Generator, type ParamSpec } from "../plugins.ts";
 import { parseHex, shiftColor } from "../color.ts";
+import { spansToSeconds, spanGain, type SpanSec } from "../spans.ts";
 
 // Composite: draws a layer texture as a transformed quad on the output.
 const VS_QUAD = `#version 300 es
@@ -78,6 +79,11 @@ interface Target { tex: WebGLTexture; fbo: WebGLFramebuffer }
 interface EffectState { id: string; def: EffectDef; params: Record<string, number>; programs: WebGLProgram[]; fb: [Target, Target] | null }
 interface LayerState {
   def: LayerDef; gen: Generator; w: number; h: number;
+  /** What the GPU resources were built for: generator, size, effect chain. Same key → reuse on update. */
+  key: string;
+  spans?: SpanSec[];
+  /** Off (outside its spans) last frame: its trails are cleared when it comes back on. */
+  off: boolean;
   canvas?: OffscreenCanvas; ctx?: OffscreenCanvasRenderingContext2D; srcTex?: WebGLTexture;
   program?: WebGLProgram; src?: Target;
   ping: [Target, Target]; effects: EffectState[];
@@ -156,32 +162,91 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.specTex);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, 32, 64, 0, gl.RED, gl.UNSIGNED_BYTE, null);
     this.texParams(gl.LINEAR);
-    for (const def of [...project.layers].sort((a, b) => a.z - b.z)) {
-      const gen = GENERATORS[def.generator];
-      if (!gen) throw new Error(`Unknown generator ${def.generator}`);
-      const tr = layoutFor(def, this.profile.layout);
-      const s = def.resolutionScale ?? 1;
-      const w = Math.max(1, Math.round(tr.w * width * s)), h = Math.max(1, Math.round(tr.h * height * s));
-      const L: LayerState = { def, gen, w, h, ping: [this.target(w, h), this.target(w, h)], effects: [] };
-      if (gen.kind === "canvas2d") {
-        L.canvas = new OffscreenCanvas(w, h);
-        L.ctx = L.canvas.getContext("2d")!;
-        L.srcTex = this.texture(w, h);
-      } else {
-        L.program = this.program(VS_FULL, generatorFS(gen));
-        L.src = this.target(w, h);
-      }
-      for (const ref of def.effects ?? []) {
-        const e = EFFECTS[ref.type];
-        if (!e) throw new Error(`Unknown effect ${ref.type}`);
-        L.effects.push({
-          id: ref.id ?? ref.type, def: e, params: { ...defaults(e.params), ...ref.params },
-          programs: e.passes.map((p) => this.program(VS_FULL, effectFS(e, p))),
-          fb: e.feedback ? [this.target(w, h), this.target(w, h)] : null,
-        });
-      }
-      this.layers.push(L);
+    for (const def of [...project.layers].sort((a, b) => a.z - b.z)) this.layers.push(this.buildLayer(def));
+    this.hasFeedback = this.layers.some((L) => L.effects.some((e) => e.fb));
+  }
+
+  private layerKey(def: LayerDef): string {
+    const tr = layoutFor(def, this.profile.layout);
+    const s = def.resolutionScale ?? 1;
+    const w = Math.max(1, Math.round(tr.w * this.profile.width * s)), h = Math.max(1, Math.round(tr.h * this.profile.height * s));
+    return JSON.stringify([def.generator, w, h, (def.effects ?? []).map((e) => [e.type, e.id ?? e.type])]);
+  }
+
+  private buildLayer(def: LayerDef): LayerState {
+    const { width, height } = this.profile;
+    const gen = GENERATORS[def.generator];
+    if (!gen) throw new Error(`Unknown generator ${def.generator}`);
+    const tr = layoutFor(def, this.profile.layout);
+    const s = def.resolutionScale ?? 1;
+    const w = Math.max(1, Math.round(tr.w * width * s)), h = Math.max(1, Math.round(tr.h * height * s));
+    const L: LayerState = { def, gen, w, h, key: this.layerKey(def), spans: this.spansOf(def), off: false, ping: [this.target(w, h), this.target(w, h)], effects: [] };
+    if (gen.kind === "canvas2d") {
+      L.canvas = new OffscreenCanvas(w, h);
+      L.ctx = L.canvas.getContext("2d")!;
+      L.srcTex = this.texture(w, h);
+    } else {
+      L.program = this.program(VS_FULL, generatorFS(gen));
+      L.src = this.target(w, h);
     }
+    for (const ref of def.effects ?? []) {
+      const e = EFFECTS[ref.type];
+      if (!e) throw new Error(`Unknown effect ${ref.type}`);
+      L.effects.push({
+        id: ref.id ?? ref.type, def: e, params: { ...defaults(e.params), ...ref.params },
+        programs: e.passes.map((p) => this.program(VS_FULL, effectFS(e, p))),
+        fb: e.feedback ? [this.target(w, h), this.target(w, h)] : null,
+      });
+    }
+    return L;
+  }
+
+  private spansOf(def: LayerDef): SpanSec[] | undefined {
+    return def.spans && def.spans.length && this.project.grid ? spansToSeconds(def.spans, this.project.grid) : undefined;
+  }
+
+  private freeLayer(L: LayerState) {
+    const gl = this.gl;
+    const freeT = (t?: Target) => { if (t) { gl.deleteTexture(t.tex); gl.deleteFramebuffer(t.fbo); } };
+    L.ping.forEach(freeT); freeT(L.src);
+    if (L.srcTex) gl.deleteTexture(L.srcTex);
+    if (L.program) gl.deleteProgram(L.program);
+    for (const e of L.effects) { e.programs.forEach((p) => gl.deleteProgram(p)); e.fb?.forEach(freeT); }
+  }
+
+  /**
+   * Apply an edited project without starting over: layers whose generator, size and effect chain are unchanged keep
+   * their GPU state (so trails flow on); parameters, colours, text, spans, order and automation take effect at
+   * once. Only new or rebuilt layers start fresh. Doesn't render; call renderFrame after.
+   */
+  update(project: Project): void {
+    const prevProject = this.project;
+    this.project = project;
+    const old = new Map(this.layers.map((L) => [L.def.id, L]));
+    const next: LayerState[] = [];
+    const built: LayerState[] = [];
+    try {
+      for (const def of [...project.layers].sort((a, b) => a.z - b.z)) {
+        const prev = old.get(def.id);
+        if (prev && prev.key === this.layerKey(def)) { old.delete(def.id); next.push(prev); }
+        else { const L = this.buildLayer(def); built.push(L); next.push(L); }
+      }
+    } catch (e) {
+      // leave the renderer as it was
+      for (const L of built) this.freeLayer(L);
+      this.project = prevProject;
+      throw e;
+    }
+    for (const L of next) {
+      if (built.includes(L)) continue;
+      const def = project.layers.find((d) => d.id === L.def.id)!;
+      L.def = def;
+      L.spans = this.spansOf(def);
+      L.effects.forEach((e, i) => { e.params = { ...defaults(e.def.params), ...def.effects?.[i]?.params }; });
+    }
+    for (const L of old.values()) this.freeLayer(L);
+    this.layers = next;
+    this.resolver = new ParamResolver(project);
     this.hasFeedback = this.layers.some((L) => L.effects.some((e) => e.fb));
   }
 
@@ -311,12 +376,18 @@ export class Renderer {
     const bg = parseHex(palette.bg!);
     gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
     const finals: (WebGLTexture | null)[] = [];
+    const gains: number[] = this.layers.map(() => 1);
     this.layers.forEach((L, idx) => {
       const id = L.def.id;
       const genDefaults = defaults(L.gen.params);
       const pv = (name: string, fallback?: number) =>
         this.resolver.value(`${id}.${name}`, L.def.params?.[name] ?? genDefaults[name] ?? fallback ?? 0, t, lookup);
-      const opacity = pv("opacity", L.def.opacity ?? 1);
+      // outside its spans the layer isn't drawn at all; coming back on, its trails start fresh
+      const gain = spanGain(L.spans, t);
+      if (gain <= 0) { L.off = true; finals.push(null); return; }
+      if (L.off) { L.off = false; for (const e of L.effects) if (e.fb) for (const tg of e.fb) this.clear(tg, L.w, L.h); }
+      const opacity = pv("opacity", L.def.opacity ?? 1) * gain;
+      gains[idx] = gain;
       if (opacity <= 0.001 && !L.effects.some((e) => e.fb)) { finals.push(null); return; }
       const t0 = this.timing ? performance.now() : 0;
       const stem = L.def.track ?? this.project.mix;
@@ -429,7 +500,7 @@ export class Renderer {
       gl.uniform2f(u("halfSize"), pv("w", base.w), pv("h", base.h));
       gl.uniform1f(u("rot"), (pv("rotation", base.rotation ?? 0) * Math.PI) / 180);
       gl.uniform1f(u("aspect"), width / height);
-      gl.uniform1f(u("opacity"), Math.min(1, pv("opacity", L.def.opacity ?? 1)));
+      gl.uniform1f(u("opacity"), Math.min(1, pv("opacity", L.def.opacity ?? 1) * gains[i]!));
       this.setBlend(L.def.blend ?? "normal");
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     });

@@ -47,7 +47,11 @@ export function matches(spec: string, e: KeyboardEvent): boolean {
 
 export function handleKey(table: Shortcut[], e: KeyboardEvent): boolean {
   const t = e.target as HTMLElement | null;
-  if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return false;
+  // typing goes to text fields; sliders and checkboxes only keep the keys they use (arrows), so Space still plays
+  const type = t?.tagName === "INPUT" ? (t as HTMLInputElement).type : "";
+  const control = type === "range" || type === "checkbox";
+  if (t && ((t.tagName === "INPUT" && !control) || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return false;
+  if (control && e.key.startsWith("Arrow")) return false;
   for (const s of table) if ([s.keys, ...(s.alt ?? [])].some((k) => matches(k, e))) { e.preventDefault(); s.run(); return true; }
   return false;
 }

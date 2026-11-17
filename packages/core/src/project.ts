@@ -6,6 +6,7 @@ import { LAYER_PARAMS, POST_PARAMS, PALETTE_SLOTS, PALETTE_ALIASES, isPaletteSlo
 import { isHex } from "./color.ts";
 import { isColorLane } from "./automation.ts";
 import type { LayoutFamily } from "./profiles.ts";
+import { validateSpans, type Span } from "./spans.ts";
 
 /** Where a layer sits on the output canvas. Fractions of the canvas, centre-anchored. */
 export interface Transform { x: number; y: number; w: number; h: number; rotation?: number }
@@ -34,6 +35,8 @@ export interface LayerDef {
   colors?: Record<string, string>;
   /** Effects applied to this layer's image, in order. Their parameters are "<layer>.<effect id>.<param>". */
   effects?: EffectRef[];
+  /** When the layer is on, in bars (see spans.ts). None: the whole song. */
+  spans?: Span[];
   /** One transform per layout family; "feed" falls back to "portrait", then "landscape". */
   layout: Partial<Record<LayoutFamily, Transform>>;
 }
@@ -112,6 +115,7 @@ export function validateProject(p: Project): string[] {
     if (ids.has(l.id)) errs.push(`duplicate layer id ${l.id}`);
     if (l.id === "post") errs.push(`"post" is reserved and can't be a layer id`);
     ids.add(l.id);
+    if (l.spans) errs.push(...validateSpans(l.spans, p.grid, `layer ${l.id}`));
     const gen = GENERATORS[l.generator];
     if (!gen) errs.push(`layer ${l.id}: unknown generator "${l.generator}" (known: ${Object.keys(GENERATORS).join(", ")})`);
     if (!l.layout.landscape && !l.layout.portrait) errs.push(`layer ${l.id} needs a landscape or portrait layout`);

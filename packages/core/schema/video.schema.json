@@ -176,6 +176,35 @@
               "pattern": "^(#[0-9A-Fa-f]{6}|bg|ink|accent|extra1|extra2|acid)$"
             },
             "description": "Generator colour \u2192 #rrggbb or a palette slot"
+          },
+          "spans": {
+            "type": "array",
+            "description": "When the layer is on, in bars (`to` exclusive; open-ended when missing); fades in beats. No spans: on for the whole song.",
+            "items": {
+              "type": "object",
+              "required": [
+                "from"
+              ],
+              "additionalProperties": false,
+              "properties": {
+                "from": {
+                  "type": "number"
+                },
+                "to": {
+                  "type": "number"
+                },
+                "fadeIn": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "beats"
+                },
+                "fadeOut": {
+                  "type": "number",
+                  "minimum": 0,
+                  "description": "beats"
+                }
+              }
+            }
           }
         }
       }

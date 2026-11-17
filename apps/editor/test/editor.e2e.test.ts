@@ -211,6 +211,11 @@ run("editor (headless Chrome)", () => {
       // the demo is 30 fps: at most one frame per video frame (+ a couple for the start)
       expect(after.previewFrames - before.previewFrames).toBeLessThanOrEqual(Math.ceil(secs * 30) + 3);
       expect(after.previewFrames - before.previewFrames).toBeGreaterThan(0);
+      // an edit is applied to the running renderer: no rebuild (trails flow on), and the picture is redrawn
+      const drawn = after.previewFrames;
+      await p2.evaluate(() => (window as any).vizierEditor.session().apply("test edit", (d: any) => { d.videos.full.layers.find((l: any) => l.id === "ring").params = { radius: 0.2 }; }));
+      await p2.waitForFunction((n) => (window as any).vizierEditor.stats().previewFrames > n, drawn, { timeout: 10_000 });
+      expect((await p2.evaluate(() => (window as any).vizierEditor.stats())).renderersBuilt - before.renderersBuilt, "renderers built for an edit").toBe(0);
     } finally { await p2.close(); }
   }, 120_000);
 
@@ -263,6 +268,50 @@ run("editor (headless Chrome)", () => {
     await page.keyboard.press("Escape");
     expect(await page.locator("text=Keyboard shortcuts").count()).toBe(0);
   }, 60_000);
+
+  it("switches generators at a bar: split the ring there, drop its second half, add a grid on from there", async () => {
+    const E = <A,>(f: (a: A) => unknown, a?: A) => page.evaluate(f as any, a);
+    const startLabel = (await state()).undoLabel;
+    const spansOf = (id: string) => E((i) => (window as any).vizierEditor.session().doc.videos.full.layers.find((l: any) => l.id === i)?.spans, id);
+    try {
+      // playhead to bar 17
+      const sec17 = (await E(() => { const g = (window as any).vizierEditor.session().doc.song.grid; return g.downbeat + (16 * 4 * 60) / g.tempo[0].bpm; })) as number;
+      await page.mouse.click(await E((t) => (window as any).vizierEditor.timeline().pageX(t), sec17 + 0.05) as number, await E(() => (window as any).vizierEditor.timeline().laneY()) as number);
+      await page.click('[data-layer="ring"]');
+      expect((await state()).selectedLayer).toBe("ring");
+      await page.keyboard.press("ControlOrMeta+e");
+      const split = await spansOf("ring") as { from: number; to?: number }[];
+      expect(split.map((s) => s.to)).toEqual([17, undefined]);
+      expect(split[1]!.from).toBe(17);
+      // click the second half in the ring's timeline row, delete it
+      const ly = await E(() => (window as any).vizierEditor.timeline().layerY("ring")) as number;
+      await page.mouse.click(await E((t) => (window as any).vizierEditor.timeline().pageX(t), sec17 + 5) as number, ly);
+      expect((await state()).selectedSpan).toBe(1);
+      await page.keyboard.press("Backspace");
+      expect((await spansOf("ring") as unknown[]).length).toBe(1);
+      // a Pulse grid on the bass track, on from the playhead
+      await page.selectOption('select[aria-label="Add a layer"]', "pulseGrid");
+      expect((await state()).selectedLayer).toBe("pulseGrid");
+      await page.selectOption('select[aria-label="Track"]', "bass");
+      await page.click("text=On from playhead");
+      expect(await spansOf("pulseGrid")).toEqual([{ from: 17 }]);
+      // drag a slider: one undo step
+      const slider = page.locator('input[aria-label="Brightness slider"]');
+      await slider.scrollIntoViewIfNeeded();
+      const box = (await slider.boundingBox())!;
+      await page.mouse.move(box.x + box.width * 0.3, box.y + box.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(box.x + box.width * 0.6, box.y + box.height / 2, { steps: 6 });
+      await page.mouse.move(box.x + box.width * 0.9, box.y + box.height / 2, { steps: 6 });
+      await page.mouse.up();
+      expect((await state()).undoLabel).toBe("brightness");
+      await page.keyboard.press("ControlOrMeta+z");
+      expect((await state()).undoLabel).toBe("on from playhead");
+    } finally {
+      for (let i = 0; i < 20 && (await state()).undoLabel !== startLabel; i++) await E(() => (window as any).vizierEditor.session().undo());
+      await page.keyboard.press("Escape");
+    }
+  }, 90_000);
 
   it("switches videos and shows the reel in its own format", async () => {
     await page.selectOption("select", "reel");

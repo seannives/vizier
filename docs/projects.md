@@ -69,8 +69,15 @@ Keep `media/`, `output/` and `.cache/` out of it.
   One per video: a Reel and a Short are two videos (one can build on the other).
 - `range`: bars, where `to` is exclusive (21–31 = bars 21 to 30). Leave it out for the whole song.
 - `layers`: each has an `id`, an optional `name`, a `generator`, the `track` it listens to (default: the mix),
-  `z`, `blend`, `opacity`, `params`, `colors`, `effects`, `text` and a `layout` per shape (`landscape`, `portrait`,
-  `feed`).
+  `z`, `blend`, `opacity`, `params`, `colors`, `effects`, `text`, `spans` (when it's on, below) and a `layout` per
+  shape (`landscape`, `portrait`, `feed`).
+- `spans`: when a layer is on, in bars, with optional fades in beats. Without spans a layer is on for the whole
+  song (an empty list too). Outside its spans a layer isn't drawn at all, and its trails start fresh when it comes
+  back on. Switching the 303 from the acid ring to a dot grid at bar 49, with a one-bar cross-fade:
+  `{ "id": "ring", …, "spans": [{ "from": 1, "to": 49, "fadeOut": 4 }] }` and
+  `{ "id": "bassGrid", "generator": "pulseGrid", "track": "bass", …, "spans": [{ "from": 48, "fadeIn": 4 }] }`.
+  `to` is exclusive, like the range, and can be left out (on to the end). Fades sit inside the span: a fade-in
+  starts at `from`, a fade-out ends at `to`.
 - `automation`: lanes of breakpoints in bars (or seconds with `t`); targets are `<layer>.<param>`,
   `<layer>.<effect>.<param>` or `post.<param>`. Curves: `linear`, `hold`, `smooth`.
 - `modulations`: audio driving a parameter: `{ "target": "chorus.opacity", "source": "chorus.env", "amount": 1.4 }`.
@@ -96,7 +103,8 @@ Each generator declares the colours it draws with, and each defaults to a palett
 
 A video with `base` starts from that video and changes only what it lists:
 
-- a layer with an existing id overrides that layer's fields (`params` and `layout` merge; `effects` replace);
+- a layer with an existing id overrides that layer's fields (`params` and `layout` merge; `effects` and `spans`
+  replace);
   `"remove": true` drops it; a new id adds a layer;
 - an automation lane replaces the base's lane for the same target (an empty `points` list removes it);
 - a modulation replaces the base's one with the same target and source (`"remove": true` drops it);

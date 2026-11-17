@@ -12,9 +12,12 @@ Colour engine first (so it can be tested in renders before the UI exists):
 
 Editor milestones:
 
-- [ ] 2. Layer list (add, remove, reorder, choose generator, track, effects); parameter panel built from plugin
-      declarations; drag/resize layers on the preview per format; inherited markers, reset to inherited, Open base;
-      New / Duplicate / Detach video
+- [ ] 2. In three parts:
+  - [x] 2a. Layer list (add, remove, reorder, duplicate, rename); layer panel (generator, track, blend, text,
+        parameters from plugin declarations, effect chain); when a layer is on (spans, rows on the timeline, ⌘E split);
+        edits applied to the preview without restarting trails (ADR 0009)
+  - [ ] 2b. Drag/resize/rotate layers on the preview per layout family; snap to centre and safe-area edges
+  - [ ] 2c. Inherited markers, reset to inherited, Open base; New / Duplicate / Detach video
 - [ ] 3. Automation lanes: one per parameter, add/drag/delete breakpoints, curve types, beat snapping;
       audio-modulation editor (track + feature + amount)
 - [ ] 4. Tracks like Ableton's (create, name, drop/replace/remove a stem; warn on length or alignment mismatch);

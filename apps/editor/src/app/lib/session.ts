@@ -5,7 +5,7 @@
 import { buildProject, resolveVideo, type Project, type SongFile, type VideoFile } from "../../../../../packages/core/src/index.ts";
 
 export interface Doc { song: SongFile; videos: Record<string, VideoFile> }
-interface Entry { doc: Doc; label: string }
+interface Entry { doc: Doc; label: string; merge?: string }
 
 const fileKey = (name: string) => `videos/${name}.json`;
 const fileJsons = (d: Doc): Record<string, string> => ({
@@ -27,25 +27,38 @@ export class Session {
 
   get doc(): Doc { return this.history[this.index]!.doc; }
 
-  /** Make one undoable change. `mutate` edits a copy; nothing happens if it changed nothing. */
-  apply(label: string, mutate: (draft: Doc) => void): boolean {
+  /**
+   * Make one undoable change. `mutate` edits a copy; nothing happens if it changed nothing.
+   * `merge`: changes with the same merge key in a row (dragging a slider) are one undo step, until `seal()`.
+   */
+  apply(label: string, mutate: (draft: Doc) => void, opts: { merge?: string } = {}): boolean {
     const draft = structuredClone(this.doc);
     mutate(draft);
     if (JSON.stringify(draft) === JSON.stringify(this.doc)) return false;
+    const last = this.history[this.index]!;
+    if (opts.merge && last.merge === opts.merge && this.index === this.history.length - 1 && this.index > 0) {
+      this.history[this.index] = { doc: draft, label, merge: opts.merge };
+      this.emit();
+      return true;
+    }
+    if (last.merge) last.merge = undefined;
     this.history = this.history.slice(0, this.index + 1);
-    this.history.push({ doc: draft, label });
+    this.history.push({ doc: draft, label, merge: opts.merge });
     if (this.history.length > Session.LIMIT) this.history.shift();
     this.index = this.history.length - 1;
     this.emit();
     return true;
   }
 
+  /** End a run of merged changes (the slider was let go): the next change is a new undo step. */
+  seal() { const last = this.history[this.index]; if (last) last.merge = undefined; }
+
   get canUndo() { return this.index > 0; }
   get canRedo() { return this.index < this.history.length - 1; }
   /** Label of the change undo would revert, e.g. "set range". */
   get undoLabel() { return this.canUndo ? this.history[this.index]!.label : null; }
   get redoLabel() { return this.canRedo ? this.history[this.index + 1]!.label : null; }
-  undo(): string | null { if (!this.canUndo) return null; const l = this.history[this.index]!.label; this.index--; this.emit(); return l; }
+  undo(): string | null { if (!this.canUndo) return null; this.seal(); const l = this.history[this.index]!.label; this.index--; this.emit(); return l; }
   redo(): string | null { if (!this.canRedo) return null; this.index++; this.emit(); return this.history[this.index]!.label; }
 
   /** Files that differ from what's on disk. */

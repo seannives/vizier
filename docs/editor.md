@@ -11,7 +11,7 @@ uploaded anywhere. Stop it with Ctrl+C in Terminal.
 browser has unsaved changes, the editor reminds you how to restart it; the changes stay in the open window. While the
 server isn't running, the editor says so and keeps your changes: start it again and save.
 
-## Milestone 1 (now)
+## What it does
 
 - **Video menu** (top left): every video in the project; videos built on another show `← base`. Switching keeps
   unsaved changes to all videos; Save writes every changed file.
@@ -33,8 +33,26 @@ server isn't running, the editor says so and keeps your changes: start it again 
 - **Save, undo, redo**: ⌘S, ⌘Z, ⇧⌘Z. Changes aren't written until you save; the Save button and the status bar
   show unsaved files, and Chrome warns before closing with unsaved changes.
 
-Layers, parameters and layout come in milestone 2, automation lanes in 3, tracks and tempo in 4, colour and
-render in 5 (see the [roadmap](roadmap.md)).
+### Layers
+
+- **Layer list** (side panel, front first): click to select; double-click a name to rename; ↑ ↓ move a layer in
+  front of or behind its neighbour; ⧉ duplicates (⌘D); ✕ removes. **+ Add layer…** adds one on top, full frame.
+- **Layer panel** (below the list, for the selected layer): what draws it, its track and blend mode; text for text
+  layers; every parameter as a slider with a number you can type into (typed values may go past the slider's range;
+  double-click a parameter to reset it to its default); the effect chain (add, reorder, remove, and each effect's
+  parameters). Parameters with an automation lane show in amber: the lane sets them while playing.
+- **When a layer is on**: each layer has a row under its track in the timeline. A full faint bar means it's on for
+  the whole song; amber blocks are its spans. Drag in an empty part of the row to make a span, drag a span's ends
+  or body to change it (snap applies), click a span and press Delete to remove it, and ⌘E splits the selected
+  layer at the playhead. The panel's **On** section shows the spans in bars with fades in beats, and has
+  **Split at playhead**, **On from playhead** and **Whole song**.
+- Edits apply to the preview at once, without restarting trails. Dragging a slider is one undo step.
+- **In a video built on another**, edits go to the open video only, as overrides; the base is never changed. A
+  layer from the base is marked "from base". Changing an inherited layer's generator replaces it with a new layer
+  (same name, track, depth, layout and spans), because the base's settings wouldn't fit the new generator.
+
+Layout on the preview (drag and resize layers) comes next, then inherited markers, reset and video actions;
+automation lanes in milestone 3, tracks and tempo in 4, colour and render in 5 (see the [roadmap](roadmap.md)).
 
 ## Keyboard
 
@@ -50,6 +68,9 @@ Press **?** in the editor for the full list.
 | [ / ] | range starts / ends at the playhead |
 | ⇧⌫ | clear the range (whole song) |
 | ⌘4 | snap to the beat on / off |
+| ⌘E | split the selected layer at the playhead |
+| Delete | remove the selected on-span |
+| ⌘D | duplicate the selected layer |
 | + / − / 0 | zoom in / out / fit the song |
 | ⌘Z / ⇧⌘Z | undo / redo |
 | ⌘S | save |

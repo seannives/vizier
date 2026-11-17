@@ -106,4 +106,16 @@ run("renderer in headless Chrome", () => {
       expect(nalTypes.has(5)).toBe(true); // IDR keyframe
     } finally { await r.close(); }
   }, 60_000);
+  it("doesn't draw a layer outside its on-spans", async () => {
+    const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
+    const grid = { tempo: [{ bar: 1, bpm: 120, beatsPerBar: 4 }], downbeat: 0 }; // a bar is 2 s
+    const ring = { ...project.layers[1]!, spans: [{ from: 1.5 }] };              // on from 1 s
+    const hash = (x: Buffer) => createHash("sha1").update(x).digest("hex");
+    const withRing = await openRenderer({ ...project, grid, layers: [project.layers[0]!, ring] }, "draft", { mix: track, bass: track }, { gpu: false });
+    const without = await openRenderer({ ...project, grid, layers: [project.layers[0]!] }, "draft", { mix: track, bass: track }, { gpu: false });
+    try {
+      expect(hash(await withRing.frame(15))).toBe(hash(await without.frame(15)));       // 0.5 s: off
+      expect(hash(await withRing.frame(45))).not.toBe(hash(await without.frame(45)));   // 1.5 s: on
+    } finally { await withRing.close(); await without.close(); }
+  }, 60_000);
 });

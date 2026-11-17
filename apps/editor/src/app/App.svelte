@@ -8,9 +8,14 @@
   import Timeline from "./components/Timeline.svelte";
   import Preview from "./components/Preview.svelte";
   import Help from "./components/Help.svelte";
+  import LayerList from "./components/LayerList.svelte";
+  import LayerPanel from "./components/LayerPanel.svelte";
+  import type { LayerRow, SpanS } from "./components/Timeline.svelte";
+  import { setSpans, splitLayerAt, duplicateLayer, layerOf } from "./lib/edits.ts";
+  import type { Doc } from "./lib/session.ts";
   import { stats } from "./lib/stats.ts";
   import {
-    barToSeconds, secondsToBar, barLabel, sectionTimes, videoFormat, getProfile, GENERATORS, type Project,
+    barToSeconds, secondsToBar, barLabel, sectionTimes, videoFormat, getProfile, spansToSeconds, type Project, type Span,
   } from "../../../../packages/core/src/index.ts";
   import type { FeatureTrack } from "../../../../packages/features/src/index.ts";
 
@@ -202,6 +207,9 @@
     { keys: "Mod+Z", label: "Undo", group: "Edit", run: undo },
     { keys: "Shift+Mod+Z", label: "Redo", group: "Edit", run: redo },
     { keys: "Mod+S", label: "Save", group: "Edit", run: save },
+    { keys: "Mod+E", label: "Split the selected layer at the playhead", group: "Layers", run: splitSelected },
+    { keys: "Delete", alt: ["Backspace"], display: "Delete", label: "Remove the selected on-span", group: "Layers", run: deleteSelectedSpan },
+    { keys: "Mod+D", label: "Duplicate the selected layer", group: "Layers", run: duplicateSelected },
     { keys: "Mod+4", label: "Snap to the beat on / off", group: "Edit", run: () => { snap = !snap; flash(`snap to beat ${snap ? "on" : "off"}`); } },
     { keys: "I", label: "Show / hide frame timing (for diagnosing a jerky playhead)", group: "View", run: () => (showStats = !showStats) },
     { keys: "?", label: "Show / hide shortcuts", group: "View", run: () => (help = !help) },
@@ -242,6 +250,62 @@
   const section = $derived([...sections].reverse().find((s) => s.t <= time + 1e-6)?.name ?? "");
   const tracks = $derived(doc ? doc.song.tracks.map((t) => ({ id: t.id, name: t.name, mix: t.mix, wave: waves[t.id] ?? null })) : []);
   const layers = $derived(project ? [...project.layers].sort((a, b) => b.z - a.z) : []);
+
+  // ---- editing layers ----
+  let selectedLayer = $state<string | null>(null);
+  let selectedSpan = $state<number | null>(null);
+  $effect(() => { void videoName; selectedLayer = null; selectedSpan = null; });
+  $effect(() => { if (selectedLayer && !layers.some((l) => l.id === selectedLayer)) { selectedLayer = null; selectedSpan = null; } });
+  function edit(label: string, fn: (d: Doc) => void, merge?: string) {
+    if (!session || !videoName) return;
+    try { session.apply(label, fn, { merge }); } catch (e) { flash(`couldn't ${label}: ${(e as Error).message}`); }
+  }
+  const seal = () => session?.seal();
+  const selectLayer = (id: string | null, span: number | null = null) => { selectedLayer = id; selectedSpan = span; };
+  const trackName = (id: string | undefined) => {
+    const t = doc?.song.tracks.find((t) => (id ? t.id === id : t.mix));
+    return t?.name ?? id ?? "mix";
+  };
+  const mixId = $derived(doc?.song.tracks.find((t) => t.mix)?.id ?? "");
+  const layerRows = $derived<LayerRow[]>(layers.map((l) => ({
+    id: l.id, name: l.name ?? l.id, track: l.track ?? mixId,
+    spans: l.spans?.length && grid ? spansToSeconds(l.spans, grid) : null,
+  })));
+  const automated = $derived(new Set((project?.automation ?? []).map((a) => a.target)));
+  const playheadBar = $derived(grid ? secondsToBar(playing ? time : marker, grid) : null);
+  const startBar = $derived(grid ? secondsToBar(0, grid) : 1);
+  const toBar = (t: number) => Math.round(secondsToBar(t, grid!) * 1000) / 1000;
+  /** Spans changed on the timeline (seconds): back to bars, keeping each span's fades (in beats). */
+  function spansFromTimeline(id: string, sec: SpanS[]) {
+    if (!grid || !doc || !videoName) return;
+    const orig: Span[] = [...(layerOf(doc, videoName, id)?.spans ?? [])].sort((a, b) => a.from - b.from);
+    const next: Span[] = sec.map((s, i) => ({
+      from: toBar(s.from), ...(s.to !== Infinity ? { to: toBar(s.to) } : {}),
+      ...(orig[i]?.fadeIn ? { fadeIn: orig[i]!.fadeIn } : {}), ...(orig[i]?.fadeOut ? { fadeOut: orig[i]!.fadeOut } : {}),
+    }));
+    edit(sec.length > orig.length ? "add on-span" : "change on-span", (d) => setSpans(d, videoName!, id, next));
+  }
+  function splitSelected() {
+    if (!selectedLayer || playheadBar === null || !videoName) { flash("select a layer to split it at the playhead"); return; }
+    const id = selectedLayer, at = playheadBar, sb = startBar, v = videoName;
+    let ok = false;
+    edit("split at playhead", (d) => { ok = splitLayerAt(d, v, id, at, sb); });
+    if (!ok) flash("nothing to split at the playhead: the layer is off there");
+  }
+  function deleteSelectedSpan() {
+    if (!selectedLayer || selectedSpan === null || !doc || !videoName) return;
+    const id = selectedLayer, i = selectedSpan, v = videoName;
+    const sorted = [...(layerOf(doc, v, id)?.spans ?? [])].sort((a, b) => a.from - b.from);
+    edit("remove on-span", (d) => setSpans(d, v, id, sorted.filter((_, j) => j !== i)));
+    selectedSpan = null;
+  }
+  function duplicateSelected() {
+    if (!selectedLayer || !videoName) return;
+    const id = selectedLayer, v = videoName;
+    let nid = "";
+    edit("duplicate layer", (d) => { nid = duplicateLayer(d, v, id); });
+    if (nid) selectLayer(nid);
+  }
   const rangeLabel = $derived(rangeBars && grid ? `bars ${barLabel(rangeBars.from ?? 1, grid)} – ${barLabel(rangeBars.to ?? secondsToBar(duration, grid), grid)}` : "whole song");
   const mmss = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
   const rangeTime = $derived.by(() => {
@@ -253,7 +317,7 @@
   $effect(() => {
     (window as any).vizierEditor = {
       stats: () => ({ ...stats.summary(), ...stats.counts }),
-      get state() { return { status, error: loadError, playing, transportPlaying: transport.playing, loop, loopWraps, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
+      get state() { return { selectedLayer, selectedSpan, status, error: loadError, playing, transportPlaying: transport.playing, loop, loopWraps, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
       timeline: () => timeline,
       clock: () => transport.clockInfo(),
       session: () => session,
@@ -293,24 +357,25 @@
       {#if !features}<div class="note">analysing audio…</div>{/if}
     </section>
     <aside class="inspector">
-      <h3>Layers</h3>
-      {#each layers as l}
-        <div class="layer">
-          <div class="lname">{l.name ?? l.id}</div>
-          <div class="lmeta">{GENERATORS[l.generator]?.label ?? l.generator}{l.track ? ` · ${doc?.song.tracks.find((t) => t.id === l.track)?.name ?? l.track}` : ""}{l.effects?.length ? ` · ${l.effects.map((e) => e.type).join(", ")}` : ""}</div>
-        </div>
-      {/each}
-      <p class="soon">Editing layers, parameters and layout comes in milestone 2.</p>
       <h3>Range</h3>
       <div class="range">{rangeLabel}{#if rangeInherited}<span class="inh" title="from the base video">inherited</span>{/if}</div>
       <div class="range dim">{rangeTime}</div>
-      <p class="hint">Drag in the bar ruler to set the range; drag its edges to adjust. Snap ({displayKeys("Mod+4")}) lines it up with beats; hold ⇧ while dragging to do the opposite.</p>
+      <h3>Layers <span class="hint-inline">front to back</span></h3>
+      {#if videoName}
+        <LayerList {layers} video={videoName} selected={selectedLayer} defaultTrack={undefined} {trackName} {edit} onselect={(id) => selectLayer(id)} />
+        {#if selectedLayer && doc}
+          <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} {edit} {seal}
+            onselect={(id) => selectLayer(id)} />
+        {:else}
+          <p class="hint">Select a layer to edit it. Each layer also has a row under its track in the timeline: drag there to set when it's on.</p>
+        {/if}
+      {/if}
     </aside>
   </main>
 
   <section class="tl">
-    <Timeline bind:this={timeline} {grid} {sections} {tracks} {duration} {time} range={rangeSec} {rangeInherited}
-      follow={playing} {marker} {snap} onseek={seek} onrange={setRange} />
+    <Timeline bind:this={timeline} {grid} {sections} {tracks} layers={layerRows} {selectedLayer} {selectedSpan} {duration} {time} range={rangeSec} {rangeInherited}
+      follow={playing} {marker} {snap} onseek={seek} onrange={setRange} onselectlayer={selectLayer} onspans={spansFromTimeline} />
   </section>
 
   <footer class="status">
@@ -353,16 +418,14 @@
   .dim { color: var(--dim); }
   .sect { color: var(--accent); font-size: 12px; }
   .spacer { flex: 1; }
-  main { display: grid; grid-template-columns: minmax(0, 1fr) 260px; min-height: 0; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; min-height: 0; }
   .stage { position: relative; min-height: 0; background: var(--bg0); }
   .note { position: absolute; top: 12px; left: 12px; color: var(--dim); font-size: 12px; }
   .err { position: absolute; bottom: 30px; left: 12px; right: 12px; color: var(--danger); font: 12px var(--mono); }
   .inspector { background: var(--bg1); border-left: 1px solid var(--line2); padding: 10px 12px; overflow: auto; }
   h3 { margin: 6px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); font-weight: 500; }
-  .layer { padding: 5px 7px; margin-bottom: 3px; background: var(--bg2); border: 1px solid var(--line); border-radius: 3px; }
-  .lname { font-weight: 500; }
-  .lmeta { color: var(--dim); font-size: 11px; }
-  .soon, .hint { color: var(--faint); font-size: 11px; margin: 8px 0 14px; }
+  .hint-inline { text-transform: none; letter-spacing: 0; color: var(--faint); font-weight: 400; margin-left: 4px; }
+  .hint { color: var(--faint); font-size: 11px; margin: 8px 0 14px; }
   .range { font-family: var(--mono); display: flex; gap: 8px; align-items: center; }
   .inh { font: 10px var(--ui); color: var(--dim); border: 1px dashed var(--line2); border-radius: 2px; padding: 0 4px; }
   .tl { min-height: 0; min-width: 0; overflow: hidden; }

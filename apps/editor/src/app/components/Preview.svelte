@@ -19,9 +19,18 @@
   // preview at about half size: plenty for judging, and cheap
   const scale = $derived(scaleOverride ?? Math.min(1, 960 / Math.max(profile.width, profile.height)));
 
+  // The renderer is built once per format, preview size and analysis; edits to the project are applied to it in
+  // place (Renderer.update), so trails flow on while you change parameters.
+  let shown = -1;
+  let applied: Project | null = null;
+  let redraw = $state(0);
+  let rebuild = $state(0); // bumped when an edit arrives and there's no renderer (none yet, or the last build failed)
   $effect(() => {
-    if (!project || !features) return;
-    const p = project, f = features, id = profileId, s = scale;
+    void rebuild;
+    if (!features) return;
+    const f = features, id = profileId, s = scale;
+    const p = untrack(() => project);
+    if (!p) return;
     let r: Renderer | null = null;
     try {
       r = new Renderer(p, id, f, "'Special Elite'", s);
@@ -31,22 +40,43 @@
       host.querySelector("canvas")?.remove();
       host.prepend(r.canvas);
       renderer = r;
+      applied = p;
       error = null;
-      // untracked: this effect builds the renderer, and must rerun only when the project or format changes, not
-      // whenever the playhead moves (reading `time` here used to rebuild the whole renderer on every frame)
+      // untracked: this effect must rerun only when the format or analysis changes, not when the playhead moves
       shown = Math.floor(untrack(() => time) * r.profile.fps + 1e-6);
       r.renderFrame(shown);
     } catch (e) { error = (e as Error).message; }
     return () => { r?.dispose(); if (renderer === r) renderer = null; };
   });
 
+  // an edit: apply it to the renderer and draw again
+  $effect(() => {
+    const p = project;
+    untrack(() => {
+      if (!p || p === applied) return;
+      if (!renderer) { if (features) rebuild++; return; }
+      try { renderer.update(p); applied = p; error = null; redraw++; } catch (e) { error = (e as Error).message; }
+    });
+  });
+
   // The preview shows whole frames at the video's frame rate, as the export will: a new frame only when the playhead
   // reaches it (30 a second for most formats), rather than one for every screen refresh (60 or 120 a second).
-  let shown = -1;
+  // After an edit while paused, the frame is drawn again at once (trails just continue), then, once the edits pause,
+  // once more with a proper lead-in so it looks exactly as it will in the export.
+  let seenRedraw = 0;
+  let settle: ReturnType<typeof setTimeout> | undefined;
   $effect(() => {
     const frame = Math.floor(time * profile.fps + 1e-6);
-    if (!renderer || frame === shown) return;
+    const rd = redraw;
+    if (!renderer || (frame === shown && rd === seenRedraw)) return;
     if (loopWraps !== seenWraps) { seenWraps = loopWraps; renderer.continueThroughJump = true; }
+    if (frame === shown) {
+      renderer.continueThroughJump = true;
+      clearTimeout(settle);
+      const r = renderer;
+      settle = setTimeout(() => { if (renderer === r && shown === frame) { const t0 = performance.now(); r.renderFrame(frame); stats.preview(performance.now() - t0); } }, 250);
+    }
+    seenRedraw = rd;
     const t0 = performance.now();
     renderer.renderFrame(frame);
     stats.preview(performance.now() - t0);

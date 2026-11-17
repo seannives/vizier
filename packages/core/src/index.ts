@@ -2,6 +2,7 @@ export * from "./profiles.ts";
 export * from "./automation.ts";
 export * from "./project.ts";
 export * from "./grid.ts";
+export * from "./spans.ts";
 export * from "./formats.ts";
 export * from "./resolve.ts";
 export * from "./rng.ts";
