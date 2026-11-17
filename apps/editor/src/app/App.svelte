@@ -84,6 +84,7 @@
 
   // ---- clock ----
   let loopWraps = $state(0);
+  let lastTick = Infinity; // the playing position at the last frame (Infinity when stopped)
   let showStats = $state(false), perf = $state(stats.summary()), statsAt = 0;
   onMount(() => {
     let raf = 0;
@@ -92,7 +93,10 @@
       if (showStats && ts - statsAt > 500) { statsAt = ts; perf = stats.summary(); }
       let t = transport.time(ts);
       const r = rangeSec;
-      if (playing && loop && r && t >= r.to) { transport.seek(r.from); t = r.from; loopWraps++; }
+      // Ableton-style: playback wraps only when it reaches the loop's end from before it; started after the loop,
+      // it plays on
+      if (playing && loop && r && t >= r.to && lastTick < r.to) { transport.seek(r.from); t = r.from; loopWraps++; }
+      lastTick = playing ? t : Infinity;
       if (playing && !transport.playing) playing = false;
       time = t;
       raf = requestAnimationFrame(tick);
@@ -126,7 +130,6 @@
   let marker = $state(0);
   let stoppedAt = 0;
   async function startFrom(from: number) {
-    if (loop && rangeSec && from >= rangeSec.to) from = rangeSec.from;
     if (from >= duration - 0.05) from = rangeSec?.from ?? 0;
     await transport.play(from); playing = true;
   }

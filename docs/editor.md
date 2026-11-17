@@ -17,7 +17,8 @@ server isn't running, the editor says so and keeps your changes: start it again 
   unsaved changes to all videos; Save writes every changed file.
 - **Transport, Ableton-style**: Play starts from the start marker (the hollow triangle in the ruler). Stop leaves the
   playhead where it stopped; the next Play jumps back to the marker, and ⇧Space continues from the stop point instead.
-  Clicking the timeline or the arrow keys move the marker. With loop on (L), playback wraps at the range's end.
+  Clicking the timeline or the arrow keys move the marker. With loop on (L), playback wraps at the range's end
+  when it gets there; started after the range, it plays on, as in Ableton.
 - **Preview**: the open video in its format, at reduced resolution, with the safe area for vertical formats.
 - **Timeline**: bar ruler, sections, and a waveform per track (each scaled to its own peak), with each track's layers
   under it. The ruler and sections stay put; swipe up and down over the tracks to scroll them, sideways to move

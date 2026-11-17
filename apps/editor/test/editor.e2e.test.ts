@@ -164,6 +164,14 @@ run("editor (headless Chrome)", () => {
     await page.keyboard.press("Space");
     await page.waitForTimeout(400);
     expect((await state()).playing).toBe(false);
+    // started after the loop, playback plays on from there (as in Ableton) instead of jumping into the loop
+    const c = await sec(5);
+    await page.mouse.click(await page.evaluate((t) => (window as any).vizierEditor.timeline().pageX(t), c + 0.2), y);
+    const wrapsAfter = (await state()).loopWraps;
+    await page.keyboard.press("Space");
+    await waitUntil("playing past bar 5", (t: number) => (window as any).vizierEditor.state.time > t + 0.3, c);
+    expect((await state()).loopWraps).toBe(wrapsAfter);
+    await page.keyboard.press("Space");
     } finally {
       // leave things as they were for the next tests, even if this one failed
       if ((await state()).playing) await page.keyboard.press("Space");
