@@ -5,7 +5,8 @@ Audio-reactive visuals for music videos and live shows. One renderer, two driver
 - **Offline**: stems + a project → frame-exact MP4s for YouTube, Shorts, Instagram.
 - **Live**: the same renderer fullscreen on a projector. Today it plays a song with a dropped-frame HUD
   (`pnpm live projects/<song> --video <video>`); live audio input and MIDI come later ([roadmap](docs/roadmap.md)).
-- **Editor** (in progress): a local web app for arranging layers, automation and colour without editing files.
+- **Editor** (in progress): a local web app for arranging a video without editing files
+  (`pnpm edit projects/<song>`; see [`docs/editor.md`](docs/editor.md)).
 
 Everything that changes over a song (geometry parameters, colours, text, layer position) is a
 parameter. Its value comes from a stack, **base → automation lane → audio modulation → live override**,
@@ -24,6 +25,7 @@ pnpm demo                                            # generates the demo projec
 pnpm render projects/demo --video full --gpu         # → projects/demo/output/full-youtube.mp4
 pnpm render projects/demo --video reel --gpu         # a vertical Reel that builds on the full video
 pnpm live projects/demo --video full                 # then open http://localhost:5173 in Chrome
+pnpm edit projects/demo                              # the editor: open http://localhost:5174 in Chrome
 ```
 
 The demo's music is synthesised by code (`scripts/demo-audio.ts`), so the repository needs no audio files: a
@@ -55,10 +57,11 @@ packages/core       formats (song/video), grid, automation, parameter stack, pro
                     effects), JSON Schemas; browser/ holds the WebGL renderer and encoder
 apps/offline        render, validate, analyze, migrate: tracks → features → headless Chrome → MP4 (encoded in Chrome)
 apps/live           live window: local server + page that renders in time with the audio, frame-pacing HUD
+apps/editor         editor: local server + Svelte 5 app; the session (project data + undo) lives in plain TS
 projects/           one folder per song (only projects/demo/ is part of this repo)
 scripts/            demo audio generator
 assets/fonts        Special Elite (Apache 2.0, see LICENSE-SpecialElite.txt)
-docs/               projects.md (project files and commands), setup-mac.md, adding-a-generator.md, roadmap.md, adr/
+docs/               projects.md, editor.md, setup-mac.md, adding-a-generator.md, roadmap.md, adr/
 ```
 
 ## Projects

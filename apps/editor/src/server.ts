@@ -1,0 +1,152 @@
+#!/usr/bin/env node
+/**
+ * The editor: a local web app for a project folder.
+ *   pnpm edit projects/demo [--video full] [--port 5174]   then open http://localhost:5174 in Chrome.
+ * The server reads and writes the project's files; the page holds the session (project data + undo history).
+ */
+import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { parseArgs } from "node:util";
+import { readFileSync, writeFileSync, statSync, createReadStream, existsSync } from "node:fs";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { build } from "esbuild";
+import sveltePluginModule from "esbuild-svelte";
+import type { Plugin } from "esbuild";
+// esbuild-svelte is CommonJS; its default export is the plugin factory
+const sveltePlugin = ((sveltePluginModule as unknown as { default?: unknown }).default ?? sveltePluginModule) as (o: object) => Plugin;
+import { getProfile, buildProject, resolveVideo, videoFormat, type SongFile, type VideoFile } from "../../../packages/core/src/index.ts";
+import { loadFeatures, decodeMono, SAMPLE_RATE } from "../../offline/src/audio.ts";
+import { listVideos, loadSong, loadVideoFile, projectDir } from "../../offline/src/project-io.ts";
+
+const root = fileURLToPath(new URL("../../../", import.meta.url));
+const { values, positionals } = parseArgs({
+  allowPositionals: true,
+  options: { video: { type: "string" }, port: { type: "string", default: "5174" }, host: { type: "string", default: "127.0.0.1" } },
+});
+if (!positionals[0]) die("usage: pnpm edit <project folder> [--video name] [--port 5174]");
+let dir: string;
+try { dir = projectDir(positionals[0]); } catch (e) { die((e as Error).message); }
+const song0 = loadSong(dir);
+const trackPath = (file: string) => resolve(dir, file);
+
+// ---- the app bundle (Svelte 5 + TypeScript), built at startup ----
+log("building the editor…");
+const t0 = Date.now();
+const bundle = await build({
+  entryPoints: [join(root, "apps/editor/src/app/main.ts")],
+  bundle: true, write: false, format: "esm", target: "es2022", outdir: "out",
+  tsconfig: join(root, "tsconfig.json"), logLevel: "error",
+  mainFields: ["svelte", "browser", "module", "main"], conditions: ["svelte", "browser"],
+  plugins: [sveltePlugin({ compilerOptions: { css: "injected" } })],
+});
+const appJs = bundle.outputFiles.find((f) => f.path.endsWith(".js"))!.text;
+log(`built in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
+
+const fonts: Record<string, string> = {
+  "plex-sans-condensed-400.woff2": "node_modules/@ibm/plex-sans-condensed/fonts/complete/woff2/IBMPlexSansCondensed-Regular.woff2",
+  "plex-sans-condensed-500.woff2": "node_modules/@ibm/plex-sans-condensed/fonts/complete/woff2/IBMPlexSansCondensed-Medium.woff2",
+  "plex-sans-condensed-600.woff2": "node_modules/@ibm/plex-sans-condensed/fonts/complete/woff2/IBMPlexSansCondensed-SemiBold.woff2",
+  "plex-mono-400.woff2": "node_modules/@ibm/plex-mono/fonts/complete/woff2/IBMPlexMono-Regular.woff2",
+  "plex-mono-500.woff2": "node_modules/@ibm/plex-mono/fonts/complete/woff2/IBMPlexMono-Medium.woff2",
+  "special-elite.ttf": "assets/fonts/SpecialElite-Regular.ttf",
+};
+
+const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>vizier · ${esc(song0.title)}</title>
+<link rel="icon" href="data:,">
+<style>
+@font-face { font-family: 'Plex Condensed'; src: url(/fonts/plex-sans-condensed-400.woff2) format('woff2'); font-weight: 400; }
+@font-face { font-family: 'Plex Condensed'; src: url(/fonts/plex-sans-condensed-500.woff2) format('woff2'); font-weight: 500; }
+@font-face { font-family: 'Plex Condensed'; src: url(/fonts/plex-sans-condensed-600.woff2) format('woff2'); font-weight: 600; }
+@font-face { font-family: 'Plex Mono'; src: url(/fonts/plex-mono-400.woff2) format('woff2'); font-weight: 400; }
+@font-face { font-family: 'Plex Mono'; src: url(/fonts/plex-mono-500.woff2) format('woff2'); font-weight: 500; }
+@font-face { font-family: 'Special Elite'; src: url(/fonts/special-elite.ttf) format('truetype'); }
+</style></head><body><div id="app"></div><script type="module" src="/app.js"></script></body></html>`;
+
+// ---- caches ----
+const waveCache = new Map<string, unknown>();
+/** Min/max peaks at 100 per second, as signed bytes, base64: small enough to send every track. */
+function waveform(file: string) {
+  const path = trackPath(file);
+  const key = `${path}|${statSync(path).mtimeMs}`;
+  if (waveCache.has(key)) return waveCache.get(key);
+  const x = decodeMono(path);
+  const per = SAMPLE_RATE / 100, n = Math.ceil(x.length / per);
+  const peaks = Buffer.alloc(n * 2);
+  for (let i = 0; i < n; i++) {
+    let lo = 0, hi = 0;
+    for (let j = Math.floor(i * per); j < Math.min(x.length, Math.floor((i + 1) * per)); j++) { const v = x[j]!; if (v < lo) lo = v; if (v > hi) hi = v; }
+    peaks.writeInt8(Math.round(Math.max(-1, lo) * 127), i * 2);
+    peaks.writeInt8(Math.round(Math.min(1, hi) * 127), i * 2 + 1);
+  }
+  const out = { rate: 100, duration: x.length / SAMPLE_RATE, peaks: peaks.toString("base64") };
+  waveCache.set(key, out);
+  return out;
+}
+
+// ---- API ----
+const json = (res: ServerResponse, body: unknown, status = 200) => {
+  res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
+  res.end(JSON.stringify(body));
+};
+const readBody = (req: IncomingMessage) => new Promise<string>((ok, fail) => {
+  let s = ""; req.setEncoding("utf8"); req.on("data", (c) => (s += c)); req.on("end", () => ok(s)); req.on("error", fail);
+});
+/** Pretty JSON with a trailing newline, as the files were written by hand: small, readable git diffs. */
+const writeJson = (path: string, data: unknown) => writeFileSync(path, JSON.stringify(data, null, 2) + "\n");
+
+const server = createServer(async (req, res) => {
+  try {
+    const url = new URL(req.url ?? "/", "http://localhost");
+    const p = url.pathname;
+    if (p === "/") { res.writeHead(200, { "content-type": "text/html; charset=utf-8" }); return void res.end(html); }
+    if (p === "/app.js") { res.writeHead(200, { "content-type": "text/javascript" }); return void res.end(appJs); }
+    if (p.startsWith("/fonts/") && fonts[p.slice(7)]) {
+      const f = fonts[p.slice(7)]!;
+      res.writeHead(200, { "content-type": f.endsWith(".ttf") ? "font/ttf" : "font/woff2", "cache-control": "max-age=86400" });
+      return void createReadStream(join(root, f)).pipe(res);
+    }
+    if (p === "/api/session") {
+      const song = loadSong(dir);
+      const videos: Record<string, VideoFile> = Object.fromEntries(listVideos(dir).map((v) => [v, loadVideoFile(dir, v)]));
+      return json(res, { id: dir.split("/").pop(), song, videos, initialVideo: values.video ?? Object.keys(videos)[0] ?? null });
+    }
+    if (p === "/api/waveform") return json(res, waveform(url.searchParams.get("file")!));
+    if (p === "/api/features") {
+      // features for the renderer, at the video's frame rate
+      const song = loadSong(dir);
+      const name = url.searchParams.get("video")!;
+      const video = resolveVideo(name, (n) => loadVideoFile(dir, n));
+      const project = buildProject(song, video, (t) => trackPath(t.file));
+      const fps = getProfile(videoFormat(video) ?? "youtube").fps;
+      return json(res, await loadFeatures(project.tracks, fps, join(dir, ".cache", "features")));
+    }
+    if (p === "/api/audio") {
+      const path = trackPath(url.searchParams.get("file")!);
+      if (!path.startsWith(dir) || !existsSync(path)) return json(res, { error: "not found" }, 404);
+      res.writeHead(200, { "content-type": "audio/wav", "content-length": statSync(path).size });
+      return void createReadStream(path).pipe(res);
+    }
+    if (p === "/api/save" && req.method === "POST") {
+      const body = JSON.parse(await readBody(req)) as { song?: SongFile; videos?: Record<string, VideoFile> };
+      const written: string[] = [];
+      if (body.song) { writeJson(join(dir, "song.json"), body.song); written.push("song.json"); }
+      for (const [name, v] of Object.entries(body.videos ?? {})) {
+        if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(name)) return json(res, { error: `bad video name ${name}` }, 400);
+        writeJson(join(dir, "videos", `${name}.json`), v);
+        written.push(`videos/${name}.json`);
+      }
+      log(`saved ${written.join(", ")}`);
+      return json(res, { written });
+    }
+    res.writeHead(404).end("not found");
+  } catch (e) {
+    log(`error: ${(e as Error).message}`);
+    json(res, { error: (e as Error).message }, 500);
+  }
+});
+server.listen(Number(values.port), values.host, () => log(`ready: open http://localhost:${values.port} in Chrome · ${dir}`));
+
+function esc(s: string) { return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!); }
+function log(s: string) { process.stderr.write(`[vizier edit] ${s}\n`); }
+function die(s: string): never { process.stderr.write(s + "\n"); process.exit(1); }
+void readFileSync;

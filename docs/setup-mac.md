@@ -97,6 +97,14 @@ bitrate (18 Mbps for `youtube`); change it with `--bitrate 24`. `--encoder ffmpe
 After each render the file is checked for the right frame count, duration and frame rate. Progress lines show the
 speed (fps), where the time goes, and the time remaining.
 
+## 6½. The editor
+
+```sh
+pnpm edit projects/the-maleficus
+```
+
+Open **http://localhost:5174** in Chrome. See [editor.md](editor.md) for what it does so far and its shortcuts.
+
 ## 7. Measure live headroom
 
 Video export is slower than live playback, because every frame is copied out of Chrome and encoded.

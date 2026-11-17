@@ -125,8 +125,15 @@ export class Renderer {
   /** When set, renderFrame adds each layer's draw+upload time (ms) here. */
   timing: Record<string, number> | null = null;
 
-  constructor(private project: Project, profileId: string, private tracks: Record<string, FeatureTrack>, private font = "'Special Elite'") {
-    this.profile = getProfile(profileId);
+  /**
+   * `scale` renders smaller than the profile's size (the editor's preview); layouts and line widths scale with it.
+   */
+  /** Seconds of lead-in after a jump (see renderFrame). Exact renders use 3 s; previews can use less. */
+  prerollSeconds = PREROLL_SECONDS;
+
+  constructor(private project: Project, profileId: string, private tracks: Record<string, FeatureTrack>, private font = "'Special Elite'", scale = 1) {
+    const full = getProfile(profileId);
+    this.profile = scale === 1 ? full : { ...full, width: Math.max(2, Math.round(full.width * scale)), height: Math.max(2, Math.round(full.height * scale)) };
     const { width, height } = this.profile;
     this.canvas = document.createElement("canvas");
     this.canvas.width = width; this.canvas.height = height;
@@ -276,13 +283,15 @@ export class Renderer {
 
   /**
    * Render frame `frame` (may be fractional when driven by time). If the project has feedback effects and this
-   * frame doesn't follow the last one, the feedback buffers are cleared and a few seconds of lead-in are rendered
-   * first, so an excerpt looks like the same moment in a full render.
+   * frame jumps backwards or more than a second ahead of the last one, the feedback buffers are cleared and a few
+   * seconds of lead-in are rendered first, so an excerpt looks like the same moment in a full render. Smaller forward
+   * steps (slow frames during playback) just continue: re-rendering lead-in there would make every frame slower.
    */
   renderFrame(frame: number): void {
-    if (this.hasFeedback && !(Math.abs(frame - this.lastFrame - 1) < 0.5 || (frame > this.lastFrame && frame - this.lastFrame <= 2))) {
+    const step = frame - this.lastFrame;
+    if (this.hasFeedback && !(step > 0 && step <= this.profile.fps)) {
       for (const L of this.layers) for (const e of L.effects) if (e.fb) for (const t of e.fb) this.clear(t, L.w, L.h);
-      const pre = Math.round(PREROLL_SECONDS * this.profile.fps);
+      const pre = Math.round(this.prerollSeconds * this.profile.fps);
       for (let f = Math.max(0, frame - pre); f < frame; f++) this.drawLayers(f, false);
     }
     this.drawLayers(frame, true);
@@ -456,6 +465,11 @@ export class Renderer {
     const layersMs = Object.fromEntries(Object.entries(this.timing).map(([k, v]) => [k, v / count]));
     this.timing = null;
     return benchStats(times, layersMs);
+  }
+
+  /** Free the GPU resources (when the editor switches videos). */
+  dispose(): void {
+    this.gl.getExtension("WEBGL_lose_context")?.loseContext();
   }
 
   /** RGBA pixels of the last frame, bottom row first (as WebGL returns them). */

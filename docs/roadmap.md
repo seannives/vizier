@@ -12,10 +12,6 @@ Colour engine first (so it can be tested in renders before the UI exists):
 
 Editor milestones:
 
-- [ ] 1. `pnpm edit <project>`: local server + Svelte app; shared session (project data + undo history outside the
-      UI); open a video; play/stop with audio; timeline with bar ruler, sections, per-track waveforms, beat grid;
-      preview (live renderer, reduced resolution, video's format and safe areas); range bracket; save, undo/redo;
-      shortcut table and `?` overlay
 - [ ] 2. Layer list (add, remove, reorder, choose generator, track, effects); parameter panel built from plugin
       declarations; drag/resize layers on the preview per format; inherited markers, reset to inherited, Open base;
       New / Duplicate / Detach video
@@ -27,6 +23,7 @@ Editor milestones:
 - [ ] Font comparison on screen: IBM Plex Sans Condensed + Plex Mono vs Space Grotesk + JetBrains Mono
 - [ ] Output window as a second view of the session (projector / second monitor), edits applied live
 - [ ] Later: pencil drawing of automation; finer snapping; record control moves (mouse or MIDI) as automation
+- [ ] Type-check Svelte files (svelte-check needs a TypeScript 6 + 7 setup today)
 
 ## Phase 4: Platform polish (then: Reels/Shorts and the YouTube video for the maleficus)
 
@@ -101,3 +98,9 @@ Editor milestones:
 - [x] Colour engine (ADR 0008): five-slot palette (`acid` → `accent`); colours declared by generators, following
       palette slots or the layer's own; colour lanes blended in OKLCH; `hueShift` and `lightness` per layer
 - [x] One `format` per video (replaces `profiles`); `pnpm migrate` updates old project files
+- [x] Editor milestone 1: `pnpm edit`; Svelte 5 app with the session (project data, undo/redo, unsaved files) in plain
+      TypeScript; video menu; play/stop; timeline (bar ruler, sections, waveforms, beat grid, zoom, scroll, follow);
+      preview in the video's format with safe areas; range bracket (snap to beat); save; shortcut table and `?` overlay;
+      end-to-end tests in headless Chrome
+- [x] Feedback lead-in only after backward jumps or leaps over 1 s (slow frames no longer cascade); 1 s lead-in in the
+      editor and live window

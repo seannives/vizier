@@ -14,7 +14,8 @@
     "validate": "node --experimental-strip-types apps/offline/src/tools.ts validate",
     "analyze": "node --experimental-strip-types apps/offline/src/tools.ts analyze",
     "demo": "node --experimental-strip-types scripts/make-demo-audio.ts",
-    "migrate": "node --experimental-strip-types apps/offline/src/tools.ts migrate"
+    "migrate": "node --experimental-strip-types apps/offline/src/tools.ts migrate",
+    "edit": "node --experimental-strip-types apps/editor/src/server.ts"
   },
   "devDependencies": {
     "@types/node": "^26.6.6",
@@ -24,11 +25,15 @@
     "vitest": "^5.1.0"
   },
   "dependencies": {
+    "@ibm/plex-mono": "^2.5.0",
+    "@ibm/plex-sans-condensed": "^2.0.0",
     "@types/d3-scale": "^4.0.9",
     "@types/d3-shape": "^3.2.0",
     "ajv": "^8.20.0",
     "d3-scale": "^4.0.3",
-    "d3-shape": "^3.2.1"
+    "d3-shape": "^3.2.1",
+    "esbuild-svelte": "^0.9.5",
+    "svelte": "^5.57.3"
   },
   "license": "Apache-2.0",
   "version": "0.2.0"

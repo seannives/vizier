@@ -1,0 +1,96 @@
+// Drives the editor in headless Chrome against a temporary copy of the demo project.
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { spawn, type ChildProcess } from "node:child_process";
+import { mkdtempSync, mkdirSync, cpSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { chromium, type Browser, type Page } from "playwright-core";
+import { DEMO, makeDemoTracks, wav } from "../../../scripts/demo-audio.ts";
+
+const root = fileURLToPath(new URL("../../../", import.meta.url));
+const chrome = [process.env.CHROME_PATH, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/usr/bin/google-chrome"].find((p) => p && existsSync(p));
+const run = chrome ? describe : describe.skip;
+const PORT = 5190 + Math.floor(Math.random() * 50);
+
+run("editor (headless Chrome)", () => {
+  let dir: string, server: ChildProcess, browser: Browser, page: Page;
+  const state = () => page.evaluate(() => (window as any).vizierEditor.state);
+
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), "vizier-editor-"));
+    cpSync(join(root, "projects/demo/song.json"), join(dir, "song.json"));
+    cpSync(join(root, "projects/demo/videos"), join(dir, "videos"), { recursive: true });
+    mkdirSync(join(dir, "media"));
+    for (const [n, s] of Object.entries(makeDemoTracks())) writeFileSync(join(dir, "media", `${n}.wav`), wav(s, DEMO.sampleRate));
+    server = spawn(process.execPath, ["--experimental-strip-types", join(root, "apps/editor/src/server.ts"), dir, "--video", "full", "--port", String(PORT)], { stdio: ["ignore", "ignore", "pipe"] });
+    await new Promise<void>((ok, fail) => {
+      let log = "";
+      server.stderr!.on("data", (d) => { log += d; if (log.includes("ready:")) ok(); });
+      server.on("exit", () => fail(new Error(log)));
+    });
+    browser = await chromium.launch({ executablePath: chrome, args: ["--autoplay-policy=no-user-gesture-required", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"] });
+    page = await browser.newPage({ viewport: { width: 1440, height: 860 } });
+    await page.goto(`http://localhost:${PORT}`);
+    await page.waitForFunction(() => (window as any).vizierEditor?.state.status === "ready", null, { timeout: 90_000 });
+  }, 120_000);
+
+  afterAll(async () => { await browser?.close(); server?.kill(); if (dir) rmSync(dir, { recursive: true, force: true }); });
+
+  it("plays and stops with the space bar", async () => {
+    await page.keyboard.press("Space");
+    await page.waitForTimeout(1200);
+    const s = await state();
+    expect(s.playing).toBe(true);
+    expect(s.time).toBeGreaterThan(0.4);
+    await page.keyboard.press("Space");
+    expect((await state()).playing).toBe(false);
+  }, 30_000);
+
+  it("drags a range in the ruler (snapped to beats), undoes, redoes and saves it", async () => {
+    const xy = await page.evaluate(() => {
+      const ed = (window as any).vizierEditor, tl = ed.timeline(), g = ed.session().doc.song.grid;
+      const sec = (bar: number) => g.downbeat + ((bar - 1) * 4 * 60) / g.tempo[0].bpm;
+      return { a: tl.pageX(sec(9) + 0.02), b: tl.pageX(sec(17) - 0.03), y: tl.rulerY() };
+    });
+    await page.mouse.move(xy.a, xy.y);
+    await page.mouse.down();
+    await page.mouse.move((xy.a + xy.b) / 2, xy.y, { steps: 4 });
+    await page.mouse.move(xy.b, xy.y, { steps: 4 });
+    await page.mouse.up();
+    let s = await state();
+    expect(s.range).toEqual({ from: 9, to: 17 });
+    expect(s.dirtyFiles).toEqual(["videos/full.json"]);
+    await page.keyboard.press("Control+z");
+    s = await state();
+    expect(s.range).toBeNull();
+    expect(s.dirtyFiles).toEqual([]);
+    await page.keyboard.press("Control+Shift+z");
+    expect((await state()).range).toEqual({ from: 9, to: 17 });
+    await page.keyboard.press("Control+s");
+    await page.waitForFunction(() => (window as any).vizierEditor.state.dirtyFiles.length === 0);
+    expect(JSON.parse(readFileSync(join(dir, "videos/full.json"), "utf8")).range).toEqual({ from: 9, to: 17 });
+    await page.screenshot({ path: join(root, "out/editor-e2e.png") });
+  }, 30_000);
+
+  it("sets range edges from the playhead with [ and ]", async () => {
+    await page.keyboard.press("Home");
+    await page.keyboard.press("ArrowRight");
+    await page.keyboard.press("ArrowRight"); // bar 11
+    await page.keyboard.press("BracketLeft");
+    expect((await state()).range.from).toBe(11);
+  }, 90_000);
+
+  it("shows the shortcuts with ?", async () => {
+    await page.keyboard.press("Shift+Slash");
+    expect(await page.locator("text=Keyboard shortcuts").count()).toBeGreaterThan(0);
+    await page.keyboard.press("Escape");
+    expect(await page.locator("text=Keyboard shortcuts").count()).toBe(0);
+  }, 60_000);
+
+  it("switches videos and shows the reel in its own format", async () => {
+    await page.selectOption("select", "reel");
+    await page.waitForFunction(() => (window as any).vizierEditor.state.videoName === "reel");
+    expect(await page.locator("text=Instagram Reels").count()).toBeGreaterThan(0);
+  }, 90_000);
+});

@@ -11,6 +11,7 @@ async function main() {
   const tracks = (await (await fetch("/features.json")).json()) as Record<string, FeatureTrack>;
   await document.fonts.load("40px 'Special Elite'");
   const r = new Renderer(project, profileId, tracks);
+  r.prerollSeconds = 1; // keep seeks quick; trails are close enough after a second
   document.body.prepend(r.canvas);
   const sections = sectionTimes(project);
   const grid = project.grid;
