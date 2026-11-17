@@ -19,8 +19,10 @@ server isn't running, the editor says so and keeps your changes: start it again 
   playhead where it stopped; the next Play jumps back to the marker, and ⇧Space continues from the stop point instead.
   Clicking the timeline or the arrow keys move the marker. With loop on (L), playback wraps at the range's end.
 - **Preview**: the open video in its format, at reduced resolution, with the safe area for vertical formats.
-- **Timeline**: bar ruler, sections, and a waveform per track (each scaled to its own peak). Click or drag to move
-  the playhead; scroll sideways with two fingers; zoom with ⌘ + two-finger swipe (up = in, as in Ableton) or pinch.
+- **Timeline**: bar ruler, sections, and a waveform per track (each scaled to its own peak), with each track's layers
+  under it. The ruler and sections stay put; swipe up and down over the tracks to scroll them, sideways to move
+  along the song. Click or drag to move the playhead; zoom with ⌘ + two-finger swipe (up = in, as in Ableton) or
+  pinch.
 - **Range**: drag in the bar ruler to set the video's range; drag its ends to adjust, or the bar to move it. The
   side panel shows it in bars and in minutes:seconds. A faint bar means the range is inherited from the base video.
 - **Preview**: shows whole frames at the video's frame rate (30 fps for most formats), as the export will.
@@ -36,7 +38,7 @@ server isn't running, the editor says so and keeps your changes: start it again 
 ### Layers
 
 - **Layer list** (side panel, front first): click to select; double-click a name to rename; ↑ ↓ move a layer in
-  front of or behind its neighbour; ⧉ duplicates (⌘D); ✕ removes. **+ Add layer…** adds one on top, full frame.
+  front of or behind its neighbour; ⧉ duplicates (⌘D; the copy goes just behind); ✕ removes. **+ Add layer…** adds one on top, full frame.
 - **Layer panel** (below the list, for the selected layer): what draws it, its track and blend mode; text for text
   layers; every parameter as a slider with a number you can type into (typed values may go past the slider's range;
   double-click a parameter to reset it to its default); the effect chain (add, reorder, remove, and each effect's

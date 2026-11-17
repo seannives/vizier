@@ -199,14 +199,14 @@ export const PANEL_LAYER_PARAMS = LAYER_PARAMS.filter((s) => !["x", "y", "w", "h
 export const effectList = () => Object.values(EFFECTS);
 export const generatorList = () => Object.values(GENERATORS);
 
-/** A copy of a layer, just in front of it, with its own id (and its automation and modulations copied too).
- *  Returns the new id. */
+/** A copy of a layer, just behind it (below it in the list, as in Ableton), with its own id; its automation and
+ *  modulations are copied too. Returns the new id. */
 export function duplicateLayer(doc: Doc, video: string, id: string): string {
   const src = layerOf(doc, video, id);
   if (!src) throw new Error(`No layer "${id}"`);
   const { id: _id, z, ...rest } = structuredClone(src);
-  const above = layersOf(doc, video).map((l) => l.z).filter((n) => n > z).sort((a, b) => a - b)[0];
-  const newZ = above === undefined ? z + 1 : (z + above) / 2;
+  const behind = layersOf(doc, video).map((l) => l.z).filter((n) => n < z).sort((a, b) => b - a)[0];
+  const newZ = behind === undefined ? z - 1 : (z + behind) / 2;
   const newId = addLayer(doc, video, src.generator, src.track, { ...rest, z: newZ, name: `${src.name ?? id} copy` });
   const all = resolved(doc, video);
   const v = doc.videos[video]!;

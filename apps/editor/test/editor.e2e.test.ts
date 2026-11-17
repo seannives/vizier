@@ -259,6 +259,26 @@ run("editor (headless Chrome)", () => {
     await page.setViewportSize({ width: 1440, height: 860 });
   }, 30_000);
 
+  it("scrolls tracks and layers under a fixed ruler, and draws the last rows", async () => {
+    await page.setViewportSize({ width: 1440, height: 700 }); // a short window: the rows don't all fit
+    try {
+      await page.waitForTimeout(300);
+      const ruler0 = await page.evaluate(() => (window as any).vizierEditor.timeline().rulerY());
+      // the last layer row, scrolled into view: the tracks canvas is what's under the pointer there (not clipped)
+      const lastId = await page.evaluate(() => [...document.querySelectorAll(".h.layer")].at(-1)!.getAttribute("title"));
+      const layers = await page.evaluate(() => (window as any).vizierEditor.session().doc.videos.full.layers.map((l: any) => [l.id, l.name]));
+      const id = layers.find((l: string[]) => l[1] === lastId)![0];
+      const y = await page.evaluate((i) => (window as any).vizierEditor.timeline().layerY(i), id);
+      expect(await page.evaluate(() => document.querySelector(".scroller")!.scrollTop)).toBeGreaterThan(0);
+      const x = await page.evaluate(() => (window as any).vizierEditor.timeline().pageX(5));
+      expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest(".wrap2") !== null, { x, y })).toBe(true);
+      expect(await page.evaluate(() => (window as any).vizierEditor.timeline().rulerY())).toBe(ruler0);
+    } finally {
+      await page.evaluate(() => { document.querySelector(".scroller")!.scrollTop = 0; });
+      await page.setViewportSize({ width: 1440, height: 860 });
+    }
+  }, 30_000);
+
   it("shows the shortcuts with ?", async () => {
     await page.keyboard.press("Shift+Slash");
     expect(await page.locator("text=Keyboard shortcuts").count()).toBeGreaterThan(0);

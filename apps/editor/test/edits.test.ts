@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Session, type Doc } from "../src/app/lib/session.ts";
 import {
-  addLayer, removeLayer, moveLayer, setParam, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
+  addLayer, removeLayer, moveLayer, duplicateLayer, setParam, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
 } from "../src/app/lib/edits.ts";
 import { validateProject, buildProject, resolveVideo } from "../../../packages/core/src/index.ts";
 
@@ -116,5 +116,20 @@ describe("undo for slider drags", () => {
     s.undo();
     expect(layerOf(s.doc, "full", "ring")!.params!.radius).toBe(0.3);
     expect(s.canUndo).toBe(false);
+  });
+});
+
+describe("duplicating", () => {
+  it("puts the copy just behind the original, with its automation", () => {
+    const d = doc();
+    const id = duplicateLayer(d, "full", "title");
+    expect(id).toBe("typeText");
+    const z = (i: string) => layerOf(d, "full", i)!.z;
+    expect(z(id)).toBeLessThan(z("title"));
+    expect(z(id)).toBeGreaterThan(z("ring"));
+    expect(layerOf(d, "full", id)!.name).toBe("title copy");
+    const id2 = duplicateLayer(d, "full", "ring");
+    expect(z(id2)).toBeLessThan(z("ring"));
+    expect(d.videos.full!.automation!.map((a) => a.target)).toContain(`${id2}.radius`);
   });
 });

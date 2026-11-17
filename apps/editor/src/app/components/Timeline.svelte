@@ -34,7 +34,10 @@
   const height = $derived(rows.length ? rows[rows.length - 1]!.y + rows[rows.length - 1]!.h : H_RULER + H_SECT);
   const rowAt = (y: number) => rows.find((r) => y >= r.y && y < r.y + r.h);
 
-  let canvas: HTMLCanvasElement;
+  const HEAD = H_RULER + H_SECT; // the ruler and sections stay put; tracks and layers scroll under them
+  let rcanvas: HTMLCanvasElement; // ruler + sections
+  let canvas: HTMLCanvasElement;  // tracks and layers (y in the same coordinates as `rows`, offset by HEAD)
+  let scroller: HTMLDivElement;
   let wrap: HTMLDivElement;
   let width = $state(800);
   let view = $state<View>({ start: 0, pxPerSec: 6 });
@@ -60,15 +63,25 @@
   export function zoomOut() { zoomAt(1 / 1.5, Math.max(0, Math.min(width, xOf(time, view)))); }
   /** For tests and tools: where a moment is drawn, in page coordinates. */
   export function pageX(t: number) { return canvas.getBoundingClientRect().left + xOf(t, view); }
-  export function rulerY() { return canvas.getBoundingClientRect().top + H_RULER / 2; }
-  /** For tests: the middle of a layer's row, in page coordinates. */
-  export function layerY(id: string) { const r = rows.find((r) => r.kind === "layer" && r.layer.id === id); return r ? canvas.getBoundingClientRect().top + r.y + r.h / 2 : NaN; }
-  export function laneY() { return canvas.getBoundingClientRect().top + H_RULER + H_SECT + H_TRACK / 2; }
+  export function rulerY() { return rcanvas.getBoundingClientRect().top + H_RULER / 2; }
+  /** Scroll a row into view; its middle in page coordinates. */
+  function rowY(r: Row | undefined) {
+    if (!r) return NaN;
+    const top = r.y - HEAD;
+    if (top < scroller.scrollTop || top + r.h > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = Math.max(0, top - 20);
+    return canvas.getBoundingClientRect().top + top + r.h / 2;
+  }
+  /** For tests: the middle of a layer's row, in page coordinates (scrolled into view). */
+  export function layerY(id: string) { return rowY(rows.find((r) => r.kind === "layer" && r.layer.id === id)); }
+  /** For tests: the middle of the first track's waveform, in page coordinates (scrolled into view). */
+  export function laneY() { return rowY(rows.find((r) => r.kind === "track")); }
   export function zoomLevel() { return view.pxPerSec; }
 
   $effect(() => { if (!fitted && duration > 0 && width > 100) { fitted = true; fit(); } });
 
   function onwheel(e: WheelEvent) {
+    // over the tracks, an up/down swipe scrolls them (unless zooming); sideways moves along the song
+    if (e.currentTarget === canvas && !e.metaKey && !e.ctrlKey && !e.shiftKey && Math.abs(e.deltaY) > Math.abs(e.deltaX)) return;
     e.preventDefault();
     // ⌘ + two-finger swipe up zooms in, as in Ableton on a Mac (with natural scrolling a swipe up has deltaY > 0).
     // Pinch (reported as Ctrl + wheel) and Ctrl + mouse wheel elsewhere: spreading / wheel up zooms in.
@@ -107,11 +120,18 @@
 
   // ---- drawing ----
   const css = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  // Both canvases are painted by the same code, in one coordinate system (ruler at y = 0), each showing its part.
   $effect(() => {
     const dpr = window.devicePixelRatio || 1;
-    canvas.width = Math.round(width * dpr); canvas.height = Math.round(height * dpr);
-    const ctx = canvas.getContext("2d")!;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    rcanvas.width = Math.round(width * dpr); rcanvas.height = Math.round(HEAD * dpr);
+    canvas.width = Math.round(width * dpr); canvas.height = Math.max(1, Math.round((height - HEAD) * dpr));
+    for (const [cv, y0] of [[rcanvas, 0], [canvas, HEAD]] as const) {
+      const ctx = cv.getContext("2d")!;
+      ctx.setTransform(dpr, 0, 0, dpr, 0, -y0 * dpr);
+      paint(ctx);
+    }
+  });
+  function paint(ctx: CanvasRenderingContext2D) {
     const C = { bg0: css("--bg0"), bg1: css("--bg1"), bg2: css("--bg2"), line: css("--line"), line2: css("--line2"), text: css("--text"), dim: css("--dim"), faint: css("--faint"), accent: css("--accent") };
     const v = view, W = width, H = height;
     const t0 = v.start, t1 = tOf(W, v);
@@ -214,7 +234,7 @@
         ctx.fillStyle = "#111"; ctx.fillRect(xa, y0, 1, h); ctx.fillRect(xb - 1, y0, 1, h);
       });
     }
-  });
+  }
 
   // ---- mouse: seek, scrub, create / move / resize the range ----
   type Drag = { kind: "seek" | "edgeL" | "edgeR" | "move" | "maybe"; x0: number; t0: number; orig: { from: number; to: number } | null; moved: boolean };
@@ -236,6 +256,8 @@
     for (let j = 0; j < sp.length; j++) if (x > xOf(sp[j]!.from, view) && x < xOf(Math.min(sp[j]!.to, duration), view)) return { index: j, part: "move" };
     return null;
   }
+  /** y in the rows' coordinates, whichever canvas the pointer is over. */
+  const vy = (e: PointerEvent) => e.offsetY + (e.currentTarget === canvas ? HEAD : 0);
   function layerDown(e: PointerEvent, l: LayerRow) {
     const x = e.offsetX, t = tOf(x, view);
     const hit = spanHit(l, x);
@@ -269,8 +291,8 @@
   }
 
   function onpointerdown(e: PointerEvent) {
-    canvas.setPointerCapture(e.pointerId);
-    const x = e.offsetX, y = e.offsetY, t = tOf(x, view);
+    (e.currentTarget as HTMLCanvasElement).setPointerCapture(e.pointerId);
+    const x = e.offsetX, y = vy(e), t = tOf(x, view);
     const row = rowAt(y);
     if (row?.kind === "layer") return layerDown(e, row.layer);
     const r = range;
@@ -288,9 +310,10 @@
     if (spanDrag) return layerMove(e);
     if (!drag) {
       const r = range;
-      const row = rowAt(e.offsetY);
+      const y = vy(e);
+      const row = rowAt(y);
       const edge = row?.kind === "layer" ? spanHit(row.layer, x) : null;
-      canvas.style.cursor = (e.offsetY < H_RULER && r && (Math.abs(x - xOf(r.from, view)) < 6 || Math.abs(x - xOf(r.to, view)) < 6)) || (edge && edge.part !== "move") ? "ew-resize" : "default";
+      (e.currentTarget as HTMLCanvasElement).style.cursor = (y < H_RULER && r && (Math.abs(x - xOf(r.from, view)) < 6 || Math.abs(x - xOf(r.to, view)) < 6)) || (edge && edge.part !== "move") ? "ew-resize" : "default";
       return;
     }
     if (Math.abs(x - drag.x0) > 3) drag.moved = true;
@@ -303,7 +326,7 @@
     else if (drag.kind === "move") { const len = o.to - o.from; const from = snapT(o.from + (t - drag.t0), e); dragRange = { from, to: Math.min(duration, from + len) }; }
   }
   function onpointerup(e: PointerEvent) {
-    canvas.releasePointerCapture(e.pointerId);
+    (e.currentTarget as HTMLCanvasElement).releasePointerCapture(e.pointerId);
     if (spanDrag) return layerUp(e);
     const d = drag; drag = null;
     if (!d) return;
@@ -313,32 +336,49 @@
 </script>
 
 <div class="timeline">
-  <div class="heads">
-    <div class="h ruler" style:height="{H_RULER}px">Bars</div>
-    <div class="h" style:height="{H_SECT}px">Sections</div>
-    {#each rows as r}
-      {#if r.kind === "track"}
-        {@const t = tracks[r.i]!}
-        <div class="h track" style:height="{H_TRACK}px" title={t.id}><span class:mix={t.mix}>{t.name}</span>{#if t.mix}<em>mix</em>{/if}</div>
-      {:else}
-        <div class="h layer" class:sel={r.layer.id === selectedLayer} style:height="{H_LAYER}px" title={r.layer.name}
-          onclick={() => onselectlayer(r.layer.id, null)} onkeydown={(e) => { if (e.key === "Enter") onselectlayer(r.layer.id, null); }} role="button" tabindex="-1">{r.layer.name}</div>
-      {/if}
-    {/each}
+  <div class="top">
+    <div class="heads">
+      <div class="h ruler" style:height="{H_RULER}px">Bars</div>
+      <div class="h" style:height="{H_SECT}px">Sections</div>
+    </div>
+    <div class="wrap" bind:this={wrap}>
+      <canvas bind:this={rcanvas} style:height="{HEAD}px" style:width="{width}px" {onwheel} {onpointerdown} {onpointermove} {onpointerup}></canvas>
+    </div>
   </div>
-  <div class="wrap" bind:this={wrap}>
-    <canvas bind:this={canvas} style:height="{height}px" style:width="{width}px"
-      {onwheel} {onpointerdown} {onpointermove} {onpointerup}></canvas>
-    <!-- the playhead and start marker sit on their own layer, so playing moves them without redrawing the waveforms -->
+  <div class="scroller" bind:this={scroller}>
+    <div class="body">
+      <div class="heads">
+        {#each rows as r}
+          {#if r.kind === "track"}
+            {@const t = tracks[r.i]!}
+            <div class="h track" style:height="{H_TRACK}px" title={t.id}><span class:mix={t.mix}>{t.name}</span>{#if t.mix}<em>mix</em>{/if}</div>
+          {:else}
+            <div class="h layer" class:sel={r.layer.id === selectedLayer} style:height="{H_LAYER}px" title={r.layer.name}
+              onclick={() => onselectlayer(r.layer.id, null)} onkeydown={(e) => { if (e.key === "Enter") onselectlayer(r.layer.id, null); }} role="button" tabindex="-1">{r.layer.name}</div>
+          {/if}
+        {/each}
+      </div>
+      <div class="wrap2">
+        <canvas bind:this={canvas} style:height="{Math.max(1, height - HEAD)}px" style:width="{width}px" {onwheel} {onpointerdown} {onpointermove} {onpointerup}></canvas>
+      </div>
+    </div>
+  </div>
+  <!-- the playhead and start marker sit on their own layer, over both parts, so playing moves them without redrawing -->
+  <div class="overlay">
     {#if Math.abs(marker - time) > 1e-3}
       <div class="marker" style:transform="translateX({xOf(marker, view)}px)"></div>
     {/if}
-    <div class="playhead" style:height="{height}px" style:transform="translateX({xOf(time, view)}px)"></div>
+    <div class="playhead" style:transform="translateX({xOf(time, view)}px)"></div>
   </div>
 </div>
 
 <style>
-  .timeline { display: flex; height: 100%; overflow-y: auto; overflow-x: hidden; background: var(--bg1); border-top: 1px solid var(--line2); }
+  .timeline { position: relative; display: flex; flex-direction: column; height: 100%; overflow: hidden; background: var(--bg1); border-top: 1px solid var(--line2); }
+  .top { display: flex; flex: 0 0 auto; border-bottom: 1px solid var(--line2); }
+  .scroller { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+  .body { display: flex; align-items: flex-start; }
+  .wrap2 { flex: 1; min-width: 0; overflow: hidden; }
+  .overlay { position: absolute; left: 132px; right: 0; top: 0; bottom: 0; pointer-events: none; overflow: hidden; }
   .heads { flex: 0 0 132px; border-right: 1px solid var(--line2); background: var(--bg2); }
   .h { display: flex; align-items: center; gap: 6px; padding: 0 8px; border-bottom: 1px solid var(--line); color: var(--dim);
     font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
@@ -352,7 +392,7 @@
   .wrap { flex: 1; min-width: 0; position: relative; overflow: hidden; }
   canvas { display: block; touch-action: none; }
   .playhead, .marker { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform; }
-  .playhead { width: 1.5px; margin-left: -0.75px; background: var(--accent); }
+  .playhead { width: 1.5px; margin-left: -0.75px; height: 100%; background: var(--accent); }
   .playhead::before { content: ""; position: absolute; top: 0; left: -4.25px; border: 5px solid transparent; border-top: 7px solid var(--accent); border-bottom: 0; }
   .marker { top: 19px; left: -5px; width: 0; height: 0; border: 5px solid transparent; border-top: 7px solid var(--accent); border-bottom: 0; opacity: .7; }
 </style>
