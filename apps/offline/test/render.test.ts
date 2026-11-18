@@ -138,15 +138,29 @@ run("renderer in headless Chrome", () => {
   }, 90_000);
   it("a smaller preview matches the export: glow spreads over the same share of the picture", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
-    const glowRing: Project = { ...project, layers: [{ ...project.layers[1]!, effects: [{ type: "glow", params: { amount: 3, radius: 20 } }] }] };
-    // the share of the picture that's clearly lit (well above the background)
-    const lit = (px: Buffer) => { let n = 0; for (let i = 0; i < px.length; i += 4) if (px[i]! > 90) n++; return n / (px.length / 4); };
-    const full = await openRenderer(glowRing, "draft", { mix: track, bass: track }, { gpu: false });
-    const half = await openRenderer(glowRing, "draft", { mix: track, bass: track }, { gpu: false, scale: 0.5 });
+    const withGlow = (radius: number): Project => ({ ...project, automation: [{ target: "post.grain", points: [{ t: 0, v: 0 }] }], // no grain: it's random per pixel
+      layers: [{ ...project.layers[1]!, effects: [{ type: "glow", params: { amount: 3, radius } }] }] });
+    // the full-size frame shrunk to half (2×2 averages), against a half-size preview: mean difference per pixel
+    const W = 960, H = 540;
+    const diff = (fullPx: Buffer, halfPx: Buffer) => {
+      let sum = 0;
+      for (let y = 0; y < H / 2; y++) for (let x = 0; x < W / 2; x++) for (let ch = 0; ch < 3; ch++) {
+        const at = (xx: number, yy: number) => fullPx[(yy * W + xx) * 4 + ch]!;
+        const avg = (at(2 * x, 2 * y) + at(2 * x + 1, 2 * y) + at(2 * x, 2 * y + 1) + at(2 * x + 1, 2 * y + 1)) / 4;
+        sum += Math.abs(avg - halfPx[(y * (W / 2) + x) * 4 + ch]!);
+      }
+      return sum / ((W / 2) * (H / 2) * 3);
+    };
+    const tracks = { mix: track, bass: track };
+    const full = await openRenderer(withGlow(20), "draft", tracks, { gpu: false });
+    const half = await openRenderer(withGlow(20), "draft", tracks, { gpu: false, scale: 0.5 });
+    // what the half-size preview showed before glow sizes were scaled: twice the radius, relative to the picture
+    const unscaled = await openRenderer(withGlow(40), "draft", tracks, { gpu: false, scale: 0.5 });
     try {
-      const a = lit(await full.frame(30)), b = lit(await half.frame(30));
-      expect(a).toBeGreaterThan(0.01);
-      expect(Math.abs(b - a) / a).toBeLessThan(0.15);
-    } finally { await full.close(); await half.close(); }
-  }, 60_000);
+      const f = await full.frame(30);
+      const scaled = diff(f, await half.frame(30)), before = diff(f, await unscaled.frame(30));
+      // far closer to the export than before (not exact: smaller pictures antialias differently, and grain differs)
+      expect(scaled, `scaled preview ${scaled}, unscaled ${before}`).toBeLessThan(before * 0.7);
+    } finally { await full.close(); await half.close(); await unscaled.close(); }
+  }, 90_000);
 });
