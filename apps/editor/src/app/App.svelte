@@ -300,7 +300,7 @@
       let pts: LanePoint[] = [];
       try { pts = laneToSeconds(lane, grid).points.sort((a, b) => a.t - b.t); } catch { continue; }
       out.push({
-        target: lane.target, layer: l.id, label: fx ? `${EFFECTS[fx.type]?.label ?? fx.type}: ${spec.label}` : spec.label,
+        target: lane.target, layer: l.id, label: spec.label, ...(fx ? { effect: EFFECTS[fx.type]?.label ?? fx.type } : {}),
         min: spec.min, max: spec.max, int: (spec as { type?: string }).type === "int" || (spec as { type?: string }).type === "toggle", points: pts,
         origin: laneInherited(doc, videoName, lane.target) ? "base" : laneChanged(doc, videoName, lane.target) ? "changed" : "own",
       });

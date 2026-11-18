@@ -9,7 +9,7 @@
   export interface LayerRow { id: string; name: string; track: string; spans: SpanS[] | null; lanes?: number }
   /** An automation lane under its layer: breakpoints in seconds; the value range is the parameter's. */
   export interface LanePoint { t: number; v: number; curve?: "linear" | "hold" | "smooth" }
-  export interface LaneRow { target: string; layer: string; label: string; min: number; max: number; int: boolean; points: LanePoint[]; origin: "own" | "base" | "changed" }
+  export interface LaneRow { target: string; layer: string; label: string; effect?: string; min: number; max: number; int: boolean; points: LanePoint[]; origin: "own" | "base" | "changed" }
 
   let { grid, sections, tracks, layers = [], selectedLayer = null, selectedSpan = null, duration, time, range, rangeInherited, follow,
     marker = 0, snap = true, onseek, onrange, onselectlayer = () => {}, onspans = () => {}, contentHeight = $bindable(0),
@@ -477,8 +477,10 @@
             {@const sp = selectedPoint?.target === ln.target ? selectedPoint.index : null}
             {@const cur = sp !== null ? (ln.points[sp]?.curve ?? "linear") : null}
             <div class="h lane" style:height="{H_LANE}px" data-lane={ln.target}>
-              <div class="lt" title={ln.target}>{ln.label}{#if ln.origin === "base"}<em class="tag">base</em>{:else if ln.origin === "changed"}<em class="tag ch">changed</em>{/if}</div>
+              <div class="lt" title="{ln.label} ({ln.target})">{ln.label}</div>
               <div class="lb">
+                {#if ln.effect}<em class="fx" title="a parameter of its {ln.effect} effect">{ln.effect}</em>{/if}
+                {#if ln.origin === "base"}<em class="tag">base</em>{:else if ln.origin === "changed"}<em class="tag ch">changed</em>{/if}
                 {#if cur}
                   {#each [["linear", "⟋", "Straight to the next point"], ["hold", "⌐", "Hold, then jump at the next point"], ["smooth", "∿", "Ease in and out"]] as [c, icon, tip]}
                     <button class:on={cur === c} title="{tip} (after the selected point)" onclick={() => onlanecurve(ln.target, sp!, c as "linear")}>{icon}</button>
@@ -513,8 +515,9 @@
   .scroller { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
   .body { display: flex; align-items: flex-start; }
   .wrap2 { flex: 1; min-width: 0; overflow: hidden; }
-  .overlay { position: absolute; left: 132px; right: 0; top: 0; bottom: 0; pointer-events: none; overflow: hidden; }
-  .heads { flex: 0 0 132px; border-right: 1px solid var(--line2); background: var(--bg2); }
+  .overlay { position: absolute; left: 152px; right: 0; top: 0; bottom: 0; pointer-events: none; overflow: hidden; }
+  /* the names column has a fixed width, so a long name can never push the timeline out of line with the ruler */
+  .heads { flex: 0 0 152px; width: 152px; min-width: 152px; max-width: 152px; overflow: hidden; border-right: 1px solid var(--line2); background: var(--bg2); }
   .h { display: flex; align-items: center; gap: 6px; padding: 0 8px; border-bottom: 1px solid var(--line); color: var(--dim);
     font-size: 11px; text-transform: uppercase; letter-spacing: .06em; }
   .h.ruler { background: var(--bg2); }
@@ -530,7 +533,8 @@
   .lb { display: flex; gap: 2px; margin-top: 3px; align-items: center; }
   .lb .sp { flex: 1; }
   .lb button { font-size: 10px; padding: 0 4px; line-height: 15px; }
-  .tag { font-style: normal; font-size: 9px; margin-left: 4px; color: var(--faint); border: 1px dashed var(--line2); border-radius: 2px; padding: 0 2px; }
+  .fx { font-style: normal; font-size: 10px; color: var(--faint); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .tag { font-style: normal; font-size: 9px; margin-left: 2px; color: var(--faint); border: 1px dashed var(--line2); border-radius: 2px; padding: 0 2px; }
   .tag.ch { color: var(--accent); border-style: solid; }
   .h.track em { font-style: normal; font-size: 10px; color: var(--accent); border: 1px solid var(--accent-dim); border-radius: 2px; padding: 0 3px; }
   .wrap { flex: 1; min-width: 0; position: relative; overflow: hidden; }

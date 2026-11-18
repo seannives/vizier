@@ -102,7 +102,7 @@ The "Joy Division" picture: the track's recent spectra as stacked lines, the new
 receding towards the horizon. Each ridge can be filled to hide the ones behind it.
 
 Listens to: spectrum history (the ridges), `centroid` (colour, per ridge).
-Colours: **Lines** (`line`, default: ink), **Highlight (bright vocals)** (`highlight`, default: accent),
+Colours: **Lines** (`line`, default: ink), **Highlight (bright)** (`highlight`, default: accent: ridges of bright moments, such as vocals, when Highlight amount is up),
 **Fill under ridges** (`fill`, default: bg).
 
 | Parameter | Range (default) | What it does |

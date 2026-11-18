@@ -14,7 +14,7 @@ export default defineGenerator({
   kind: "canvas2d",
   colors: [
     { name: "line", label: "Lines", default: "ink" },
-    { name: "highlight", label: "Highlight (bright vocals)", default: "accent" },
+    { name: "highlight", label: "Highlight (bright)", default: "accent" },
     { name: "fill", label: "Fill under ridges", default: "bg" },
   ],
   params: [

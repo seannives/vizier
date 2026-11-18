@@ -421,6 +421,22 @@ run("editor (headless Chrome)", () => {
     await page.evaluate(() => { localStorage.removeItem("vizier.timelineHeight.in"); });
   }, 30_000);
 
+  it("long names never push the timeline out of line with the ruler", async () => {
+    const startLabel = (await state()).undoLabel;
+    try {
+      await page.evaluate(() => (window as any).vizierEditor.session().apply("long name", (d: any) => { d.videos.full.layers.find((l: any) => l.id === "ring").name = "A really very long layer name that can't fit"; }));
+      await page.click('[data-fold="ring"]');
+      const left = (sel: string) => page.locator(sel).first().evaluate((el) => el.getBoundingClientRect().left);
+      expect(await left("section.tl .scroller canvas")).toBe(await left("section.tl .top canvas"));
+      const h = await page.locator(".h.layer", { hasText: "A really" }).evaluate((el) => ({ sw: el.scrollWidth, cw: el.clientWidth, to: getComputedStyle(el).textOverflow }));
+      expect(h.to).toBe("ellipsis");
+      expect(h.sw).toBeGreaterThan(h.cw); // cut off with …, not widening the column
+    } finally {
+      for (let i = 0; i < 5 && (await state()).undoLabel !== startLabel; i++) await page.evaluate(() => (window as any).vizierEditor.session().undo());
+      if ((await state()).shownLanes.some((t: string) => t.startsWith("ring."))) await page.click('[data-fold="ring"]');
+    }
+  }, 30_000);
+
   it("shows the shortcuts with ?", async () => {
     await page.keyboard.press("Shift+Slash");
     expect(await page.locator("text=Keyboard shortcuts").count()).toBeGreaterThan(0);
