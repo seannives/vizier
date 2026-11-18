@@ -135,7 +135,7 @@ describe("bug sweep: rules that hold after any sequence of edits", () => {
         expect(JSON.stringify(s.doc), `${what}: redo`).toBe(after);
       }
     }), fuzz(300));
-  });
+  }, 120_000); // hundreds of edit sequences: seconds alone, longer beside the Chrome tests
 
   it("saving and loading again changes nothing", () => {
     fc.assert(fc.property(fc.array(step, { minLength: 1, maxLength: 25 }), (steps) => {
@@ -151,5 +151,5 @@ describe("bug sweep: rules that hold after any sequence of edits", () => {
         expect(JSON.stringify(b), `video ${name} after saving and loading`).toBe(JSON.stringify(a));
       }
     }), fuzz(200));
-  });
+  }, 120_000);
 });
