@@ -285,6 +285,47 @@ run("editor (headless Chrome)", () => {
     } finally { await p3.close(); }
   }, 120_000);
 
+  it("pops the preview out into its own window that follows the editor, edits it, and comes back when closed", async () => {
+    const ctx = await browser.newContext({ viewport: { width: 1440, height: 860 } });
+    const main = await ctx.newPage();
+    try {
+      await main.goto(`http://localhost:${PORT}/?previewScale=0.1`);
+      await main.waitForFunction(() => (window as any).vizierEditor?.state.status === "ready", null, { timeout: 60_000 });
+      const [out] = await Promise.all([ctx.waitForEvent("page"), main.click("text=⧉ Pop out")]);
+      await out.setViewportSize({ width: 1000, height: 640 });
+      await main.waitForFunction(() => (window as any).vizierEditor.state.popped, null, { timeout: 15_000 });
+      await out.waitForFunction(() => (window as any).vizierOutput?.state.connected, null, { timeout: 15_000 });
+      expect(await main.locator(".stage").count()).toBe(0);            // the editor's own preview is gone
+      expect(await main.locator("aside.inspector").count()).toBe(2);   // its room goes to the panels
+      // the output window follows selection and the playhead; a key there plays the editor
+      await main.click('[data-layer="ring"]');
+      await out.waitForFunction(() => (window as any).vizierOutput.state.selected === "ring");
+      await out.keyboard.press("Space");
+      await main.waitForFunction(() => (window as any).vizierEditor.state.time > 0.5, null, { timeout: 20_000 });
+      await out.waitForFunction(() => (window as any).vizierOutput.state.time > 0.5, null, { timeout: 20_000 });
+      await out.keyboard.press("Space");
+      expect(await main.evaluate(() => (window as any).vizierEditor.state.playing)).toBe(false);
+      // dragging the ring there moves it in the editor's video
+      const x0 = await main.evaluate(() => (window as any).vizierEditor.session().doc.videos.full.layers.find((l: any) => l.id === "ring").layout.landscape.x);
+      const ov = (await out.locator(".overlay").boundingBox())!;
+      await out.keyboard.down("Shift");
+      await out.mouse.move(ov.x + ov.width / 2, ov.y + ov.height / 2); await out.mouse.down();
+      await out.mouse.move(ov.x + ov.width / 2 + 100, ov.y + ov.height / 2, { steps: 5 }); await out.mouse.up();
+      await out.keyboard.up("Shift");
+      const x1 = await main.evaluate(() => (window as any).vizierEditor.session().doc.videos.full.layers.find((l: any) => l.id === "ring").layout.landscape.x);
+      expect(x1 - x0).toBeCloseTo(100 / ov.width, 2);
+      // ⌘Z pressed in the output window undoes it in the editor
+      await out.keyboard.press("ControlOrMeta+z");
+      await main.waitForFunction((x) => (window as any).vizierEditor.session().doc.videos.full.layers.find((l: any) => l.id === "ring").layout.landscape.x === x, x0);
+      // closing it brings the preview back
+      await out.close();
+      await main.waitForFunction(() => !(window as any).vizierEditor.state.popped, null, { timeout: 6000 });
+      await main.waitForTimeout(1500);
+      expect(await main.evaluate(() => (window as any).vizierEditor.state.popped)).toBe(false);
+      expect(await main.locator(".stage .preview").count()).toBe(1);
+    } finally { await ctx.close(); }
+  }, 120_000);
+
   it("I shows frame timing", async () => {
     await page.keyboard.press("i");
     await page.waitForTimeout(800);

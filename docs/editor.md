@@ -25,6 +25,12 @@ server isn't running, the editor says so and keeps your changes: start it again 
   Clicking the timeline or the arrow keys move the marker. With loop on (L), playback wraps at the range's end
   when it gets there; started after the range, it plays on, as in Ableton.
 - **Preview**: the open video in its format, at reduced resolution, with the safe area for vertical formats.
+- **Pop out** (top right of the preview): the preview moves to its own window, for a second screen or a
+  projector. The editor then splits its side panel in two (video and layers on the left, the selected layer on the
+  right) and gives the timeline more height. The output window follows the playhead and the open video; its
+  layout handles edit the editor's video; keys pressed there go to the editor (Space, ⌘Z…). **F** toggles full
+  screen there (Esc leaves it), without handles. Close the window, or **Bring it back** in the editor, to return.
+  If Chrome blocks the window, allow pop-ups for the editor's page.
 - **Timeline**: bar ruler, sections, and a waveform per track (each scaled to its own peak), with each track's layers
   under it. The ruler and sections stay put; swipe up and down over the tracks to scroll them, sideways to move
   along the song. Click or drag to move the playhead; zoom with ⌘ + two-finger swipe (up = in, as in Ableton) or
@@ -83,7 +89,7 @@ value); **Reset layer to base** drops all of this video's changes to the layer. 
 A base layer removed here is listed under the layers with **Restore**, which also brings back its automation.
 Changes always go to the open video; to change the base, open it.
 
-The preview in its own window comes next (see the roadmap);
+Next: automation lanes in milestone 3,
 automation lanes in milestone 3, tracks and tempo in 4, colour and render in 5 (see the [roadmap](roadmap.md)).
 
 ## Keyboard

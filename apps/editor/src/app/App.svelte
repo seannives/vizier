@@ -16,6 +16,7 @@
   import { setSpans, splitLayerAt, duplicateLayer, layerOf, setLayout, newVideo } from "./lib/edits.ts";
   import type { Doc } from "./lib/session.ts";
   import { stats } from "./lib/stats.ts";
+  import { openLink, type Msg } from "./lib/link.ts";
   import {
     barToSeconds, secondsToBar, barLabel, sectionTimes, videoFormat, getProfile, spansToSeconds, type Project, type Span, type Transform,
   } from "../../../../packages/core/src/index.ts";
@@ -102,6 +103,7 @@
       // it plays on
       if (playing && loop && r && t >= r.to && lastTick < r.to) { transport.seek(r.from); t = r.from; loopWraps++; }
       lastTick = playing ? t : Infinity;
+      if (popped && (t !== sentTime || loopWraps !== sentWraps)) { link?.send({ type: "time", time: t, loopWraps }); sentTime = t; sentWraps = loopWraps; }
       if (playing && !transport.playing) playing = false;
       time = t;
       raf = requestAnimationFrame(tick);
@@ -295,6 +297,41 @@
   }
   const family = $derived(getProfile(profileId).layout);
 
+  // ---- the preview in its own window (output window) ----
+  // While it's open (it says so every second), the editor shows no preview of its own: the side panels spread out
+  // and the timeline gets taller. Its layout handles and keys act on this editor.
+  let link: ReturnType<typeof openLink> | null = null;
+  let outputSeen = 0, byeAt = 0;
+  let sentTime = NaN, sentWraps = -1; // the playhead the output window was last told
+  let popped = $state(false);
+  function onLinkMessage(m: Msg) {
+    // (a heartbeat can still arrive just after the window said goodbye, while it closes)
+    if (m.type === "here") { if (Date.now() - byeAt < 1500) return; outputSeen = Date.now(); if (!popped) popped = true; }
+    else if (m.type === "bye") { byeAt = Date.now(); outputSeen = 0; popped = false; }
+    else if (m.type === "select") selectLayer(m.id);
+    else if (m.type === "layout") layoutFromPreview(m.id, m.t, m.final);
+    else if (m.type === "key") window.dispatchEvent(new KeyboardEvent("keydown", { key: m.key, code: m.code, shiftKey: m.shiftKey, metaKey: m.metaKey, ctrlKey: m.ctrlKey, altKey: m.altKey, cancelable: true }));
+  }
+  onMount(() => {
+    link = openLink(onLinkMessage);
+    link.send({ type: "hello" }); // an output window left open from before answers
+    const id = setInterval(() => { if (popped && Date.now() - outputSeen > 3000) popped = false; }, 500);
+    return () => { clearInterval(id); link?.close(); };
+  });
+  function popOut() {
+    const q = new URLSearchParams({ view: "output" });
+    if (previewParam && previewParam !== "0") q.set("previewScale", previewParam);
+    const w = window.open(`/?${q}`, "vizier-output", "popup,width=1280,height=760");
+    if (!w) flash("Chrome blocked the window: allow pop-ups for this page");
+  }
+  function bringBack() { link?.send({ type: "close" }); popped = false; outputSeen = 0; }
+  // what the output window shows
+  $effect(() => {
+    if (!popped || !link) return;
+    link.send({ type: "show", project: project ? $state.snapshot(project) as Project : null, profileId, selected: selectedLayer });
+    sentTime = NaN; // and the playhead again
+  });
+
   // ---- videos: new, duplicate; the open one must exist (undoing "new video" removes it) ----
   let newDialog = $state<null | "base" | "copy" | "blank">(null);
   function createVideo(o: { name: string; format: string; how: "blank" | "base" | "copy" }) {
@@ -344,7 +381,7 @@
   $effect(() => {
     (window as any).vizierEditor = {
       stats: () => ({ ...stats.summary(), ...stats.counts }),
-      get state() { return { selectedLayer, selectedSpan, status, error: loadError, playing, transportPlaying: transport.playing, loop, loopWraps, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
+      get state() { return { popped, selectedLayer, selectedSpan, status, error: loadError, playing, transportPlaying: transport.playing, loop, loopWraps, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
       timeline: () => timeline,
       clock: () => transport.clockInfo(),
       session: () => session,
@@ -355,7 +392,7 @@
 {#if loadError}
   <div class="fatal">Couldn't open the project: {loadError}</div>
 {:else}
-<div class="app">
+<div class="app" class:popped>
   <header class="top">
     <div class="brand">vizier</div>
     <div class="proj" title="project folder">{doc?.song.title ?? projectId}</div>
@@ -379,13 +416,16 @@
     <button onclick={() => (help = true)} title="Keyboard shortcuts (?)">?</button>
   </header>
 
-  <main>
-    <section class="stage">
-      {#if !previewOff}<Preview {project} {profileId} {features} {time} scaleOverride={previewScale} {loopWraps}
-        {selectedLayer} onselect={(id) => selectLayer(id)} onlayout={layoutFromPreview} />{/if}
-      {#if projectErr}<div class="err">{projectErr}</div>{/if}
-      {#if !features}<div class="note">analysing audio…</div>{/if}
-    </section>
+  <main class:popped>
+    {#if !popped}
+      <section class="stage">
+        {#if !previewOff}<Preview {project} {profileId} {features} {time} scaleOverride={previewScale} {loopWraps}
+          {selectedLayer} onselect={(id) => selectLayer(id)} onlayout={layoutFromPreview} />{/if}
+        {#if projectErr}<div class="err">{projectErr}</div>{/if}
+        {#if !features}<div class="note">analysing audio…</div>{/if}
+        <button class="popout" onclick={popOut} title="Show the preview in its own window (a second screen or a projector); the editor gets more room">⧉ Pop out</button>
+      </section>
+    {/if}
     <aside class="inspector">
       <h3>Video</h3>
       {#if doc && videoName && doc.videos[videoName]}
@@ -394,15 +434,24 @@
       <h3>Layers <span class="hint-inline">front to back</span></h3>
       {#if videoName}
         <LayerList {layers} video={videoName} doc={doc ?? undefined} selected={selectedLayer} defaultTrack={undefined} {trackName} {edit} onselect={(id) => selectLayer(id)} />
-        {#if selectedLayer && doc}
-          <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} {edit} {seal} {family}
-            onselect={(id) => selectLayer(id)} />
-        {:else}
-          <p class="hint">Select a layer to edit it. Each layer also has a row under its track in the timeline: drag there to set when it's on.</p>
-        {/if}
+      {/if}
+      {#if !popped}{@render layerPanel()}{/if}
+      {#if popped}
+        <p class="hint">The preview is in its own window. <button class="small" onclick={bringBack}>Bring it back</button></p>
+        {#if projectErr}<p class="hint err-inline">{projectErr}</p>{/if}
       {/if}
     </aside>
+    {#if popped}<aside class="inspector">{@render layerPanel()}</aside>{/if}
   </main>
+
+  {#snippet layerPanel()}
+    {#if videoName && selectedLayer && doc}
+      <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} {edit} {seal} {family}
+        onselect={(id) => selectLayer(id)} />
+    {:else if videoName}
+      <p class="hint">Select a layer to edit it. Each layer also has a row under its track in the timeline: drag there to set when it's on.</p>
+    {/if}
+  {/snippet}
 
   <section class="tl">
     <Timeline bind:this={timeline} {grid} {sections} {tracks} layers={layerRows} {selectedLayer} {selectedSpan} {duration} {time} range={rangeSec} {rangeInherited}
@@ -435,6 +484,12 @@
 <style>
   .app { display: grid; grid-template-rows: 42px minmax(0, 1fr) minmax(170px, 34vh) 24px; grid-template-columns: minmax(0, 1fr);
     height: 100vh; width: 100vw; overflow: hidden; }
+  .app.popped { grid-template-rows: 42px minmax(0, 1fr) minmax(170px, 56vh) 24px; }
+  main.popped { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  main.popped .inspector { border-left: none; border-right: 1px solid var(--line2); }
+  .popout { position: absolute; top: 8px; right: 8px; font-size: 11px; padding: 2px 8px; opacity: .7; }
+  .popout:hover { opacity: 1; }
+  .err-inline { color: var(--danger); font-family: var(--mono); }
   .top { display: flex; align-items: center; gap: 10px; padding: 0 10px; background: var(--bg2); border-bottom: 1px solid var(--line2);
     min-width: 0; overflow: hidden; }
   .top select { min-width: 0; max-width: 220px; }

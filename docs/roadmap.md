@@ -20,15 +20,13 @@ Editor milestones:
         and safe area; Layout section in the panel; resizing keeps a layer's shaders
   - [x] 2c. Inherited markers (base / changed / added), ↺ reset per setting and per layer, restore removed layers,
         Open base; Video section (name, format, base, range); New / Duplicate / Detach video
-- [ ] Preview in its own window (after 2c, before 3): pop the preview out to a second window (the output window
-      below, with the same layout handles); the main window then splits Range/video settings from the layer panel
-      and gives the timeline more height for automation lanes
+- [x] Preview in its own window: Pop out moves the preview to an output window (follows the editor, layout
+      handles, keys go to the editor, F for full screen); the editor splits its panels and the timeline grows
 - [ ] 3. Automation lanes: one per parameter, add/drag/delete breakpoints, curve types, beat snapping;
       audio-modulation editor (track + feature + amount)
 - [ ] 4. Tracks like Ableton's (create, name, drop/replace/remove a stem; warn on length or alignment mismatch);
       tempo panel (typed BPM with detected suggestion, downbeat, drag the grid, audible click)
 - [ ] 5. Colour pickers, palette panel and colour lanes; Render button with progress; list of renders
-- [ ] Output window as a second view of the session (projector / second monitor), edits applied live
 - [ ] Later: pencil drawing of automation; finer snapping; record control moves (mouse or MIDI) as automation
 
 ## Phase 4: Platform polish (then: Reels/Shorts and the YouTube video for the maleficus)

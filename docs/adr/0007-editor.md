@@ -31,3 +31,10 @@ a music tool, and later grow into a way to *play* the visuals live.
   numbers (chosen over IBM Plex after an on-screen comparison: easier to read). Neutral dark greys, one amber accent.
 - **Milestones:** (1) open, play, timeline + preview; (2) layers, parameters, layout; (3) automation lanes;
   (4) tracks/stems and tempo panel; (5) colour UI and Render.
+
+**Update (2026-11-18): the output window.** The preview pops out into a second window of the same editor page
+(`?view=output`). The two windows talk over a BroadcastChannel rather than through the local server: they are in
+the same browser, so it's simpler and has no network delay. The editor sends the project, format, selection and
+playhead (every frame while playing); the output window sends back selection, layout drags and keys, and a
+heartbeat every second so the editor knows it's open. A projector on another computer would need the server
+route; that's not planned.
