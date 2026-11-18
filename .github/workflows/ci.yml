@@ -3,12 +3,14 @@ on: [push, pull_request]
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 25 # a hung step fails the run instead of waiting hours
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - name: Install ffmpeg
+        timeout-minutes: 5 # Ubuntu's package servers occasionally hang
         run: command -v ffmpeg || (sudo apt-get update -q && sudo apt-get install -y -q ffmpeg)
       - run: pnpm install --frozen-lockfile
       - run: npx tsc -p tsconfig.json
