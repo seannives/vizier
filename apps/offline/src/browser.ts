@@ -7,8 +7,10 @@ import type { Project } from "../../../packages/core/src/index.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 
-/** Bundle the renderer for the browser (esbuild resolves @vizier/* through tsconfig paths). */
-async function bundle(): Promise<string> {
+/** Bundle the renderer for the browser (esbuild resolves @vizier/* through tsconfig paths); once per process. */
+let bundled: Promise<string> | null = null;
+function bundle(): Promise<string> { return (bundled ??= buildBundle()); }
+async function buildBundle(): Promise<string> {
   const r = await build({ entryPoints: [root + "packages/core/src/browser/entry.ts"], bundle: true, write: false, format: "iife", target: "es2022", tsconfig: root + "tsconfig.json", logLevel: "error" });
   return r.outputFiles[0]!.text;
 }
@@ -18,6 +20,8 @@ import type { BenchStats as BenchResult } from "../../../packages/core/src/brows
 export interface EncodeInfo { codec: string; hardware: boolean | "unknown"; bitrateMbps: number }
 export interface RendererHandle {
   frame(n: number): Promise<Buffer>;
+  /** Render a frame without reading its pixels back (for frames that only lead up to the one you want). */
+  render(n: number): Promise<void>;
   encodeStart(bitrateMbps: number): Promise<EncodeInfo>;
   encodeFrames(start: number, count: number, first: number): Promise<Buffer>;
   encodeFinish(): Promise<Buffer>; bench(start: number, count: number): Promise<BenchResult>; close(): Promise<void>
@@ -51,6 +55,7 @@ export async function openRenderer(project: Project, profileId: string, tracks: 
       const b64 = await page.evaluate((f) => (window as any).vizier.renderAndRead(f), n);
       return Buffer.from(b64, "base64");
     },
+    render: (n) => page.evaluate((f) => (window as any).vizier.render(f), n),
     encodeStart: (mbps) => page.evaluate((m) => (window as any).vizier.encodeStart(m), mbps),
     encodeFrames: async (start, count, first) =>
       Buffer.from(await page.evaluate(([s, c, f]) => (window as any).vizier.encodeFrames(s, c, f), [start, count, first] as const), "base64"),

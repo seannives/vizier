@@ -13,7 +13,8 @@ const candidates = [
   "/usr/bin/google-chrome",
 ].filter((p): p is string => !!p);
 const chrome = candidates.find((p) => existsSync(p));
-const run = chrome ? describe : describe.skip;
+// VIZIER_QUICK=1 (pnpm test:quick) skips the tests that drive Chrome
+const run = chrome && !process.env.VIZIER_QUICK ? describe : describe.skip;
 if (chrome) process.env.CHROME_PATH = chrome;
 
 const SR = 48000;
@@ -37,13 +38,18 @@ const fxProject: Project = {
   ],
 };
 
+// Software rendering is slow and these tests run alongside the editor's browser tests, so they draw at half size
+// in each direction (a quarter of the pixels) unless the size is what's being tested, and allow plenty of time.
+const SMALL = { gpu: false, scale: 0.5 };
+const W = 480, H = 270; // the draft profile (960×540) at half size
+
 run("renderer in headless Chrome", () => {
   it("draws non-blank frames, and the same frame twice is byte-identical", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
-    const r = await openRenderer(project, "draft", { mix: track, bass: track }, { gpu: false });
+    const r = await openRenderer(project, "draft", { mix: track, bass: track }, SMALL);
     try {
       const a = await r.frame(20), b = await r.frame(45), a2 = await r.frame(20);
-      expect(a.length).toBe(960 * 540 * 4);
+      expect(a.length).toBe(W * H * 4);
       const hash = (x: Buffer) => createHash("sha1").update(x).digest("hex");
       expect(hash(a2)).toBe(hash(a));      // determinism: rendering is a pure function of the frame number
       expect(hash(b)).not.toBe(hash(a));   // and frames do change over time
@@ -51,48 +57,49 @@ run("renderer in headless Chrome", () => {
       for (let i = 0; i < a.length; i += 4) if (a[i]! > 120) lit++;
       expect(lit).toBeGreaterThan(500);   // something brighter than the background was drawn
     } finally { await r.close(); }
-  }, 60_000);
+  }, 180_000);
 
   it("renders shader generators and effect chains", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
-    const r = await openRenderer(fxProject, "draft", { mix: track, bass: track }, { gpu: false });
+    const r = await openRenderer(fxProject, "draft", { mix: track, bass: track }, SMALL);
     try {
       const px = await r.frame(40);
       let lit = 0;
       for (let i = 0; i < px.length; i += 4) if (px[i + 1]! > 100) lit++;
       expect(lit).toBeGreaterThan(1000);
     } finally { await r.close(); }
-  }, 60_000);
+  }, 180_000);
 
   it("a frame with trails looks the same whether rendered in sequence or jumped to (lead-in)", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
     const hash = (x: Buffer) => createHash("sha1").update(x).digest("hex");
-    const a = await openRenderer(fxProject, "draft", { mix: track, bass: track }, { gpu: false });
-    const b = await openRenderer(fxProject, "draft", { mix: track, bass: track }, { gpu: false });
+    const a = await openRenderer(fxProject, "draft", { mix: track, bass: track }, SMALL);
+    const b = await openRenderer(fxProject, "draft", { mix: track, bass: track }, SMALL);
     try {
       let seq: Buffer = Buffer.alloc(0);
-      for (let f = 0; f <= 45; f++) seq = await a.frame(f); // sequential, as in a full render
+      for (let f = 0; f < 45; f++) await a.render(f);        // sequential, as in a full render
+      seq = await a.frame(45);
       const jumped = await b.frame(45);                       // straight to frame 45, as in an excerpt
       expect(hash(jumped)).toBe(hash(seq));
     } finally { await a.close(); await b.close(); }
-  }, 120_000);
+  }, 180_000);
 
   it("palette lanes change the picture (background follows palette.bg)", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
     const p: Project = { ...project, layers: [], automation: [{ target: "palette.bg", points: [{ t: 0, c: "#ff0000", curve: "hold" }, { t: 1, c: "#0000ff" }] }] };
-    const r = await openRenderer(p, "draft", { mix: track, bass: track }, { gpu: false });
+    const r = await openRenderer(p, "draft", { mix: track, bass: track }, SMALL);
     try {
-      const centre = (px: Buffer) => { const i = (270 * 960 + 480) * 4; return [px[i]!, px[i + 1]!, px[i + 2]!]; };
+      const centre = (px: Buffer) => { const i = ((H / 2) * W + W / 2) * 4; return [px[i]!, px[i + 1]!, px[i + 2]!]; };
       const [r0, , b0] = centre(await r.frame(10)); // 0.33 s: red
       const [r1, , b1] = centre(await r.frame(40)); // 1.33 s: blue
       expect(r0).toBeGreaterThan(200); expect(b0).toBeLessThan(60);
       expect(b1).toBeGreaterThan(200); expect(r1).toBeLessThan(60);
     } finally { await r.close(); }
-  }, 60_000);
+  }, 180_000);
 
   it("encodes H.264 in the browser (WebCodecs) as an Annex B stream with SPS/PPS and a keyframe", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
-    const r = await openRenderer(project, "draft", { mix: track, bass: track }, { gpu: false });
+    const r = await openRenderer(project, "draft", { mix: track, bass: track }, SMALL);
     try {
       const info = await r.encodeStart(4);
       expect(info.codec).toMatch(/^avc1\.6400/);
@@ -105,28 +112,28 @@ run("renderer in headless Chrome", () => {
       expect(nalTypes.has(8)).toBe(true); // PPS
       expect(nalTypes.has(5)).toBe(true); // IDR keyframe
     } finally { await r.close(); }
-  }, 60_000);
+  }, 180_000);
   it("doesn't draw a layer outside its on-spans", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
     const grid = { tempo: [{ bar: 1, bpm: 120, beatsPerBar: 4 }], downbeat: 0 }; // a bar is 2 s
     const ring = { ...project.layers[1]!, spans: [{ from: 1.5 }] };              // on from 1 s
     const hash = (x: Buffer) => createHash("sha1").update(x).digest("hex");
-    const withRing = await openRenderer({ ...project, grid, layers: [project.layers[0]!, ring] }, "draft", { mix: track, bass: track }, { gpu: false });
-    const without = await openRenderer({ ...project, grid, layers: [project.layers[0]!] }, "draft", { mix: track, bass: track }, { gpu: false });
+    const withRing = await openRenderer({ ...project, grid, layers: [project.layers[0]!, ring] }, "draft", { mix: track, bass: track }, SMALL);
+    const without = await openRenderer({ ...project, grid, layers: [project.layers[0]!] }, "draft", { mix: track, bass: track }, SMALL);
     try {
       expect(hash(await withRing.frame(15))).toBe(hash(await without.frame(15)));       // 0.5 s: off
       expect(hash(await withRing.frame(45))).not.toBe(hash(await without.frame(45)));   // 1.5 s: on
     } finally { await withRing.close(); await without.close(); }
-  }, 60_000);
+  }, 180_000);
   it("an edit applied to a running renderer keeps its trails (and still takes effect)", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
     const hash = (x: Buffer) => createHash("sha1").update(x).digest("hex");
     const tracks = { mix: track, bass: track };
     // a: renders frames in order, gets the same project again as an edit at frame 20; b: never edited
-    const a = await openRenderer(fxProject, "draft", tracks, { gpu: false });
-    const b = await openRenderer(fxProject, "draft", tracks, { gpu: false });
+    const a = await openRenderer(fxProject, "draft", tracks, SMALL);
+    const b = await openRenderer(fxProject, "draft", tracks, SMALL);
     try {
-      for (let f = 0; f <= 20; f++) { await a.frame(f); await b.frame(f); }
+      for (let f = 0; f <= 20; f++) { await a.render(f); await b.render(f); }
       await a.update(structuredClone(fxProject));
       expect(hash(await a.frame(21))).toBe(hash(await b.frame(21)));   // the trails carried on exactly
       // a real edit (the ring's radius) shows from the next frame
@@ -135,7 +142,7 @@ run("renderer in headless Chrome", () => {
       await a.update(edited);
       expect(hash(await a.frame(22))).not.toBe(hash(await b.frame(22)));
     } finally { await a.close(); await b.close(); }
-  }, 90_000);
+  }, 180_000);
   it("a smaller preview matches the export: glow spreads over the same share of the picture", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
     const withGlow = (radius: number): Project => ({ ...project, automation: [{ target: "post.grain", points: [{ t: 0, v: 0 }] }], // no grain: it's random per pixel
@@ -162,5 +169,5 @@ run("renderer in headless Chrome", () => {
       // far closer to the export than before (not exact: smaller pictures antialias differently, and grain differs)
       expect(scaled, `scaled preview ${scaled}, unscaled ${before}`).toBeLessThan(before * 0.7);
     } finally { await full.close(); await half.close(); await unscaled.close(); }
-  }, 90_000);
+  }, 180_000);
 });

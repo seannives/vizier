@@ -10,7 +10,7 @@ export default defineConfig({
       { extends: true, test: { name: "node", include: ["**/*.test.ts"], exclude: ["**/node_modules/**", "**/*.component.test.ts"] } },
       {
         extends: true,
-        plugins: [svelte()],
+        plugins: [svelte({ configFile: false })], // no svelte.config.js: the defaults are what we want
         resolve: { conditions: ["browser"] },
         test: { name: "components", include: ["apps/editor/test/**/*.component.test.ts"], environment: "jsdom" },
       },

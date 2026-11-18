@@ -11,7 +11,8 @@ import { DEMO, makeDemoTracks, wav } from "../../../scripts/demo-audio.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const chrome = [process.env.CHROME_PATH, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/usr/bin/google-chrome"].find((p) => p && existsSync(p));
-const run = chrome ? describe : describe.skip;
+// VIZIER_QUICK=1 (pnpm test:quick) skips the tests that drive Chrome
+const run = chrome && !process.env.VIZIER_QUICK ? describe : describe.skip;
 const PORT = 5190 + Math.floor(Math.random() * 50);
 
 run("editor (headless Chrome)", () => {

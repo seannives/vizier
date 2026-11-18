@@ -17,7 +17,8 @@
     "migrate": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts migrate",
     "editor": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts editor",
     "vizier": "node --experimental-strip-types --disable-warning=ExperimentalWarning scripts/vizier.ts",
-    "check:svelte": "node scripts/svelte-check.cjs"
+    "check:svelte": "node scripts/svelte-check.cjs",
+    "test:quick": "VIZIER_QUICK=1 vitest run"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
