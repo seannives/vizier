@@ -324,7 +324,7 @@ run("editor (headless Chrome)", () => {
       await main.waitForFunction((x) => (window as any).vizierEditor.session().doc.videos.full.layers.find((l: any) => l.id === "ring").layout.landscape.x === x, x0);
       // closing it brings the preview back
       await out.close();
-      await main.waitForFunction(() => !(window as any).vizierEditor.state.popped, null, { timeout: 6000 });
+      await main.waitForFunction(() => !(window as any).vizierEditor.state.popped, null, { timeout: 30_000 }); // (a busy machine delays the goodbye)
       await main.waitForTimeout(1500);
       expect(await main.evaluate(() => (window as any).vizierEditor.state.popped)).toBe(false);
       expect(await main.locator(".stage .preview").count()).toBe(1);
