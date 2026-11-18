@@ -62,7 +62,7 @@ apps/editor         editor: local server + Svelte 5 app; the session (project da
 projects/           one folder per song (only projects/demo/ is part of this repo)
 scripts/            demo audio generator
 assets/fonts        Special Elite (Apache 2.0, see LICENSE-SpecialElite.txt)
-docs/               projects.md, editor.md, setup-mac.md, adding-a-generator.md, roadmap.md, adr/
+docs/               visuals.md, projects.md, editor.md, setup-mac.md, adding-a-generator.md, roadmap.md, adr/
 ```
 
 ## Projects
@@ -74,6 +74,7 @@ See [`docs/projects.md`](docs/projects.md).
 Generators: `acidRing`, `pulseGrid`, `typeText`, `ridgeline`, `flowField`. Effects: `glow`, `trails`.
 Colours follow a five-slot palette (or a layer's own colours) and can be automated; see
 [`docs/projects.md`](docs/projects.md#colour).
+What each generator, effect and parameter does, with pictures: [`docs/visuals.md`](docs/visuals.md).
 Adding visuals: [`docs/adding-a-generator.md`](docs/adding-a-generator.md).
 
 ## Licence

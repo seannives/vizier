@@ -45,7 +45,7 @@ server isn't running, the editor says so and keeps your changes: start it again 
 
 - **Layer list** (side panel, front first): click to select; double-click a name to rename; ↑ ↓ move a layer in
   front of or behind its neighbour; ⧉ duplicates (⌘D; the copy goes just behind); ✕ removes. **+ Add layer…** adds one on top, full frame.
-- **Layer panel** (below the list, for the selected layer): what draws it, its track and blend mode; text for text
+- **Layer panel** (below the list, for the selected layer; what every parameter does: [visuals.md](visuals.md)): what draws it, its track and blend mode; text for text
   layers; every parameter as a slider with a number you can type into (typed values may go past the slider's range;
   double-click a parameter to reset it to its default); the effect chain (add, reorder, remove, and each effect's
   parameters). Parameters with an automation lane show in amber: the lane sets them while playing.

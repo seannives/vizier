@@ -96,6 +96,14 @@ keeping the files' order and layout. Commit the result in your projects repo.`,
     details: `
 Writes projects/demo/media/{mix,drums,bass,pad}.wav: a 32-bar, 128 BPM sketch, the same every time.`,
   },
+  "docs-images": {
+    script: "scripts/make-docs-images.ts",
+    summary: "render the pictures in docs/visuals.md",
+    usage: "vizier docs-images",
+    details: `
+Renders each generator and effect from the demo song's audio into docs/images/visuals/*.jpg. Run it after
+changing how a generator or effect looks. Needs Chrome and ffmpeg.`,
+  },
 };
 
 const [cmd, ...rest] = process.argv.slice(2);

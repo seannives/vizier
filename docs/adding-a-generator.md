@@ -78,3 +78,6 @@ renderer first renders a few seconds of lead-in, so the frame matches the same m
 - `pnpm test`: the plugin test checks every parameter declaration (unique names, `min ≤ default ≤ max`).
 - Render a still at a busy moment and a quiet one: `vizier render projects/demo --video full --still-bar 13 --gpu`.
 - `vizier render projects/demo --video full --bench 300 --gpu` to check the cost per frame.
+- Document it in [visuals.md](visuals.md) (what it does, what it listens to, every parameter) and add a shot to
+  `scripts/make-docs-images.ts`, then `vizier docs-images`. A test fails until every generator, effect and
+  parameter is in visuals.md with a picture.
