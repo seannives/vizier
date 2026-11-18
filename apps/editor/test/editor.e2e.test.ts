@@ -576,6 +576,13 @@ run("editor (headless Chrome)", () => {
       expect(await page.locator('[data-lane="ring.radius"], [data-lane="ring.spike"]').count()).toBe(2);
       await page.click('[data-fold="ring"]');
       expect(await page.locator("[data-lane]").count()).toBe(0);
+      // removing a lane un-lights its A; A then starts a new one (rather than "hiding" one that's gone)
+      await a.click();
+      await page.click('[data-lane="ring.spike"] button[title="Remove this lane"]');
+      expect(await a.evaluate((el) => el.classList.contains("on"))).toBe(false);
+      await a.click();
+      expect((await lane("ring.spike") as any[]).length).toBe(1);
+      expect(await a.evaluate((el) => el.classList.contains("on"))).toBe(true);
     } finally {
       for (let i = 0; i < 20 && (await state()).undoLabel !== startLabel; i++) await E(() => (window as any).vizierEditor.session().undo());
       if ((await state()).shownLanes.some((t: string) => t.startsWith("ring."))) await page.click('[data-fold="ring"]');

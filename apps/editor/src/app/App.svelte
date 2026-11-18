@@ -324,17 +324,19 @@
     const sp = selectedPoint, v = videoName;
     const ln = sp && laneRows.find((l) => l.target === sp.target);
     if (!sp || !ln || !v) return false;
-    if (ln.points.length <= 1) edit("remove lane", (d) => removeLane(d, v, sp.target));
+    if (ln.points.length <= 1) { edit("remove lane", (d) => removeLane(d, v, sp.target)); hideLane(sp.target); }
     else lanePoints(sp.target, ln.points.filter((_, j) => j !== sp.index));
     selectedPoint = null;
     return true;
   }
+  /** Lanes that are shown and exist (a removed or undone lane isn't "shown", so A isn't lit for it). */
+  const visibleLanes = $derived(new Set(laneRows.map((l) => l.target).filter((t) => shownLanes.has(t))));
   /** A in the layer panel: start a lane at the playhead with the current value and show it; on an automated
    *  parameter, show or hide its lane. */
   function automate(target: string, value: number) {
     const v = videoName;
     if (!v) return;
-    if (shownLanes.has(target)) return hideLane(target);
+    if (visibleLanes.has(target)) return hideLane(target);
     if (!laneRows.some((l) => l.target === target))
       edit("automate", (d) => addLane(d, v, target, grid ? { bar: toBar(playing ? time : marker) } : { t: playing ? time : marker }, value));
     shownLanes = new Set([...shownLanes, target]);
@@ -544,7 +546,7 @@
 
   {#snippet layerPanel()}
     {#if videoName && selectedLayer && doc}
-      <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} {shownLanes} {edit} {seal} {family} onautomate={automate} {time} {features}
+      <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} shownLanes={visibleLanes} {edit} {seal} {family} onautomate={automate} {time} {features}
         onselect={(id) => selectLayer(id)} />
     {:else if videoName}
       <p class="hint">Select a layer to edit it. Each layer also has a row under its track in the timeline: drag there to set when it's on.</p>
@@ -559,7 +561,7 @@
       lanes={laneRows} {shownLanes} {selectedPoint} ontogglelanes={toggleLanes} onhidelane={hideLane}
       onselectpoint={(t, i) => { if (t) selectLayer(t.split(".")[0]!); selectedPoint = t && i !== null ? { target: t, index: i } : null; }}
       onlanepoints={lanePoints} onlanecurve={laneCurve}
-      onlaneremove={(t) => { const v = videoName; if (v) edit("remove lane", (d) => removeLane(d, v, t)); selectedPoint = null; }}
+      onlaneremove={(t) => { const v = videoName; if (v) edit("remove lane", (d) => removeLane(d, v, t)); hideLane(t); }}
       onlanereset={(t) => { const v = videoName; if (v) edit("lane: back to the base's", (d) => resetLane(d, v, t)); }} />
   </section>
 
