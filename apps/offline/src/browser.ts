@@ -20,7 +20,9 @@ export interface RendererHandle {
   frame(n: number): Promise<Buffer>;
   encodeStart(bitrateMbps: number): Promise<EncodeInfo>;
   encodeFrames(start: number, count: number, first: number): Promise<Buffer>;
-  encodeFinish(): Promise<Buffer>; bench(start: number, count: number): Promise<BenchResult>; close(): Promise<void> }
+  encodeFinish(): Promise<Buffer>; bench(start: number, count: number): Promise<BenchResult>; close(): Promise<void>
+  /** Apply an edited project to the running renderer (as the editor does). */
+  update(project: Project): Promise<void> }
 
 /**
  * Headless Chrome running the same renderer the live app uses.
@@ -53,6 +55,7 @@ export async function openRenderer(project: Project, profileId: string, tracks: 
     encodeFrames: async (start, count, first) =>
       Buffer.from(await page.evaluate(([s, c, f]) => (window as any).vizier.encodeFrames(s, c, f), [start, count, first] as const), "base64"),
     encodeFinish: async () => Buffer.from(await page.evaluate(() => (window as any).vizier.encodeFinish()), "base64"),
+    update: (p) => page.evaluate((x) => (window as any).vizier.update(x), p),
     bench: (start, count) => page.evaluate(([s, c]) => (window as any).vizier.bench(s, c), [start, count] as const),
     close: () => browser.close(),
   };

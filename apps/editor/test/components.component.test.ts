@@ -69,4 +69,63 @@ describe("Timeline", () => {
     await clickAt(10.2);
     expect(onseek.mock.lastCall![0]).toBeCloseTo(10.2, 1);
   });
+
+  describe("layer rows (when a layer is on)", () => {
+    // one track (the mix), with one layer under it: on 10–20 s; the layer row is just below the track's waveform
+    const layer = (spans: { from: number; to: number; fadeIn: number; fadeOut: number }[] | null) => ({ id: "ring", name: "Ring", track: "mix", spans });
+    async function rows(spans: Parameters<typeof layer>[0]) {
+      const onspans = vi.fn(), onselectlayer = vi.fn(), onseek = vi.fn();
+      const r = render(Timeline, { ...base, time: 0, snap: true, tracks: [{ id: "mix", name: "Mix", mix: true, wave: null }],
+        layers: [layer(spans)], onspans, onselectlayer, onseek } as any);
+      await tick();
+      const tl = r.component as any;
+      const body = r.container.querySelectorAll("canvas")[1]!;
+      const ev = (type: string, t: number, shiftKey = false) => Object.defineProperties(new MouseEvent(type, { bubbles: true, shiftKey }), {
+        offsetX: { value: tl.pageX(t) - 0 }, offsetY: { value: 46 + 9 }, pointerId: { value: 1 } }); // the layer row, in the tracks canvas
+      for (const c of r.container.querySelectorAll("canvas")) c.getBoundingClientRect = () => ({ left: 0, top: 0, right: 800, bottom: 200, width: 800, height: 200, x: 0, y: 0, toJSON() {} });
+      const drag = async (from: number, to: number, shiftKey = false) => {
+        await fireEvent(body, ev("pointerdown", from, shiftKey));
+        await fireEvent(body, ev("pointermove", (from + to) / 2, shiftKey));
+        await fireEvent(body, ev("pointermove", to, shiftKey));
+        await fireEvent(body, ev("pointerup", to, shiftKey));
+      };
+      return { onspans, onselectlayer, onseek, drag };
+    }
+    const on = { from: 10, to: 20, fadeIn: 0, fadeOut: 0 };
+    it("dragging in an empty part makes a span (snapped to beats) and selects it", async () => {
+      const { onspans, onselectlayer, drag } = await rows([on]);
+      await drag(30.2, 35.9);
+      expect(onspans).toHaveBeenCalledWith("ring", [on, { from: 30, to: 36, fadeIn: 0, fadeOut: 0 }]);
+      expect(onselectlayer).toHaveBeenLastCalledWith("ring", 1);
+    });
+    it("a layer that's on for the whole song becomes on just for the dragged span", async () => {
+      const { onspans, drag } = await rows(null);
+      await drag(4, 8);
+      expect(onspans).toHaveBeenCalledWith("ring", [{ from: 4, to: 8, fadeIn: 0, fadeOut: 0 }]);
+    });
+    it("drags a span's start and end, and moves it whole", async () => {
+      const a = await rows([on]);
+      await a.drag(10, 12.2);
+      expect(a.onspans).toHaveBeenLastCalledWith("ring", [{ ...on, from: 12 }]);
+      const b = await rows([on]);
+      await b.drag(20, 25.1);
+      expect(b.onspans).toHaveBeenLastCalledWith("ring", [{ ...on, to: 25 }]);
+      const c = await rows([on]);
+      await c.drag(15, 17);
+      expect(c.onspans).toHaveBeenLastCalledWith("ring", [{ ...on, from: 12, to: 22 }]);
+      const d = await rows([on]);
+      await d.drag(15, 17.2, true); // ⇧: no snapping
+      expect(d.onspans.mock.lastCall![1][0].from).toBeCloseTo(12.2, 1);
+    });
+    it("a click on a span selects it; a click in empty space selects the layer and moves the playhead", async () => {
+      const { onspans, onselectlayer, onseek, drag } = await rows([on]);
+      await drag(15, 15);
+      expect(onselectlayer).toHaveBeenLastCalledWith("ring", 0);
+      expect(onseek).not.toHaveBeenCalled();
+      await drag(40.2, 40.2);
+      expect(onselectlayer).toHaveBeenLastCalledWith("ring", null);
+      expect(onseek).toHaveBeenLastCalledWith(40);
+      expect(onspans).not.toHaveBeenCalled();
+    });
+  });
 });

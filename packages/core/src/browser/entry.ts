@@ -19,6 +19,8 @@ const b64 = (px: Uint8Array) => {
     return { width: r.profile.width, height: r.profile.height, fps: r.profile.fps };
   },
   render(frame: number) { r!.renderFrame(frame); },
+  /** Apply an edited project to the running renderer (as the editor does). */
+  update(project: Project) { r!.update(project); },
   bench(start: number, count: number) { return r!.bench(start, count); },
   /** Render a frame and return its pixels as base64 (bottom row first). */
   renderAndRead(frame: number): string {

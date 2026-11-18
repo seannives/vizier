@@ -102,4 +102,84 @@ describe("LayerPanel", () => {
     s.undo();
     expect(layerOf(s.doc, "full", "ring")!.params).toBeUndefined();
   });
+
+  it("adds, reorders and removes effects, and sets an effect's parameter (one undo per drag)", async () => {
+    const { s, edit, seal } = setup();
+    const props = () => ({ ...base, doc: s.doc, layerId: "ring", playheadBar: 1, edit, seal });
+    const r = render(LayerPanel, props());
+    const add = r.getByLabelText("Add an effect") as HTMLSelectElement;
+    add.value = "trails"; await fireEvent.change(add);
+    add.value = "glow"; await fireEvent.change(add);
+    await r.rerender(props());
+    expect(layerOf(s.doc, "full", "ring")!.effects!.map((e) => e.type)).toEqual(["trails", "glow"]);
+    await fireEvent.click(r.getAllByTitle("Earlier in the chain")[1]!);
+    await r.rerender(props());
+    expect(layerOf(s.doc, "full", "ring")!.effects!.map((e) => e.type)).toEqual(["glow", "trails"]);
+    const amount = r.getByLabelText("Amount slider") as HTMLInputElement;
+    for (const v of ["0.2", "0.4"]) { amount.value = v; await fireEvent.input(amount); }
+    await fireEvent.change(amount);
+    expect(layerOf(s.doc, "full", "ring")!.effects![0]!.params).toEqual({ amount: 0.4 });
+    s.undo();
+    expect(layerOf(s.doc, "full", "ring")!.effects![0]!.params).toBeUndefined();
+    await r.rerender(props());
+    await fireEvent.click(r.getAllByTitle("Remove")[0]!);
+    expect(layerOf(s.doc, "full", "ring")!.effects!.map((e) => e.type)).toEqual(["trails"]);
+  });
+  it("edits text (typing is one undo step)", async () => {
+    const { s, edit, seal } = setup();
+    const r = render(LayerPanel, { ...base, doc: s.doc, layerId: "title", playheadBar: 1, edit, seal });
+    const box = r.getByLabelText("Text") as HTMLTextAreaElement;
+    for (const t of ["h", "he", "hel", "hello"]) { box.value = t; await fireEvent.input(box); }
+    await fireEvent.change(box);
+    expect(layerOf(s.doc, "full", "title")!.text).toBe("hello");
+    s.undo();
+    expect(layerOf(s.doc, "full", "title")!.text).toBe("hi");
+  });
+  it("sets the layout from the number fields, for this video's shape", async () => {
+    const { s, edit, seal } = setup();
+    const props = () => ({ ...base, doc: s.doc, layerId: "ring", playheadBar: 1, edit, seal, family: "portrait" as const });
+    const r = render(LayerPanel, props());
+    expect(r.getByText(/Uses the landscape layout/)).toBeTruthy();
+    const x = r.getByLabelText("X (% of width)") as HTMLInputElement;
+    x.value = "30"; await fireEvent.change(x);
+    expect(layerOf(s.doc, "full", "ring")!.layout.portrait).toEqual({ x: 0.3, y: 0.5, w: 1, h: 1 });
+    expect(layerOf(s.doc, "full", "ring")!.layout.landscape).toEqual(L.landscape);
+    await r.rerender(props());
+    const rot = r.getByLabelText("Rotation (degrees)") as HTMLInputElement;
+    rot.value = "45"; await fireEvent.change(rot);
+    expect(layerOf(s.doc, "full", "ring")!.layout.portrait!.rotation).toBe(45);
+    await r.rerender(props());
+    await fireEvent.click(r.getByText("Fill frame"));
+    expect(layerOf(s.doc, "full", "ring")!.layout.portrait).toEqual({ x: 0.5, y: 0.5, w: 1, h: 1 });
+  });
+});
+
+describe("LayerList: rename and duplicate", () => {
+  it("renames on double-click (Enter keeps it, Escape cancels)", async () => {
+    const { s, edit } = setup();
+    const props = () => ({ layers: [...layersOf(s.doc, "full")].sort((a, b) => b.z - a.z), video: "full", selected: "ring", trackName: () => "", edit, onselect: () => {} });
+    const r = render(LayerList, props());
+    await fireEvent.dblClick(r.container.querySelector('[data-layer="ring"] .lname')!);
+    const input = r.container.querySelector("input.rename") as HTMLInputElement;
+    input.value = "303 ring";
+    await fireEvent.keyDown(input, { key: "Enter" });
+    await fireEvent.blur(input);
+    expect(layerOf(s.doc, "full", "ring")!.name).toBe("303 ring");
+    await r.rerender(props());
+    await fireEvent.dblClick(r.container.querySelector('[data-layer="ring"] .lname')!);
+    const again = r.container.querySelector("input.rename") as HTMLInputElement;
+    again.value = "nope";
+    await fireEvent.keyDown(again, { key: "Escape" });
+    expect(layerOf(s.doc, "full", "ring")!.name).toBe("303 ring");
+  });
+  it("duplicates a layer just behind it and selects the copy", async () => {
+    const { s, edit } = setup();
+    const onselect = vi.fn();
+    const r = render(LayerList, { layers: [...layersOf(s.doc, "full")].sort((a, b) => b.z - a.z), video: "full", selected: "ring", trackName: () => "", edit, onselect });
+    await fireEvent.click(r.container.querySelector('[data-layer="ring"] button[title="Duplicate"]')!);
+    expect(onselect).toHaveBeenLastCalledWith("acidRing");
+    const copy = layerOf(s.doc, "full", "acidRing")!;
+    expect(copy.name).toBe("Acid ring copy");
+    expect(copy.z).toBeLessThan(layerOf(s.doc, "full", "ring")!.z);
+  });
 });

@@ -118,4 +118,22 @@ run("renderer in headless Chrome", () => {
       expect(hash(await withRing.frame(45))).not.toBe(hash(await without.frame(45)));   // 1.5 s: on
     } finally { await withRing.close(); await without.close(); }
   }, 60_000);
+  it("an edit applied to a running renderer keeps its trails (and still takes effect)", async () => {
+    const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
+    const hash = (x: Buffer) => createHash("sha1").update(x).digest("hex");
+    const tracks = { mix: track, bass: track };
+    // a: renders frames in order, gets the same project again as an edit at frame 20; b: never edited
+    const a = await openRenderer(fxProject, "draft", tracks, { gpu: false });
+    const b = await openRenderer(fxProject, "draft", tracks, { gpu: false });
+    try {
+      for (let f = 0; f <= 20; f++) { await a.frame(f); await b.frame(f); }
+      await a.update(structuredClone(fxProject));
+      expect(hash(await a.frame(21))).toBe(hash(await b.frame(21)));   // the trails carried on exactly
+      // a real edit (the ring's radius) shows from the next frame
+      const edited = structuredClone(fxProject);
+      edited.layers[1]!.params = { radius: 0.4 };
+      await a.update(edited);
+      expect(hash(await a.frame(22))).not.toBe(hash(await b.frame(22)));
+    } finally { await a.close(); await b.close(); }
+  }, 90_000);
 });

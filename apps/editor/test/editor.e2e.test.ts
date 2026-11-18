@@ -267,6 +267,21 @@ run("editor (headless Chrome)", () => {
       expect((await layout()).w).toBe(a.w);
       await p3.keyboard.press("ControlOrMeta+z");
       expect(await layout()).toEqual(orig);
+      // clicking again where layers overlap selects the next one down, then wraps round to the top
+      const zOf = (id: string) => p3.evaluate((i) => (window as any).vizierEditor.session().doc.videos.full.layers.find((l: any) => l.id === i).z, id);
+      const picked: string[] = [];
+      for (let i = 0; i < 6; i++) {
+        await p3.mouse.click(cx, cy + 5);
+        picked.push(await p3.evaluate(() => (window as any).vizierEditor.state.selectedLayer));
+      }
+      const top = picked.indexOf(picked[0]!, 1); // the cycle length
+      expect(top, `picked ${picked.join(" ")}`).toBeGreaterThan(1);
+      const cycle = picked.slice(0, top);
+      expect(new Set(cycle).size).toBe(cycle.length);
+      const zs = await Promise.all(cycle.map(zOf));
+      // after the ring (selected before), each click goes one layer further back, until it wraps to the front
+      const back = zs.slice(zs.indexOf(Math.max(...zs)));
+      expect([...back].sort((a, b) => b - a)).toEqual(back);
     } finally { await p3.close(); }
   }, 120_000);
 
@@ -378,6 +393,10 @@ run("editor (headless Chrome)", () => {
       expect((await state()).undoLabel).toBe("brightness");
       await page.keyboard.press("ControlOrMeta+z");
       expect((await state()).undoLabel).toBe("on from playhead");
+      // ⌘D duplicates the selected layer and selects the copy
+      await page.keyboard.press("ControlOrMeta+d");
+      expect((await state()).selectedLayer).toBe("pulseGrid-2");
+      expect(await spansOf("pulseGrid-2")).toEqual([{ from: 17 }]);
     } finally {
       for (let i = 0; i < 20 && (await state()).undoLabel !== startLabel; i++) await E(() => (window as any).vizierEditor.session().undo());
       await page.keyboard.press("Escape");
