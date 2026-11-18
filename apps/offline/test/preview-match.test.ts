@@ -60,7 +60,10 @@ const SETUP: Record<string, { track: string; bar: number; params?: Record<string
 };
 // Fine detail drawn in the generator's own units (not pixels) aliases more at a smaller size. That's sampling, not
 // a units mismatch, and Full preview quality shows the real thing; these limits are looser accordingly.
-const LIMIT: Record<string, number> = { default: 0.08, flowField: 0.2, "flowField max": 0.6 };
+// The pulse grid at its maximum density draws dots under a pixel across at these test sizes, which browsers
+// antialias a little differently (0.02 here, 0.09 on GitHub's machines); its units bug showed even at the
+// default density (0.13), which keeps the default limit.
+const LIMIT: Record<string, number> = { default: 0.08, flowField: 0.2, "flowField max": 0.6, "pulseGrid max": 0.15 };
 
 run("bug sweep: the smaller preview looks like the export", () => {
   afterAll(closeSharedBrowsers);
