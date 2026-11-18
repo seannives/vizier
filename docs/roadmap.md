@@ -98,6 +98,8 @@ Editor milestones:
 - [ ] Golden-image tests per machine (pixels differ between software GL and the Mac GPU)
 - [ ] Test the editor's sync control with Bluetooth headphones and external speakers (it lines up at 0 ms on the
       MacBook's built-in speakers), to check it works as expected
+- [ ] Mute and solo for layers, like tracks in Live: M hides a layer, S shows only the soloed layers (several
+      can be soloed). To decide: whether they affect only the preview while editing, or exports too
 
 ## Done
 
