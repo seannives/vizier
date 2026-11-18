@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Session, type Doc } from "../src/app/lib/session.ts";
 import {
-  addLayer, removeLayer, moveLayer, duplicateLayer, setParam, setLayout, placement, hasOwnLayout, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
+  addLayer, removeLayer, moveLayer, duplicateLayer, setParam, setLayout, placement, hasOwnLayout, patchLayer,
+  layerOrigin, isChanged, baseLayer, resetSetting, resetLayer, removedLayers, restoreLayer, newVideo, detachVideo, setVideo, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
 } from "../src/app/lib/edits.ts";
 import { validateProject, buildProject, resolveVideo } from "../../../packages/core/src/index.ts";
 
@@ -154,5 +155,84 @@ describe("layout", () => {
     expect(d.videos.reel!.layers).toEqual([{ id: "ring", layout: { portrait: { x: 0.5, y: 0.3, w: 0.9, h: 0.4 } } }]);
     expect(layerOf(d, "reel", "ring")!.layout.landscape).toEqual({ x: 0.5, y: 0.5, w: 1, h: 1 }); // inherited, untouched
     expect(layerOf(d, "full", "ring")!.layout.portrait).toBeUndefined();                       // the base untouched
+  });
+});
+
+describe("inheritance: marking, resetting, restoring", () => {
+  it("tells layers added here from inherited ones, and inherited ones changed here", () => {
+    const d = doc();
+    addLayer(d, "reel", "pulseGrid");
+    expect(layerOrigin(d, "reel", "pulseGrid")).toBe("own");
+    expect(layerOrigin(d, "reel", "ring")).toBe("inherited");
+    setParam(d, "reel", "ring", "radius", 0.5);
+    expect(layerOrigin(d, "reel", "ring")).toBe("changed");
+    expect(isChanged(d, "reel", "ring", { param: "radius" })).toBe(true);
+    expect(isChanged(d, "reel", "ring", { param: "spike" })).toBe(false);
+    expect(isChanged(d, "full", "ring", { param: "radius" })).toBe(false); // no base: nothing to go back to
+    expect(baseLayer(d, "reel", "ring")!.params).toEqual({ radius: 0.3 });
+  });
+  it("resets one setting to the base's; with nothing left changed, the layer is plain inherited again", () => {
+    const d = doc();
+    setParam(d, "reel", "ring", "radius", 0.5);
+    setLayout(d, "reel", "ring", "portrait", { x: 0.5, y: 0.3, w: 1, h: 0.5 });
+    patchLayer(d, "reel", "ring", { blend: "add" });
+    resetSetting(d, "reel", "ring", { param: "radius" });
+    expect(layerOf(d, "reel", "ring")!.params!.radius).toBe(0.3);
+    resetSetting(d, "reel", "ring", { layout: "portrait" });
+    expect(layerOf(d, "reel", "ring")!.layout.portrait).toBeUndefined();
+    expect(layerOrigin(d, "reel", "ring")).toBe("changed");
+    resetSetting(d, "reel", "ring", { field: "blend" });
+    expect(layerOrigin(d, "reel", "ring")).toBe("inherited");
+    expect(d.videos.reel!.layers).toBeUndefined();
+  });
+  it("resets a whole layer, and restores a removed one with its automation", () => {
+    const d = doc();
+    setParam(d, "reel", "ring", "radius", 0.5);
+    setSpans(d, "reel", "ring", [{ from: 9 }]);
+    resetLayer(d, "reel", "ring");
+    expect(layerOf(d, "reel", "ring")).toEqual(layerOf(d, "full", "ring"));
+    removeLayer(d, "reel", "ring");
+    expect(removedLayers(d, "reel").map((l) => l.id)).toEqual(["ring"]);
+    expect(resolveVideo("reel", (n) => d.videos[n]!).automation).toEqual([]);
+    restoreLayer(d, "reel", "ring");
+    expect(removedLayers(d, "reel")).toEqual([]);
+    expect(layerOf(d, "reel", "ring")).toEqual(layerOf(d, "full", "ring"));
+    expect(resolveVideo("reel", (n) => d.videos[n]!).automation!.map((a) => a.target)).toEqual(["ring.radius"]);
+    expect(d.videos.reel).toEqual(doc().videos.reel);
+  });
+});
+
+describe("video actions", () => {
+  it("makes a new video: blank, built on another, or an independent copy", () => {
+    const d = doc();
+    expect(newVideo(d, { name: "Short: the drop", format: "shorts" })).toBe("short-the-drop");
+    expect(d.videos["short-the-drop"]).toMatchObject({ version: 2, name: "Short: the drop", format: "shorts", layers: [] });
+    const b = newVideo(d, { name: "Reel 2", format: "reels", from: { video: "reel", how: "base" } });
+    expect(d.videos[b]).toMatchObject({ base: "reel", format: "reels" });
+    expect(layersOf(d, b).map((l) => l.id)).toEqual(["ring", "title"]);
+    const c = newVideo(d, { name: "Reel", format: "reels", from: { video: "reel", how: "copy" } });
+    expect(c).toBe("reel-3"); // "reel" and "reel-2" are taken
+    expect(d.videos[c]!.base).toBeUndefined();
+    expect(layersOf(d, c)).toEqual(layersOf(d, "reel"));
+    expect(d.videos[c]!.range).toEqual({ from: 9, to: 17 });
+    for (const v of [b, c]) expect(valid(d, v)).toEqual([]);
+  });
+  it("detaches a video from its base without changing how it looks", () => {
+    const d = doc();
+    setParam(d, "reel", "ring", "radius", 0.5);
+    const before = resolveVideo("reel", (n) => d.videos[n]!);
+    detachVideo(d, "reel");
+    expect(d.videos.reel!.base).toBeUndefined();
+    expect(layersOf(d, "reel")).toEqual(before.layers);
+    expect(d.videos.reel!.format).toBe("reels");
+    setParam(d, "full", "ring", "radius", 0.9); // the old base changing no longer affects it
+    expect(layerOf(d, "reel", "ring")!.params!.radius).toBe(0.5);
+  });
+  it("sets and clears a video's own settings", () => {
+    const d = doc();
+    setVideo(d, "reel", { format: "shorts", name: "A short" });
+    expect(d.videos.reel).toMatchObject({ format: "shorts", name: "A short" });
+    setVideo(d, "reel", { range: undefined });
+    expect(d.videos.reel!.range).toBeUndefined();
   });
 });

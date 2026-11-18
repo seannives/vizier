@@ -255,3 +255,119 @@ export function splitLayerAt(doc: Doc, video: string, id: string, bar: number, s
   setSpans(doc, video, id, next);
   return true;
 }
+
+// ---- videos that build on others: what's inherited, what's changed here, and going back ----
+
+/** How a layer relates to the video's base: added in this video, inherited unchanged, or inherited and changed here. */
+export type LayerOrigin = "own" | "inherited" | "changed";
+export function layerOrigin(doc: Doc, video: string, id: string): LayerOrigin {
+  if (!isInherited(doc, video, id)) return "own";
+  const e = doc.videos[video]?.layers?.find((l) => l.id === id && !l.remove);
+  return e && Object.keys(e).some((k) => k !== "id") ? "changed" : "inherited";
+}
+/** The layer as the base video has it (undefined for a layer added here). */
+export function baseLayer(doc: Doc, video: string, id: string): LayerDef | undefined {
+  const base = doc.videos[video]?.base;
+  return base ? layerOf(doc, base, id) : undefined;
+}
+
+/** A setting of an inherited layer that can be changed here and reset: a field, a parameter, or one shape's layout. */
+export type Setting = { field: "generator" | "track" | "blend" | "text" | "effects" | "spans" | "name" | "z" | "opacity" | "colors" }
+  | { param: string } | { layout: LayoutFamily };
+
+/** Whether this video changes the setting of an inherited layer (false for layers added here: nothing to go back to). */
+export function isChanged(doc: Doc, video: string, id: string, s: Setting): boolean {
+  if (!isInherited(doc, video, id)) return false;
+  const e = doc.videos[video]?.layers?.find((l) => l.id === id && !l.remove);
+  if (!e) return false;
+  if ("param" in s) return e.params?.[s.param] !== undefined;
+  if ("layout" in s) return e.layout?.[s.layout] !== undefined;
+  return (e as unknown as Record<string, unknown>)[s.field] !== undefined;
+}
+
+/** Go back to the base's value for one setting of an inherited layer. */
+export function resetSetting(doc: Doc, video: string, id: string, s: Setting): void {
+  const v = doc.videos[video]!;
+  const e = v.layers?.find((l) => l.id === id && !l.remove);
+  if (!e) return;
+  if ("param" in s) { if (e.params) { delete e.params[s.param]; if (!Object.keys(e.params).length) delete e.params; } }
+  else if ("layout" in s) { if (e.layout) { delete e.layout[s.layout]; if (!Object.keys(e.layout).length) delete e.layout; } }
+  else delete (e as unknown as Record<string, unknown>)[s.field];
+  if (Object.keys(e).length === 1) { v.layers = v.layers!.filter((l) => l !== e); if (!v.layers.length) delete v.layers; }
+}
+
+/** Drop every change this video makes to an inherited layer: it's the base's again. */
+export function resetLayer(doc: Doc, video: string, id: string): void {
+  const v = doc.videos[video]!;
+  if (!isInherited(doc, video, id)) return;
+  v.layers = (v.layers ?? []).filter((l) => l.id !== id || l.remove);
+  if (!v.layers.length) delete v.layers;
+}
+
+/** Layers of the base that this video removes. */
+export function removedLayers(doc: Doc, video: string): LayerDef[] {
+  const v = doc.videos[video];
+  if (!v?.base) return [];
+  const gone = new Set((v.layers ?? []).filter((l) => l.remove).map((l) => l.id));
+  return layersOf(doc, v.base).filter((l) => gone.has(l.id));
+}
+
+/** Bring back a base layer this video removed, with the base's automation and modulations for it. */
+export function restoreLayer(doc: Doc, video: string, id: string): void {
+  const v = doc.videos[video]!;
+  v.layers = (v.layers ?? []).filter((l) => !(l.id === id && l.remove));
+  if (!v.layers.length) delete v.layers;
+  const mine = (t: string) => t.startsWith(`${id}.`);
+  if (v.automation) { v.automation = v.automation.filter((a) => !(mine(a.target) && a.points.length === 0)); if (!v.automation.length) delete v.automation; }
+  if (v.modulations) { v.modulations = v.modulations.filter((m) => !(mine(m.target) && m.remove)); if (!v.modulations.length) delete v.modulations; }
+}
+
+// ---- video settings and actions ----
+
+/** Video ids are file names: letters, digits, - and _. */
+export function videoId(doc: Doc, name: string): string {
+  const stem = name.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "") || "video";
+  if (!doc.videos[stem]) return stem;
+  let n = 2;
+  while (doc.videos[`${stem}-${n}`]) n++;
+  return `${stem}-${n}`;
+}
+const SCHEMA = "../../../packages/core/schema/video.schema.json";
+
+/** A new video: blank (no layers), building on another video, or an independent copy of one (its base flattened
+ *  in). Returns its id. */
+export function newVideo(doc: Doc, opts: { name: string; format: string; from?: { video: string; how: "base" | "copy" } }): string {
+  const id = videoId(doc, opts.name);
+  let v: VideoFile;
+  if (opts.from?.how === "base") v = { version: 2, name: opts.name, base: opts.from.video, format: opts.format };
+  else if (opts.from?.how === "copy") v = { ...flattened(doc, opts.from.video), name: opts.name, format: opts.format };
+  else v = { version: 2, name: opts.name, format: opts.format, layers: [] };
+  doc.videos[id] = { $schema: SCHEMA, ...v } as VideoFile;
+  return id;
+}
+/** The video with its base merged in: an independent file that looks exactly the same. */
+function flattened(doc: Doc, video: string): VideoFile {
+  const r = structuredClone(resolved(doc, video));
+  delete r.base;
+  delete r.profiles;
+  r.layers = (r.layers ?? []).filter((l) => !l.remove);
+  if (!r.automation?.length) delete r.automation;
+  if (!r.modulations?.length) delete r.modulations;
+  return r;
+}
+/** Make a video independent of its base: everything it inherited is copied in, so it looks the same. */
+export function detachVideo(doc: Doc, video: string): void {
+  const own = doc.videos[video]!;
+  if (!own.base) return;
+  const flat = flattened(doc, video);
+  doc.videos[video] = { ...flat, name: own.name ?? flat.name, format: own.format ?? flat.format };
+}
+/** Change a video's own settings (name, format, range); `undefined` removes the setting (inherit / default). */
+export function setVideo(doc: Doc, video: string, patch: Partial<Pick<VideoFile, "name" | "format" | "range">>): void {
+  const v = doc.videos[video]!;
+  for (const [k, val] of Object.entries(patch)) {
+    if (val === undefined) delete (v as unknown as Record<string, unknown>)[k];
+    else (v as unknown as Record<string, unknown>)[k] = val;
+  }
+  if (patch.format !== undefined) delete v.profiles;
+}

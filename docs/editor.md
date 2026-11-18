@@ -14,7 +14,12 @@ server isn't running, the editor says so and keeps your changes: start it again 
 ## What it does
 
 - **Video menu** (top left): every video in the project; videos built on another show `← base`. Switching keeps
-  unsaved changes to all videos; Save writes every changed file.
+  unsaved changes to all videos; Save writes every changed file. **+ New** makes a video that builds on the open
+  one, an independent copy of it, or a blank one, in any format; **Duplicate** is a quick copy. A new video is
+  written to `videos/<name>.json` when you save.
+- **Video** (side panel): the open video's name, format, what it builds on (click the name to open the base;
+  **Detach** copies everything it inherits into it, so it looks the same but no longer follows the base) and its
+  range.
 - **Transport, Ableton-style**: Play starts from the start marker (the hollow triangle in the ruler). Stop leaves the
   playhead where it stopped; the next Play jumps back to the marker, and ⇧Space continues from the stop point instead.
   Clicking the timeline or the arrow keys move the marker. With loop on (L), playback wraps at the range's end
@@ -69,7 +74,16 @@ server isn't running, the editor says so and keeps your changes: start it again 
   type its size there.
 - A drag is one undo step.
 
-Inherited markers, reset and video actions come next;
+### Videos that build on others
+
+In a video with a base (a Reel built on the full video), the layer list tags each layer: **base** (inherited,
+unchanged), **changed** (inherited, changed here) or **added** (only in this video). In the layer panel, every
+setting this video changes has a dot and a **↺** that takes it back to the base's value (hover it to see that
+value); **Reset layer to base** drops all of this video's changes to the layer. Format and range have a ↺ too.
+A base layer removed here is listed under the layers with **Restore**, which also brings back its automation.
+Changes always go to the open video; to change the base, open it.
+
+The preview in its own window comes next (see the roadmap);
 automation lanes in milestone 3, tracks and tempo in 4, colour and render in 5 (see the [roadmap](roadmap.md)).
 
 ## Keyboard

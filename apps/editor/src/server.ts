@@ -114,13 +114,13 @@ const server = createServer(async (req, res) => {
     }
     if (p === "/api/waveform") return json(res, waveform(url.searchParams.get("file")!));
     if (p === "/api/features") {
-      // features for the renderer, at the video's frame rate
+      // features of every track, at a frame rate (the open video's): doesn't depend on any video file, so it works
+      // for videos that haven't been saved yet
       const song = loadSong(dir);
-      const name = url.searchParams.get("video")!;
-      const video = resolveVideo(name, (n) => loadVideoFile(dir, n));
-      const project = buildProject(song, video, (t) => trackPath(t.file));
-      const fps = getProfile(videoFormat(video) ?? "youtube").fps;
-      return json(res, await loadFeatures(project.tracks, fps, join(dir, ".cache", "features")));
+      const fps = Number(url.searchParams.get("fps") ?? 30);
+      if (!(fps > 0 && fps <= 240)) return json(res, { error: `bad fps ${fps}` }, 400);
+      const tracks = Object.fromEntries(song.tracks.map((t) => [t.id, trackPath(t.file)]));
+      return json(res, await loadFeatures(tracks, fps, join(dir, ".cache", "features")));
     }
     if (p === "/api/audio") {
       const path = trackPath(url.searchParams.get("file")!);

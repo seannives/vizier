@@ -4,6 +4,7 @@
   import {
     layerOf, isInherited, splitLayerAt, patchLayer, setParam, setGenerator, setSpans, addEffect, removeEffect, moveEffect, setEffectParam,
     PANEL_LAYER_PARAMS, effectList, generatorList, placement, setLayout, hasOwnLayout,
+    layerOrigin, isChanged, resetSetting, resetLayer, baseLayer, type Setting,
   } from "../lib/edits.ts";
   import type { Doc } from "../lib/session.ts";
 
@@ -26,6 +27,10 @@
   const layer = $derived(layerOf(doc, video, layerId));
   const gen = $derived(layer ? GENERATORS[layer.generator] : undefined);
   const inherited = $derived(isInherited(doc, video, layerId));
+  const origin = $derived(layerOrigin(doc, video, layerId));
+  const base = $derived(baseLayer(doc, video, layerId));
+  const ch = (st: Setting) => isChanged(doc, video, layerId, st);
+  const reset = (st: Setting, what: string) => edit(`reset ${what} to base`, (d) => resetSetting(d, video, layerId, st));
   const BLENDS: BlendMode[] = ["normal", "add", "screen", "multiply"];
 
   const valueOf = (s: ParamSpec) => layer?.params?.[s.name] ?? (s.name === "opacity" ? layer?.opacity : undefined) ?? s.default;
@@ -87,34 +92,37 @@
 <div class="panel">
   <div class="title">
     <span class="name">{layer.name ?? layer.id}</span>
-    {#if inherited}<span class="inh" title="This layer comes from the base video; changes here are saved in this video only">from base</span>{/if}
+    {#if inherited}<span class="inh" title="This layer comes from the base video; changes here are saved in this video only">{origin === "changed" ? "changed here" : "from base"}</span>{/if}
   </div>
+  {#if origin === "changed"}
+    <div class="spanbtns"><button onclick={() => edit("reset layer to base", (d) => resetLayer(d, video, layerId))} title="Drop every change this video makes to the layer">Reset layer to base</button></div>
+  {/if}
 
   <label class="field"><span>Draws</span>
     <select value={layer.generator} onchange={changeGenerator} aria-label="Generator">
       {#each generatorList() as g}<option value={g.id}>{g.label}</option>{/each}
     </select>
   </label>
-  <label class="field"><span>Track</span>
+  <div class="field"><span>Track{#if ch({ field: "track" })}<button class="rs" title="Back to the base's track" onclick={(e) => { e.preventDefault(); reset({ field: "track" }, "track"); }}>↺</button>{/if}</span>
     <select value={layer.track ?? ""} aria-label="Track" onchange={(e) => { const t = e.currentTarget.value; e.currentTarget.blur(); edit("track", (d) => patchLayer(d, video, layerId, { track: t || undefined })); }}>
       <option value="">{tracks.find((t) => t.mix)?.name ?? "Mix"} (mix)</option>
       {#each tracks.filter((t) => !t.mix) as t}<option value={t.id}>{t.name}</option>{/each}
     </select>
-  </label>
-  <label class="field"><span>Blend</span>
+  </div>
+  <div class="field"><span>Blend{#if ch({ field: "blend" })}<button class="rs" title="Back to the base's blend" onclick={(e) => { e.preventDefault(); reset({ field: "blend" }, "blend"); }}>↺</button>{/if}</span>
     <select value={layer.blend ?? "normal"} aria-label="Blend" onchange={(e) => { const b = e.currentTarget.value as BlendMode; e.currentTarget.blur(); edit("blend", (d) => patchLayer(d, video, layerId, { blend: b })); }}>
       {#each BLENDS as b}<option value={b}>{b}</option>{/each}
     </select>
-  </label>
+  </div>
   {#if gen.kind === "canvas2d" && gen.usesText}
-    <label class="field col"><span>Text</span>
+    <div class="field col"><span>Text{#if ch({ field: "text" })}<button class="rs" title="Back to the base's text: {base?.text ?? ""}" onclick={(e) => { e.preventDefault(); reset({ field: "text" }, "text"); }}>↺</button>{/if}</span>
       <textarea rows="2" value={layer.text ?? ""} aria-label="Text" onkeydown={(e) => e.stopPropagation()}
         oninput={(e) => { const t = e.currentTarget.value; edit("text", (d) => patchLayer(d, video, layerId, { text: t }), `${layerId}.text`); }}
         onchange={seal}></textarea>
-    </label>
+    </div>
   {/if}
 
-  <h4>Layout <span class="fam">{family}</span></h4>
+  <h4>Layout <span class="fam">{family}</span>{#if ch({ layout: family })}<button class="rs" title="Back to the base's {family} layout" onclick={() => reset({ layout: family }, "layout")}>↺</button>{/if}</h4>
   {#if place}
     <div class="lay mono">
       <label>x <input type="text" value={pct(place.x)} aria-label="X (% of width)" onkeydown={(e) => e.stopPropagation()} onchange={(e) => { const v = fromPct(e); if (v !== undefined) setPlace({ x: v }); }} />%</label>
@@ -130,7 +138,7 @@
     </div>
   {/if}
 
-  <h4>On</h4>
+  <h4>On{#if ch({ field: "spans" })}<button class="rs" title="Back to when the base has it on" onclick={() => reset({ field: "spans" }, "on-spans")}>↺</button>{/if}</h4>
   {#if !spans.length}
     <div class="whole">Whole song</div>
   {:else}
@@ -161,10 +169,12 @@
 
   <h4>Parameters</h4>
   {#each [...PANEL_LAYER_PARAMS, ...gen.params] as s (s.name)}
-    <ParamControl spec={s} value={valueOf(s)} automated={automated.has(`${layerId}.${s.name}`)} onchange={(v, f) => param(s, v, f)} />
+    <ParamControl spec={s} value={valueOf(s)} automated={automated.has(`${layerId}.${s.name}`)} onchange={(v, f) => param(s, v, f)}
+      changed={ch({ param: s.name }) || (s.name === "opacity" && ch({ field: "opacity" }))} baseValue={base?.params?.[s.name] ?? (s.name === "opacity" ? base?.opacity : undefined)}
+      onreset={() => edit(`reset ${s.label.toLowerCase()} to base`, (d) => { resetSetting(d, video, layerId, { param: s.name }); if (s.name === "opacity") resetSetting(d, video, layerId, { field: "opacity" }); })} />
   {/each}
 
-  <h4>Effects</h4>
+  <h4>Effects{#if ch({ field: "effects" })}<button class="rs" title="Back to the base's effect chain" onclick={() => reset({ field: "effects" }, "effects")}>↺</button>{/if}</h4>
   {#each layer.effects ?? [] as e, i (e.id ?? e.type)}
     {@const def = EFFECTS[e.type]}
     <div class="fx">
@@ -199,6 +209,8 @@
   .field.col { flex-direction: column; align-items: stretch; }
   textarea { resize: vertical; font-family: 'Special Elite', var(--ui); }
   h4 { margin: 12px 0 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); font-weight: 500; border-top: 1px solid var(--line); padding-top: 8px; }
+  .rs { padding: 0 4px; font-size: 11px; line-height: 14px; margin-left: 5px; text-transform: none; letter-spacing: 0; }
+  .field > span { display: flex; align-items: center; }
   .fam { text-transform: none; letter-spacing: 0; color: var(--faint); margin-left: 4px; }
   .lay { display: grid; grid-template-columns: 1fr 1fr; gap: 3px 10px; font-size: 11px; color: var(--dim); }
   .lay label { display: flex; align-items: center; gap: 4px; }

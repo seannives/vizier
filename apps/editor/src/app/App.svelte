@@ -10,8 +10,10 @@
   import Help from "./components/Help.svelte";
   import LayerList from "./components/LayerList.svelte";
   import LayerPanel from "./components/LayerPanel.svelte";
+  import VideoPanel from "./components/VideoPanel.svelte";
+  import NewVideo from "./components/NewVideo.svelte";
   import type { LayerRow, SpanS } from "./components/Timeline.svelte";
-  import { setSpans, splitLayerAt, duplicateLayer, layerOf, setLayout } from "./lib/edits.ts";
+  import { setSpans, splitLayerAt, duplicateLayer, layerOf, setLayout, newVideo } from "./lib/edits.ts";
   import type { Doc } from "./lib/session.ts";
   import { stats } from "./lib/stats.ts";
   import {
@@ -74,12 +76,15 @@
     } catch (e) { loadError = (e as Error).message; }
   });
 
-  // features for the open video (its format's frame rate); reloaded when switching videos
+  // features of every track for the renderer
+  // (at the open video's frame rate; fetched again only when that changes)
   $effect(() => {
-    const v = videoName;
-    if (!v || v === featuresFor) return;
-    featuresFor = v; features = null;
-    api.features(v).then((f) => { if (featuresFor === v) features = f; }).catch((e) => { projectErr = (e as Error).message; });
+    if (!videoName) return;
+    const fps = getProfile(profileId).fps;
+    const key = String(fps);
+    if (key === featuresFor) return;
+    featuresFor = key; features = null;
+    api.features(fps).then((f) => { if (featuresFor === key) features = f; }).catch((e) => { projectErr = (e as Error).message; });
   });
 
   // ---- clock ----
@@ -289,6 +294,18 @@
     edit(sec.length > orig.length ? "add on-span" : "change on-span", (d) => setSpans(d, videoName!, id, next));
   }
   const family = $derived(getProfile(profileId).layout);
+
+  // ---- videos: new, duplicate; the open one must exist (undoing "new video" removes it) ----
+  let newDialog = $state<null | "base" | "copy" | "blank">(null);
+  function createVideo(o: { name: string; format: string; how: "blank" | "base" | "copy" }) {
+    const from = videoName;
+    newDialog = null;
+    if (!from) return;
+    let id = "";
+    edit(`new video: ${o.name}`, (d) => { id = newVideo(d, { name: o.name, format: o.format, from: o.how === "blank" ? undefined : { video: from, how: o.how } }); });
+    if (id) { videoName = id; flash(`made ${o.name}: save (⌘S) to write videos/${id}.json`); }
+  }
+  $effect(() => { if (doc && videoName && !doc.videos[videoName]) videoName = Object.keys(doc.videos).sort()[0] ?? null; });
   function layoutFromPreview(id: string, t: Transform, final: boolean) {
     const v = videoName, fam = family;
     if (!v) return;
@@ -345,6 +362,8 @@
     <select bind:value={videoName} title="video" disabled={!doc}>
       {#each videoNames as v}<option value={v}>{doc?.videos[v]?.name ?? v}{doc?.videos[v]?.base ? `  ← ${doc.videos[v].base}` : ""}</option>{/each}
     </select>
+    <button class="small" onclick={() => (newDialog = "base")} disabled={!doc} title="Make a new video (build on this one, copy it, or start blank)">+ New</button>
+    <button class="small" onclick={() => (newDialog = "copy")} disabled={!doc} title="An independent copy of this video">Duplicate</button>
     <span class="badge">{getProfile(profileId).label}</span>
     <div class="transport">
       <button class:on={playing} onclick={togglePlay} title="Play / stop ({displayKeys("Space")})">{playing ? "■" : "▶"}</button>
@@ -368,12 +387,13 @@
       {#if !features}<div class="note">analysing audio…</div>{/if}
     </section>
     <aside class="inspector">
-      <h3>Range</h3>
-      <div class="range">{rangeLabel}{#if rangeInherited}<span class="inh" title="from the base video">inherited</span>{/if}</div>
-      <div class="range dim">{rangeTime}</div>
+      <h3>Video</h3>
+      {#if doc && videoName && doc.videos[videoName]}
+        <VideoPanel {doc} video={videoName} {rangeLabel} {rangeTime} {rangeInherited} {edit} onopen={(v) => (videoName = v)} />
+      {/if}
       <h3>Layers <span class="hint-inline">front to back</span></h3>
       {#if videoName}
-        <LayerList {layers} video={videoName} selected={selectedLayer} defaultTrack={undefined} {trackName} {edit} onselect={(id) => selectLayer(id)} />
+        <LayerList {layers} video={videoName} doc={doc ?? undefined} selected={selectedLayer} defaultTrack={undefined} {trackName} {edit} onselect={(id) => selectLayer(id)} />
         {#if selectedLayer && doc}
           <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} {edit} {seal} {family}
             onselect={(id) => selectLayer(id)} />
@@ -408,6 +428,9 @@
 {/if}
 
 {#if help}<Help {shortcuts} onclose={() => (help = false)} />{/if}
+{#if newDialog && videoName && doc}
+  <NewVideo currentName={doc.videos[videoName]?.name ?? videoName} currentFormat={profileId} how={newDialog} oncreate={createVideo} oncancel={() => (newDialog = null)} />
+{/if}
 
 <style>
   .app { display: grid; grid-template-rows: 42px minmax(0, 1fr) minmax(170px, 34vh) 24px; grid-template-columns: minmax(0, 1fr);
@@ -421,6 +444,7 @@
   .delay button { padding: 0 6px; font-size: 11px; line-height: 16px; }
   .brand { font-weight: 600; letter-spacing: .04em; color: var(--accent); }
   .proj { font-weight: 500; }
+  .small { font-size: 11px; padding: 2px 7px; }
   .badge { font-size: 11px; color: var(--dim); border: 1px solid var(--line2); border-radius: 3px; padding: 1px 6px; }
   .transport { display: flex; gap: 4px; margin-left: 8px; }
   .transport button { width: 32px; padding: 3px 0; }
@@ -437,8 +461,6 @@
   h3 { margin: 6px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); font-weight: 500; }
   .hint-inline { text-transform: none; letter-spacing: 0; color: var(--faint); font-weight: 400; margin-left: 4px; }
   .hint { color: var(--faint); font-size: 11px; margin: 8px 0 14px; }
-  .range { font-family: var(--mono); display: flex; gap: 8px; align-items: center; }
-  .inh { font: 10px var(--ui); color: var(--dim); border: 1px dashed var(--line2); border-radius: 2px; padding: 0 4px; }
   .tl { min-height: 0; min-width: 0; overflow: hidden; }
   .status { display: flex; gap: 12px; align-items: center; padding: 0 10px; font-size: 11px; background: var(--bg2); border-top: 1px solid var(--line2); color: var(--dim); }
   .unsaved { color: var(--accent); }

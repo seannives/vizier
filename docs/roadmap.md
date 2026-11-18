@@ -12,13 +12,14 @@ Colour engine first (so it can be tested in renders before the UI exists):
 
 Editor milestones:
 
-- [ ] 2. In three parts:
+- [x] 2. In three parts:
   - [x] 2a. Layer list (add, remove, reorder, duplicate, rename); layer panel (generator, track, blend, text,
         parameters from plugin declarations, effect chain); when a layer is on (spans, rows on the timeline, ⌘E split);
         edits applied to the preview without restarting trails (ADR 0009)
   - [x] 2b. Drag/resize/rotate layers on the preview per layout family; snap to edges and centres of the frame
         and safe area; Layout section in the panel; resizing keeps a layer's shaders
-  - [ ] 2c. Inherited markers, reset to inherited, Open base; New / Duplicate / Detach video
+  - [x] 2c. Inherited markers (base / changed / added), ↺ reset per setting and per layer, restore removed layers,
+        Open base; Video section (name, format, base, range); New / Duplicate / Detach video
 - [ ] Preview in its own window (after 2c, before 3): pop the preview out to a second window (the output window
       below, with the same layout handles); the main window then splits Range/video settings from the layer panel
       and gives the timeline more height for automation lanes

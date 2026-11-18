@@ -21,8 +21,9 @@ export const api = {
     for (let i = 0; i < bin.length; i++) peaks[i] = (bin.charCodeAt(i) << 24) >> 24;
     return { rate: w.rate, duration: w.duration, peaks };
   },
-  async features(video: string): Promise<Record<string, FeatureTrack>> {
-    return getJson(`/api/features?video=${encodeURIComponent(video)}`);
+  /** Every track's features at a frame rate (the open video's). */
+  async features(fps: number): Promise<Record<string, FeatureTrack>> {
+    return getJson(`/api/features?fps=${fps}`);
   },
   audioUrl: (file: string) => `/api/audio?file=${encodeURIComponent(file)}`,
   async save(payload: object): Promise<{ written?: string[]; error?: string }> {

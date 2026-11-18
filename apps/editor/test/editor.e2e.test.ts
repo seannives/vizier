@@ -403,8 +403,49 @@ run("editor (headless Chrome)", () => {
     }
   }, 90_000);
 
+  it("in a reel: marks and resets what it changes, restores a removed layer; makes, saves and undoes a new video", async () => {
+    const E = <A,>(f: (a: A) => unknown, a?: A) => page.evaluate(f as any, a);
+    const startLabel = (await state()).undoLabel;
+    try {
+      await page.selectOption("header select", "reel");
+      await page.waitForFunction(() => (window as any).vizierEditor.state.videoName === "reel");
+      const tag = (id: string) => page.locator(`[data-layer="${id}"] .tag`).textContent();
+      expect(await tag("ring")).toBe("base");
+      expect(await tag("caption")).toBe("added");
+      // change the ring's radius here: it's marked, and ↺ takes it back to the full video's value
+      await page.click('[data-layer="ring"]');
+      const box = page.locator('input[aria-label="Radius"]');
+      await box.fill("1.5"); await box.press("Enter"); await box.blur();
+      expect(await tag("ring")).toBe("changed");
+      expect(await E(() => (window as any).vizierEditor.session().doc.videos.full.layers.find((l: any) => l.id === "ring").params?.radius)).not.toBe(1.5);
+      await page.click('button[aria-label="Reset Radius to base"]');
+      expect(await tag("ring")).toBe("base");
+      // remove an inherited layer, then restore it
+      await page.click('[data-layer="title"] button[title="Remove"]');
+      expect(await page.locator('[data-removed="title"]').count()).toBe(1);
+      await page.click('[data-removed="title"] button');
+      expect(await tag("title")).toBe("base");
+      // a new Short built on the reel: opened, saved to its own file
+      await page.click("text=+ New");
+      await page.fill('input[aria-label="New video name"]', "Short: the break");
+      await page.selectOption('select[aria-label="New video format"]', "shorts");
+      await page.click('button[type="submit"]');
+      await page.waitForFunction(() => (window as any).vizierEditor.state.videoName === "short-the-break");
+      expect(await page.locator("text=YouTube Shorts").count()).toBeGreaterThan(0);
+      await page.keyboard.press("ControlOrMeta+s");
+      await page.waitForFunction(() => (window as any).vizierEditor.state.dirtyFiles.length === 0);
+      expect(JSON.parse(readFileSync(join(dir, "videos/short-the-break.json"), "utf8"))).toMatchObject({ base: "reel", format: "shorts" });
+      // undoing "new video" while it's open goes back to a video that exists
+      await page.keyboard.press("ControlOrMeta+z");
+      await page.waitForFunction(() => (window as any).vizierEditor.state.videoName !== "short-the-break");
+    } finally {
+      for (let i = 0; i < 20 && (await state()).undoLabel !== startLabel; i++) await E(() => (window as any).vizierEditor.session().undo());
+      await page.selectOption("header select", "full");
+    }
+  }, 120_000);
+
   it("switches videos and shows the reel in its own format", async () => {
-    await page.selectOption("select", "reel");
+    await page.selectOption("header select", "reel");
     await page.waitForFunction(() => (window as any).vizierEditor.state.videoName === "reel");
     expect(await page.locator("text=Instagram Reels").count()).toBeGreaterThan(0);
   }, 90_000);
