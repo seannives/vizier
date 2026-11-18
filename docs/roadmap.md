@@ -26,6 +26,15 @@ Editor milestones:
   - [x] 3a. Automation lanes under their layer (unfold ▸): add/drag/delete breakpoints, curves, beat snapping;
         A in the panel starts a lane; inherited lanes (base / changed / ↺)
   - [ ] 3b. Audio-modulation editor (track + feature + amount + curve) in the layer panel
+- [ ] **Bug sweep** (after 3b, before 4: milestone 4 changes tracks and tempo, which everything in bars rests on)
+  - [ ] Independent code review by a fresh reviewer, focused on the seams: seconds vs bars, pixels vs fractions
+        of the frame, preview vs export, a video vs its base, every conversion between units
+  - [ ] Rule-based tests over random sequences of edits: every edit leaves the project valid; undo then redo
+        restores it exactly; saving and reloading changes nothing; editing a reel never changes its base
+  - [ ] Preview vs export for every generator and effect: the same moments rendered both ways and compared
+  - [ ] A checklist session on the Mac with the maleficus (a reel, the pop-out on a second screen, shortcuts,
+        speakers, GPU), fixing what turns up
+  - Then a lighter sweep every couple of milestones (mainly the rule-based tests)
 - [ ] 4. Tracks like Ableton's (create, name, drop/replace/remove a stem; warn on length or alignment mismatch);
       tempo panel (typed BPM with detected suggestion, downbeat, drag the grid, audible click)
 - [ ] 5. Colour pickers, palette panel and colour lanes; Render button with progress; list of renders
