@@ -318,6 +318,39 @@
     const id = setInterval(() => { if (popped && Date.now() - outputSeen > 3000) popped = false; }, 500);
     return () => { clearInterval(id); link?.close(); };
   });
+  // ---- timeline height: drag the grip on its top edge; remembered separately with the preview in and popped out.
+  // Popped out, it starts at the height its rows need (the panels above get the rest).
+  let tlContent = $state(0);
+  let tlHeights = $state<{ in: number | null; out: number | null }>({
+    in: Number(load("vizier.timelineHeight.in", "0")) || null, out: Number(load("vizier.timelineHeight.out", "0")) || null,
+  });
+  let winH = $state(window.innerHeight);
+  onMount(() => { const r = () => (winH = window.innerHeight); addEventListener("resize", r); return () => removeEventListener("resize", r); });
+  const tlMax = $derived(Math.max(140, winH - 42 - 24 - 140)); // leave room for the panels above
+  const clampTl = (h: number) => Math.round(Math.min(tlMax, Math.max(120, h)));
+  const tlRows = $derived.by(() => {
+    const own = popped ? tlHeights.out : tlHeights.in;
+    if (own) return `${clampTl(own)}px`;
+    if (popped && tlContent) return `${clampTl(tlContent)}px`;
+    return "minmax(170px, 34vh)";
+  });
+  function setTlHeight(h: number | null) {
+    const k = popped ? "out" : "in";
+    tlHeights = { ...tlHeights, [k]: h };
+    save_(`vizier.timelineHeight.${k}`, h ? String(h) : "");
+  }
+  function gripDown(e: PointerEvent) {
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    const y0 = e.clientY, h0 = (el.parentElement as HTMLElement).getBoundingClientRect().height;
+    const move = (ev: PointerEvent) => setTlHeight(clampTl(h0 - (ev.clientY - y0)));
+    const up = () => { el.removeEventListener("pointermove", move); el.removeEventListener("pointerup", up); };
+    el.addEventListener("pointermove", move); el.addEventListener("pointerup", up);
+    e.preventDefault();
+  }
+  /** Double-click the grip: just tall enough for every row. */
+  function fitTimeline() { if (tlContent) setTlHeight(clampTl(tlContent)); }
+
   function popOut() {
     const q = new URLSearchParams({ view: "output" });
     if (previewParam && previewParam !== "0") q.set("previewScale", previewParam);
@@ -392,7 +425,7 @@
 {#if loadError}
   <div class="fatal">Couldn't open the project: {loadError}</div>
 {:else}
-<div class="app" class:popped>
+<div class="app" class:popped style:grid-template-rows="42px minmax(0, 1fr) {tlRows} 24px">
   <header class="top">
     <div class="brand">vizier</div>
     <div class="proj" title="project folder">{doc?.song.title ?? projectId}</div>
@@ -454,7 +487,9 @@
   {/snippet}
 
   <section class="tl">
-    <Timeline bind:this={timeline} {grid} {sections} {tracks} layers={layerRows} {selectedLayer} {selectedSpan} {duration} {time} range={rangeSec} {rangeInherited}
+    <div class="grip" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline"
+      title="Drag to resize the timeline; double-click to fit its rows" onpointerdown={gripDown} ondblclick={fitTimeline}></div>
+    <Timeline bind:this={timeline} bind:contentHeight={tlContent} {grid} {sections} {tracks} layers={layerRows} {selectedLayer} {selectedSpan} {duration} {time} range={rangeSec} {rangeInherited}
       follow={playing} {marker} {snap} onseek={seek} onrange={setRange} onselectlayer={selectLayer} onspans={spansFromTimeline} />
   </section>
 
@@ -484,7 +519,6 @@
 <style>
   .app { display: grid; grid-template-rows: 42px minmax(0, 1fr) minmax(170px, 34vh) 24px; grid-template-columns: minmax(0, 1fr);
     height: 100vh; width: 100vw; overflow: hidden; }
-  .app.popped { grid-template-rows: 42px minmax(0, 1fr) minmax(170px, 56vh) 24px; }
   main.popped { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
   main.popped .inspector { border-left: none; border-right: 1px solid var(--line2); }
   .popout { position: absolute; top: 8px; right: 8px; font-size: 11px; padding: 2px 8px; opacity: .7; }
@@ -516,7 +550,10 @@
   h3 { margin: 6px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); font-weight: 500; }
   .hint-inline { text-transform: none; letter-spacing: 0; color: var(--faint); font-weight: 400; margin-left: 4px; }
   .hint { color: var(--faint); font-size: 11px; margin: 8px 0 14px; }
-  .tl { min-height: 0; min-width: 0; overflow: hidden; }
+  .tl { position: relative; min-height: 0; min-width: 0; overflow: hidden; }
+  .grip { position: absolute; top: 0; left: 0; right: 0; height: 6px; z-index: 3; cursor: ns-resize; }
+  .grip::after { content: ""; position: absolute; left: 50%; top: 2px; width: 36px; height: 2px; margin-left: -18px; border-radius: 1px; background: var(--line2); }
+  .grip:hover::after { background: var(--accent); }
   .status { display: flex; gap: 12px; align-items: center; padding: 0 10px; font-size: 11px; background: var(--bg2); border-top: 1px solid var(--line2); color: var(--dim); }
   .unsaved { color: var(--accent); }
   .fatal { padding: 40px; color: var(--danger); font: 14px var(--mono); }

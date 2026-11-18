@@ -9,7 +9,9 @@
   export interface LayerRow { id: string; name: string; track: string; spans: SpanS[] | null }
 
   let { grid, sections, tracks, layers = [], selectedLayer = null, selectedSpan = null, duration, time, range, rangeInherited, follow,
-    marker = 0, snap = true, onseek, onrange, onselectlayer = () => {}, onspans = () => {} }: {
+    marker = 0, snap = true, onseek, onrange, onselectlayer = () => {}, onspans = () => {}, contentHeight = $bindable(0) }: {
+    /** Out: the height (px) the timeline needs to show every row without scrolling. */
+    contentHeight?: number;
     grid?: Grid; sections: { t: number; name: string }[]; tracks: TrackRow[]; duration: number; time: number;
     layers?: LayerRow[]; selectedLayer?: string | null; selectedSpan?: number | null;
     onselectlayer?: (id: string | null, span: number | null) => void;
@@ -32,6 +34,7 @@
     return out;
   });
   const height = $derived(rows.length ? rows[rows.length - 1]!.y + rows[rows.length - 1]!.h : H_RULER + H_SECT);
+  $effect(() => { contentHeight = height + 2; }); // + the borders
   const rowAt = (y: number) => rows.find((r) => y >= r.y && y < r.y + r.h);
 
   const HEAD = H_RULER + H_SECT; // the ruler and sections stay put; tracks and layers scroll under them

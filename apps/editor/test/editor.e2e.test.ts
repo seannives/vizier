@@ -297,6 +297,10 @@ run("editor (headless Chrome)", () => {
       await out.waitForFunction(() => (window as any).vizierOutput?.state.connected, null, { timeout: 15_000 });
       expect(await main.locator(".stage").count()).toBe(0);            // the editor's own preview is gone
       expect(await main.locator("aside.inspector").count()).toBe(2);   // its room goes to the panels
+      // the timeline is just tall enough for its rows (when they fit): the panels above get the rest
+      const fit = await main.evaluate(() => { const c = document.querySelectorAll("section.tl canvas"); return c[0]!.getBoundingClientRect().height + c[1]!.getBoundingClientRect().height; });
+      const tl = await main.locator("section.tl").evaluate((el) => el.getBoundingClientRect().height);
+      expect(Math.abs(tl - Math.min(fit + 2, 860 - 42 - 24 - 140))).toBeLessThan(4);
       // the output window follows selection and the playhead; a key there plays the editor
       await main.click('[data-layer="ring"]');
       await out.waitForFunction(() => (window as any).vizierOutput.state.selected === "ring");
@@ -384,6 +388,19 @@ run("editor (headless Chrome)", () => {
       await page.evaluate(() => { document.querySelector(".scroller")!.scrollTop = 0; });
       await page.setViewportSize({ width: 1440, height: 860 });
     }
+  }, 30_000);
+
+  it("resizes the timeline from the grip on its top edge; double-click fits its rows", async () => {
+    const tlH = () => page.locator("section.tl").evaluate((el) => el.getBoundingClientRect().height);
+    const h0 = await tlH();
+    const g = (await page.locator(".grip").boundingBox())!;
+    await page.mouse.move(g.x + g.width / 2, g.y + 3); await page.mouse.down();
+    await page.mouse.move(g.x + g.width / 2, g.y - 50, { steps: 4 }); await page.mouse.move(g.x + g.width / 2, g.y - 80, { steps: 4 }); await page.mouse.up();
+    expect(await tlH()).toBeCloseTo(h0 + 80, -1);
+    await page.dblclick(".grip");
+    const fit = await page.evaluate(() => { const c = document.querySelectorAll("section.tl canvas"); return c[0]!.getBoundingClientRect().height + c[1]!.getBoundingClientRect().height + 2; });
+    expect(Math.abs((await tlH()) - Math.min(fit + 1, 860 - 42 - 24 - 140))).toBeLessThan(4);
+    await page.evaluate(() => { localStorage.removeItem("vizier.timelineHeight.in"); });
   }, 30_000);
 
   it("shows the shortcuts with ?", async () => {

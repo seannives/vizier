@@ -34,7 +34,9 @@ server isn't running, the editor says so and keeps your changes: start it again 
 - **Timeline**: bar ruler, sections, and a waveform per track (each scaled to its own peak), with each track's layers
   under it. The ruler and sections stay put; swipe up and down over the tracks to scroll them, sideways to move
   along the song. Click or drag to move the playhead; zoom with ⌘ + two-finger swipe (up = in, as in Ableton) or
-  pinch.
+  pinch. Drag the **grip** on the timeline's top edge to make it taller or shorter (remembered, separately for
+  the preview in the editor and popped out); double-click it to fit the rows exactly. With the preview popped out,
+  the timeline starts just tall enough for its rows.
 - **Range**: drag in the bar ruler to set the video's range; drag its ends to adjust, or the bar to move it. The
   side panel shows it in bars and in minutes:seconds. A faint bar means the range is inherited from the base video.
 - **Preview**: shows whole frames at the video's frame rate (30 fps for most formats), as the export will.
