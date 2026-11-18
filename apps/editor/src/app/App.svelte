@@ -278,9 +278,16 @@
   };
   const mixId = $derived(doc?.song.tracks.find((t) => t.mix)?.id ?? "");
   // ---- automation lanes: shown under their layer when it's unfolded ----
-  let expanded = $state(new Set<string>());
+  let shownLanes = $state(new Set<string>()); // lanes shown in the timeline (by target); hidden ones keep working
   let selectedPoint = $state<{ target: string; index: number } | null>(null);
-  const toggleLanes = (id: string) => { const n = new Set(expanded); if (n.has(id)) n.delete(id); else n.add(id); expanded = n; };
+  /** ▸ on a layer: show all its lanes, or hide them all if any are shown. */
+  function toggleLanes(layer: string) {
+    const mine = laneRows.filter((l) => l.layer === layer).map((l) => l.target);
+    const n = new Set(shownLanes);
+    if (mine.some((t) => n.has(t))) for (const t of mine) n.delete(t); else for (const t of mine) n.add(t);
+    shownLanes = n;
+  }
+  const hideLane = (target: string) => { const n = new Set(shownLanes); n.delete(target); shownLanes = n; if (selectedPoint?.target === target) selectedPoint = null; };
   const targets = $derived(project ? paramTargets(project) : new Map());
   const laneRows = $derived.by<LaneRow[]>(() => {
     if (!doc || !videoName || !doc.videos[videoName]) return [];
@@ -321,12 +328,15 @@
     selectedPoint = null;
     return true;
   }
-  /** Start a lane for a parameter at the playhead with its current value, and show it. */
+  /** A in the layer panel: start a lane at the playhead with the current value and show it; on an automated
+   *  parameter, show or hide its lane. */
   function automate(target: string, value: number) {
-    const v = videoName, layer = target.split(".")[0]!;
+    const v = videoName;
     if (!v) return;
-    edit("automate", (d) => addLane(d, v, target, grid ? { bar: toBar(playing ? time : marker) } : { t: playing ? time : marker }, value));
-    expanded = new Set([...expanded, layer]);
+    if (shownLanes.has(target)) return hideLane(target);
+    if (!laneRows.some((l) => l.target === target))
+      edit("automate", (d) => addLane(d, v, target, grid ? { bar: toBar(playing ? time : marker) } : { t: playing ? time : marker }, value));
+    shownLanes = new Set([...shownLanes, target]);
   }
   const lanesPerLayer = $derived(laneRows.reduce((m, l) => m.set(l.layer, (m.get(l.layer) ?? 0) + 1), new Map<string, number>()));
   const layerRows = $derived<LayerRow[]>(layers.map((l) => ({
@@ -467,7 +477,7 @@
   $effect(() => {
     (window as any).vizierEditor = {
       stats: () => ({ ...stats.summary(), ...stats.counts }),
-      get state() { return { expanded: [...expanded], selectedPoint, popped, selectedLayer, selectedSpan, status, error: loadError, playing, transportPlaying: transport.playing, loop, loopWraps, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
+      get state() { return { shownLanes: [...shownLanes], selectedPoint, popped, selectedLayer, selectedSpan, status, error: loadError, playing, transportPlaying: transport.playing, loop, loopWraps, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
       timeline: () => timeline,
       clock: () => transport.clockInfo(),
       session: () => session,
@@ -532,7 +542,7 @@
 
   {#snippet layerPanel()}
     {#if videoName && selectedLayer && doc}
-      <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} {edit} {seal} {family} onautomate={automate}
+      <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} {shownLanes} {edit} {seal} {family} onautomate={automate}
         onselect={(id) => selectLayer(id)} />
     {:else if videoName}
       <p class="hint">Select a layer to edit it. Each layer also has a row under its track in the timeline: drag there to set when it's on.</p>
@@ -544,7 +554,7 @@
       title="Drag to resize the timeline; double-click to fit its rows" onpointerdown={gripDown} ondblclick={fitTimeline}></div>
     <Timeline bind:this={timeline} bind:contentHeight={tlContent} {grid} {sections} {tracks} layers={layerRows} {selectedLayer} {selectedSpan} {duration} {time} range={rangeSec} {rangeInherited}
       follow={playing} {marker} {snap} onseek={seek} onrange={setRange} onselectlayer={selectLayer} onspans={spansFromTimeline}
-      lanes={laneRows} {expanded} {selectedPoint} ontogglelanes={toggleLanes}
+      lanes={laneRows} {shownLanes} {selectedPoint} ontogglelanes={toggleLanes} onhidelane={hideLane}
       onselectpoint={(t, i) => { if (t) selectLayer(t.split(".")[0]!); selectedPoint = t && i !== null ? { target: t, index: i } : null; }}
       onlanepoints={lanePoints} onlanecurve={laneCurve}
       onlaneremove={(t) => { const v = videoName; if (v) edit("remove lane", (d) => removeLane(d, v, t)); selectedPoint = null; }}

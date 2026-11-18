@@ -529,7 +529,7 @@ run("editor (headless Chrome)", () => {
     try {
       const before = await lane("ring.radius") as unknown[];
       await page.click('[data-fold="ring"]');
-      expect((await state()).expanded).toContain("ring");
+      expect((await state()).shownLanes).toContain("ring.radius");
       let p = await xy("ring.radius", (await sec(20)) + 0.05, 1.5);
       await page.mouse.click(p.x, p.y);
       expect((await lane("ring.radius") as any[]).length).toBe(before.length + 1);
@@ -549,9 +549,20 @@ run("editor (headless Chrome)", () => {
       await a.scrollIntoViewIfNeeded(); await a.click();
       expect((await lane("ring.spike") as any[]).length).toBe(1);
       expect(await page.locator('[data-lane="ring.spike"]').count()).toBe(1);
+      expect(await a.evaluate((el) => el.classList.contains("on"))).toBe(true);
+      // A again hides it (the lane stays); the lane header's – hides one too; ▸ shows all the layer's lanes
+      await a.click();
+      expect(await page.locator('[data-lane="ring.spike"]').count()).toBe(0);
+      expect((await lane("ring.spike") as any[]).length).toBe(1);
+      await page.click('[data-lane="ring.radius"] button[aria-label="Hide lane"]');
+      expect(await page.locator('[data-lane="ring.radius"]').count()).toBe(0);
+      await page.click('[data-fold="ring"]');
+      expect(await page.locator('[data-lane="ring.radius"], [data-lane="ring.spike"]').count()).toBe(2);
+      await page.click('[data-fold="ring"]');
+      expect(await page.locator("[data-lane]").count()).toBe(0);
     } finally {
       for (let i = 0; i < 20 && (await state()).undoLabel !== startLabel; i++) await E(() => (window as any).vizierEditor.session().undo());
-      if ((await state()).expanded.includes("ring")) await page.click('[data-fold="ring"]');
+      if ((await state()).shownLanes.some((t: string) => t.startsWith("ring."))) await page.click('[data-fold="ring"]');
     }
   }, 90_000);
 

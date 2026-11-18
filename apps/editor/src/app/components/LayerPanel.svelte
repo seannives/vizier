@@ -9,7 +9,7 @@
   import type { Doc } from "../lib/session.ts";
 
   /** The selected layer's settings: what draws it, its track, parameters, effects and when it's on. */
-  let { doc, video, layerId, tracks, playheadBar, startBar = 1, automated, edit, seal, onselect, family = "landscape", onautomate }: {
+  let { doc, video, layerId, tracks, playheadBar, startBar = 1, automated, shownLanes = new Set<string>(), edit, seal, onselect, family = "landscape", onautomate }: {
     doc: Doc; video: string; layerId: string; tracks: { id: string; name: string; mix?: boolean }[];
     /** The playhead's position in bars (for "split at playhead"), or null without a tempo. */
     playheadBar: number | null;
@@ -20,6 +20,8 @@
     edit: (label: string, fn: (d: Doc) => void, merge?: string) => void;
     seal: () => void;
     onselect: (id: string | null) => void;
+    /** Lanes shown in the timeline (A is highlighted for those). */
+    shownLanes?: Set<string>;
     /** Start or show an automation lane for a target ("<layer>.<param>" or "<layer>.<effect>.<param>"). */
     onautomate?: (target: string, value: number) => void;
     /** The open video's layout family (its format's shape). */
@@ -171,7 +173,7 @@
 
   <h4>Parameters</h4>
   {#each [...PANEL_LAYER_PARAMS, ...gen.params] as s (s.name)}
-    <ParamControl spec={s} value={valueOf(s)} automated={automated.has(`${layerId}.${s.name}`)} onchange={(v, f) => param(s, v, f)}
+    <ParamControl spec={s} value={valueOf(s)} automated={automated.has(`${layerId}.${s.name}`)} laneShown={shownLanes.has(`${layerId}.${s.name}`)} onchange={(v, f) => param(s, v, f)}
       changed={ch({ param: s.name }) || (s.name === "opacity" && ch({ field: "opacity" }))} baseValue={base?.params?.[s.name] ?? (s.name === "opacity" ? base?.opacity : undefined)}
       onautomate={onautomate ? () => onautomate(`${layerId}.${s.name}`, valueOf(s)) : undefined}
       onreset={() => edit(`reset ${s.label.toLowerCase()} to base`, (d) => { resetSetting(d, video, layerId, { param: s.name }); if (s.name === "opacity") resetSetting(d, video, layerId, { field: "opacity" }); })} />
@@ -190,7 +192,7 @@
         </span>
       </div>
       {#each def?.params ?? [] as s (s.name)}
-        <ParamControl spec={s} value={e.params?.[s.name] ?? s.default} automated={automated.has(`${layerId}.${e.id ?? e.type}.${s.name}`)} onchange={(v, f) => effectParam(i, s, v, f)}
+        <ParamControl spec={s} value={e.params?.[s.name] ?? s.default} automated={automated.has(`${layerId}.${e.id ?? e.type}.${s.name}`)} laneShown={shownLanes.has(`${layerId}.${e.id ?? e.type}.${s.name}`)} onchange={(v, f) => effectParam(i, s, v, f)}
           onautomate={onautomate ? () => onautomate(`${layerId}.${e.id ?? e.type}.${s.name}`, e.params?.[s.name] ?? s.default) : undefined} />
       {/each}
     </div>

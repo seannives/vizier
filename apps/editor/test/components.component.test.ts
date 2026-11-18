@@ -133,9 +133,9 @@ describe("Timeline", () => {
     // one track, one layer unfolded, one lane under it: 0..1, a point at 10 s (0.2) and 20 s (0.8)
     const pts = [{ t: 10, v: 0.2 }, { t: 20, v: 0.8 }];
     async function lane(points = pts) {
-      const cb = { onlanepoints: vi.fn(), onselectpoint: vi.fn(), onlanecurve: vi.fn(), onlaneremove: vi.fn(), ontogglelanes: vi.fn() };
+      const cb = { onlanepoints: vi.fn(), onselectpoint: vi.fn(), onlanecurve: vi.fn(), onlaneremove: vi.fn(), ontogglelanes: vi.fn(), onhidelane: vi.fn() };
       const r = render(Timeline, { ...base, time: 0, snap: true, tracks: [{ id: "mix", name: "Mix", mix: true, wave: null }],
-        layers: [{ id: "ring", name: "Ring", track: "mix", spans: null, lanes: 1 }], expanded: new Set(["ring"]),
+        layers: [{ id: "ring", name: "Ring", track: "mix", spans: null, lanes: 1 }], shownLanes: new Set(["ring.spike"]),
         lanes: [{ target: "ring.spike", layer: "ring", label: "Spikes", min: 0, max: 1, int: false, points, origin: "own" }],
         selectedPoint: { target: "ring.spike", index: 0 }, ...cb } as any);
       await tick();
@@ -180,6 +180,8 @@ describe("Timeline", () => {
       expect(cb.onlaneremove).toHaveBeenCalledWith("ring.spike");
       await fireEvent.click(r.container.querySelector('[data-fold="ring"]')!);
       expect(cb.ontogglelanes).toHaveBeenCalledWith("ring");
+      await fireEvent.click(r.getByLabelText("Hide lane"));
+      expect(cb.onhidelane).toHaveBeenCalledWith("ring.spike");
     });
   });
 });

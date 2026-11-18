@@ -73,16 +73,18 @@ server isn't running, the editor says so and keeps your changes: start it again 
 
 ### Automation lanes
 
-- A layer with automation has an **▸** in front of its row in the timeline: click it to unfold its lanes (one per
-  automated parameter, its effects' included). The line shows the value over the song.
+- A layer with automation has an **▸** in front of its row in the timeline: click it to show all its lanes (one
+  per automated parameter, its effects' included), or hide them. The line shows the value over the song. A lane's
+  **–** hides just that lane; hidden lanes keep working.
 - **Click** in a lane to add a breakpoint there (time snapped to the beat unless ⇧); **drag** a breakpoint to move
   it (it can't pass its neighbours); **click** one to select it, and **Delete** removes it (removing the last one
   removes the lane).
 - The lane's header sets the **curve** after the selected breakpoint: ⟋ straight, ⌐ hold then jump, ∿ ease in
   and out. ✕ removes the lane.
-- **A** next to a parameter in the layer panel starts a lane at the playhead with the current value (and unfolds
-  it); on an automated parameter it just shows the lane. While a lane exists, it sets the parameter: the slider
-  sets the value only where no lane does.
+- **A** next to a parameter in the layer panel starts a lane at the playhead with the current value and shows it;
+  on an automated parameter it shows or hides the lane, and it's highlighted while the lane is shown. Automated
+  parameters say **- automated** after their name: the lane sets the value while playing, and the slider only
+  where no lane does.
 - In a video built on another, inherited lanes are tagged **base**; editing one makes it this video's own
   (**changed**, with ↺ to go back to the base's); ✕ removes it here only.
 - Breakpoints are saved in bars, so they stay on the music if the tempo changes.

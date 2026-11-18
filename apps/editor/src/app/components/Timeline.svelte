@@ -13,11 +13,14 @@
 
   let { grid, sections, tracks, layers = [], selectedLayer = null, selectedSpan = null, duration, time, range, rangeInherited, follow,
     marker = 0, snap = true, onseek, onrange, onselectlayer = () => {}, onspans = () => {}, contentHeight = $bindable(0),
-    lanes = [], expanded = new Set<string>(), selectedPoint = null, ontogglelanes = () => {}, onselectpoint = () => {}, onlanepoints = () => {},
-    onlanecurve = () => {}, onlaneremove = () => {}, onlanereset = () => {} }: {
-    /** Automation lanes of the unfolded layers. */
-    lanes?: LaneRow[]; expanded?: Set<string>; selectedPoint?: { target: string; index: number } | null;
+    lanes = [], shownLanes = new Set<string>(), selectedPoint = null, ontogglelanes = () => {}, onselectpoint = () => {}, onlanepoints = () => {},
+    onlanecurve = () => {}, onlaneremove = () => {}, onlanereset = () => {}, onhidelane = () => {} }: {
+    /** Every automation lane, and which are shown (by target); hidden lanes keep working. */
+    lanes?: LaneRow[]; shownLanes?: Set<string>; selectedPoint?: { target: string; index: number } | null;
+    /** ▸ on a layer row: show all its lanes, or hide them if any are shown. */
     ontogglelanes?: (layer: string) => void;
+    /** Hide one lane (its header's button). */
+    onhidelane?: (target: string) => void;
     onselectpoint?: (target: string | null, index: number | null) => void;
     /** A lane's breakpoints were added or moved (seconds). */
     onlanepoints?: (target: string, points: LanePoint[]) => void;
@@ -45,7 +48,7 @@
       out.push({ kind: "track", i, y, h: H_TRACK }); y += H_TRACK;
       for (const l of layers.filter((l) => l.track === t.id)) {
         out.push({ kind: "layer", layer: l, y, h: H_LAYER }); y += H_LAYER;
-        if (expanded.has(l.id)) for (const ln of lanes.filter((ln) => ln.layer === l.id)) { out.push({ kind: "lane", lane: ln, y, h: H_LANE }); y += H_LANE; }
+        for (const ln of lanes.filter((ln) => ln.layer === l.id && shownLanes.has(ln.target))) { out.push({ kind: "lane", lane: ln, y, h: H_LANE }); y += H_LANE; }
       }
     });
     return out;
@@ -464,10 +467,11 @@
             {@const t = tracks[r.i]!}
             <div class="h track" style:height="{H_TRACK}px" title={t.id}><span class:mix={t.mix}>{t.name}</span>{#if t.mix}<em>mix</em>{/if}</div>
           {:else if r.kind === "layer"}
+            {@const open = lanes.some((ln) => ln.layer === r.layer.id && shownLanes.has(ln.target))}
             <div class="h layer" class:sel={r.layer.id === selectedLayer} style:height="{H_LAYER}px" title={r.layer.name}
               onclick={() => onselectlayer(r.layer.id, null)} onkeydown={(e) => { if (e.key === "Enter") onselectlayer(r.layer.id, null); }} role="button" tabindex="-1">
-              {#if r.layer.lanes}<button class="fold" data-fold={r.layer.id} title="{expanded.has(r.layer.id) ? "Hide" : "Show"} automation ({r.layer.lanes})"
-                onclick={(e) => { e.stopPropagation(); ontogglelanes(r.layer.id); }}>{expanded.has(r.layer.id) ? "▾" : "▸"}</button>{/if}{r.layer.name}</div>
+              {#if r.layer.lanes}<button class="fold" class:open data-fold={r.layer.id} title="{open ? "Hide" : "Show"} its automation ({r.layer.lanes} lane{r.layer.lanes > 1 ? "s" : ""})"
+                onclick={(e) => { e.stopPropagation(); ontogglelanes(r.layer.id); }}>{open ? "▾" : "▸"}</button>{/if}{r.layer.name}</div>
           {:else}
             {@const ln = r.lane}
             {@const sp = selectedPoint?.target === ln.target ? selectedPoint.index : null}
@@ -482,6 +486,7 @@
                 {/if}
                 <span class="sp"></span>
                 {#if ln.origin === "changed"}<button title="Back to the base video's lane" onclick={() => onlanereset(ln.target)}>↺</button>{/if}
+                <button title="Hide this lane (it keeps working; A in the layer panel or ▸ shows it again)" onclick={() => onhidelane(ln.target)} aria-label="Hide lane">–</button>
                 <button title="Remove this lane" onclick={() => onlaneremove(ln.target)}>✕</button>
               </div>
             </div>
@@ -517,8 +522,9 @@
   .h.track span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .h.layer { height: 18px; padding-left: 18px; font-size: 11px; text-transform: none; letter-spacing: 0; color: var(--dim); cursor: default;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 17px; }
-  .h.layer.sel { color: var(--accent); background: var(--bg3); }
-  .fold { background: none; border: none; padding: 0 3px 0 0; margin-left: -12px; color: var(--dim); font-size: 10px; line-height: 17px; }
+  .h.layer.sel { color: var(--accent); background: var(--bg3); font-weight: 600; }
+  .fold { background: none; border: none; padding: 0; width: 15px; margin-left: -16px; color: var(--text); font-size: 13px; line-height: 17px; text-align: center; }
+  .fold:hover, .fold.open { color: var(--accent); }
   .h.lane { display: block; padding: 3px 6px 3px 18px; text-transform: none; letter-spacing: 0; font-size: 11px; color: var(--dim); background: var(--bg1); }
   .lt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
   .lb { display: flex; gap: 2px; margin-top: 3px; align-items: center; }
