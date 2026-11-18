@@ -100,12 +100,18 @@
   let openMods = $state(new Set<string>());
   const mixId = $derived(tracks.find((t) => t.mix)?.id ?? tracks[0]?.id ?? "mix");
   const modsFor = (target: string) => modsOf(doc, video, target);
+  /** M: open rows close; closed ones open (adding a modulation first if there's none). */
   function modulate(target: string, spec: ParamSpec) {
-    const has = modsFor(target).length > 0;
     const n = new Set(openMods);
-    if (has && n.has(target)) { n.delete(target); openMods = n; return; }
-    if (!has) addModFor(target, spec);
+    if (n.has(target)) { n.delete(target); openMods = n; return; }
+    if (!modsFor(target).length) addModFor(target, spec);
     n.add(target); openMods = n;
+  }
+  /** ✕ on a modulation; removing the last one closes the rows. */
+  function removeModFor(target: string, source: string) {
+    const last = modsFor(target).length <= 1; // (decided before: the panel sees the edit only once it re-renders)
+    edit("remove modulation", (d) => removeMod(d, video, target, source));
+    if (last) { const n = new Set(openMods); n.delete(target); openMods = n; }
   }
   /** A new modulation: the layer's own track, its smoothed loudness, a quarter of the parameter's range. */
   function addModFor(target: string, spec: ParamSpec) {
@@ -125,7 +131,7 @@
     {#each modsFor(target) as m (m.source)}
       <ModRow mod={m} {spec} {tracks} level={levelOf(m.source)} origin={modOrigin(doc, video, m)}
         onchange={(next, final) => { edit("modulation", (d) => setMod(d, video, target, m.source, next), next.source === m.source ? `mod:${target}<-${m.source}` : undefined); if (final) seal(); }}
-        onremove={() => edit("remove modulation", (d) => removeMod(d, video, target, m.source))}
+        onremove={() => removeModFor(target, m.source)}
         onreset={() => edit("modulation: back to the base's", (d) => resetMod(d, video, target, m.source))} />
     {/each}
     <button class="addmod" onclick={() => addModFor(target, spec)} title="Another track or feature also moves it (they add up)">+ another</button>

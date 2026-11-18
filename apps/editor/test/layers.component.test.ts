@@ -222,5 +222,25 @@ describe("audio modulation in the layer panel", () => {
     await fireEvent.click(r.getByLabelText("Remove modulation"));
     expect(modsOf(s.doc, "full", "ring.radius")).toEqual([]);
   });
+  it("removing the last modulation closes the rows and M; M then starts a new one", async () => {
+    const { s, edit, seal } = setup();
+    const r = render(LayerPanel, props(s, edit, seal));
+    const M = () => r.getByLabelText("Modulate Radius");
+    await fireEvent.click(M());
+    await r.rerender(props(s, edit, seal));
+    await fireEvent.click(r.getByLabelText("Remove modulation"));
+    await r.rerender(props(s, edit, seal));
+    expect(modsOf(s.doc, "full", "ring.radius")).toEqual([]);
+    expect(r.queryByText("+ another")).toBeNull();
+    expect(M().classList.contains("on")).toBe(false);
+    expect(r.queryByText("- modulated")).toBeNull();
+    // with rows open and no modulation left (e.g. after undo), M closes them rather than adding one
+    await fireEvent.click(M());
+    expect(modsOf(s.doc, "full", "ring.radius").length).toBe(1);
+    s.undo();
+    await r.rerender(props(s, edit, seal));
+    await fireEvent.click(M());
+    expect(modsOf(s.doc, "full", "ring.radius")).toEqual([]);
+    expect(M().classList.contains("on")).toBe(false);
+  });
 });
-
