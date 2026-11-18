@@ -466,7 +466,9 @@ export class Renderer {
         gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         src = L.src!.tex;
       }
-      // 2. the effect chain
+      // 2. the effect chain. Sizes in pixels (`pixels: true`) are pixels of the full-size video: scaled to this
+      // layer's own texture, which is smaller in a preview and for a layer drawn at reduced resolution
+      const pxScale = this.scale * (L.def.resolutionScale ?? 1);
       let cur = src;
       let ping = 0;
       for (const e of L.effects) {
@@ -484,7 +486,7 @@ export class Renderer {
           gl.uniform2f(u("u_res"), L.w, L.h);
           gl.uniform1f(u("u_time"), t);
           gl.uniform1f(u("u_fps"), fps);
-          for (const s of e.def.params) gl.uniform1f(u(`u_${s.name}`), this.resolver.value(`${id}.${e.id}.${s.name}`, e.params[s.name]!, t, lookup) * (s.pixels ? this.scale : 1));
+          for (const s of e.def.params) gl.uniform1f(u(`u_${s.name}`), this.resolver.value(`${id}.${e.id}.${s.name}`, e.params[s.name]!, t, lookup) * (s.pixels ? pxScale : 1));
           gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
           gl.viewport(0, 0, L.w, L.h);
           gl.disable(gl.BLEND);
@@ -498,10 +500,11 @@ export class Renderer {
       finals.push(opacity > 0.001 ? cur : null);
     });
     if (!output) return;
-    // 3. composite the layers onto the output
+    // 3. composite the layers onto the background colour (so add, screen and multiply blend with it, as they
+    // look; post then sees an opaque picture)
     gl.bindFramebuffer(gl.FRAMEBUFFER, this.out.fbo);
     gl.viewport(0, 0, width, height);
-    gl.clearColor(0, 0, 0, 0);
+    gl.clearColor(bg[0], bg[1], bg[2], 1);
     gl.clear(gl.COLOR_BUFFER_BIT);
     gl.useProgram(this.progLayer);
     const u = (n: string) => gl.getUniformLocation(this.progLayer, n);

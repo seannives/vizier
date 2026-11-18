@@ -44,6 +44,48 @@ export function secondsToBar(sec: number, grid: Grid): number {
   return (lo + hi) / 2;
 }
 
+/** Beats per bar in effect at a bar position (the segment starting at or before it; the first one before that). */
+export function beatsPerBarAt(bar: number, grid: Grid): number {
+  const s = segs(grid);
+  let cur = s[0];
+  for (const seg of s) if (seg.bar <= bar + 1e-9) cur = seg;
+  return cur?.beatsPerBar ?? 4;
+}
+
+/**
+ * A bar position moved by a number of beats (negative: back), counting beats in the metre in effect along the way:
+ * 4 beats back from bar 17 when bars 1–16 are in 4/4 is bar 16, whatever metre starts at 17.
+ */
+export function addBeats(bar: number, beats: number, grid: Grid): number {
+  const s = segs(grid);
+  let x = bar, left = Math.abs(beats);
+  const fwd = beats >= 0;
+  for (let guard = 0; left > 1e-12 && guard < 1000; guard++) {
+    // the segment in effect in the direction of travel, and where it ends that way
+    const inEffect = fwd ? beatsPerBarAt(x, grid) : beatsPerBarAt(x - 1e-6, grid); // (just before x, going back)
+    const edge = fwd ? (s.find((seg) => seg.bar > x + 1e-9)?.bar ?? Infinity) : ([...s].reverse().find((seg) => seg.bar < x - 1e-6 && seg !== s[0])?.bar ?? -Infinity);
+    const room = Math.abs(edge - x) * inEffect; // beats until that edge
+    if (left <= room) { x += (fwd ? 1 : -1) * (left / inEffect); left = 0; }
+    else { x = edge; left -= room; }
+  }
+  return x;
+}
+
+/** The next beat line strictly after (dir 1) or before (dir -1) a bar position, in the metre of each bar. */
+export function nextBeatLine(bar: number, dir: 1 | -1, grid: Grid): number {
+  const eps = 1e-6;
+  const b = Math.floor(bar + eps);
+  const bpb = beatsPerBarAt(b, grid);
+  if (dir > 0) {
+    const k = Math.floor((bar - b) * bpb + eps) + 1;
+    return k >= bpb ? b + 1 : b + k / bpb;
+  }
+  const k = Math.ceil((bar - b) * bpb - eps) - 1;
+  if (k >= 0) return b + k / bpb;
+  const pb = beatsPerBarAt(b - 1, grid);
+  return b - 1 + (pb - 1) / pb;
+}
+
 /** "17.3" style label (bar.beat), using the display offset. */
 export function barLabel(bar: number, grid: Grid): string {
   const s = segs(grid).filter((x) => x.bar <= bar).pop() ?? segs(grid)[0]!;

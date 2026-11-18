@@ -7,7 +7,9 @@
   import { spansToSeconds, spanGain, type LayerDef, type Transform } from "../../../../../packages/core/src/index.ts";
   import type { FeatureTrack } from "../../../../../packages/features/src/index.ts";
 
-  let { project, profileId, features, time, scaleOverride = null, loopWraps = 0, selectedLayer = null, onselect = () => {}, onlayout = () => {}, qualityKey = "in" }: {
+  let { project, profileId, features, time, scaleOverride = null, loopWraps = 0, selectedLayer = null, onselect = () => {}, onlayout = () => {}, qualityKey = "in", handles = true }: {
+    /** Show the layout handles (and let clicks select and drag layers). Off for a full-screen output window. */
+    handles?: boolean;
     project: Project | null; profileId: string; features: Record<string, FeatureTrack> | null; time: number;
     scaleOverride?: number | null; loopWraps?: number;
     /** Where the quality choice is remembered: the editor's preview ("in") and the output window ("out") each have one. */
@@ -61,6 +63,10 @@
     return () => { r?.dispose(); if (renderer === r) renderer = null; };
   });
 
+  // Text is drawn in Special Elite: once the font has loaded, draw the frame again (the export waits for it; here
+  // the first frame may come before it, in a fallback font)
+  $effect(() => { let live = true; void document.fonts.load("40px 'Special Elite'").then(() => { if (live) redraw++; }); return () => { live = false; }; });
+
   // an edit: apply it to the renderer and draw again
   $effect(() => {
     const p = project;
@@ -81,13 +87,19 @@
     const frame = Math.floor(time * profile.fps + 1e-6);
     const rd = redraw;
     if (!renderer || (frame === shown && rd === seenRedraw)) return;
-    if (loopWraps !== seenWraps) { seenWraps = loopWraps; renderer.continueThroughJump = true; }
-    if (frame === shown) {
-      renderer.continueThroughJump = true;
+    const wrapped = loopWraps !== seenWraps;
+    if (wrapped) { seenWraps = loopWraps; renderer.continueThroughJump = true; }
+    // Once the picture holds still, draw it once more with a proper lead-in, so it looks exactly as in the export:
+    // after an edit (drawn at once with trails just continuing), and after a jump of more than a frame (up to a
+    // second ahead, trails would otherwise carry the old moment along). While playing the frame moves on first,
+    // so this never fires mid-playback.
+    const settleLater = () => {
       clearTimeout(settle);
-      const r = renderer;
+      const r = renderer!;
       settle = setTimeout(() => { if (renderer === r && shown === frame) { const t0 = performance.now(); r.renderFrame(frame); stats.preview(performance.now() - t0); } }, 250);
-    }
+    };
+    if (frame === shown) { renderer.continueThroughJump = true; settleLater(); }
+    else if (shown >= 0 && Math.abs(frame - shown) > 1 && !wrapped) settleLater();
     seenRedraw = rd;
     const t0 = performance.now();
     renderer.renderFrame(frame);
@@ -100,7 +112,7 @@
 
 <div class="preview">
   <div class="box" style:aspect-ratio="{profile.width} / {profile.height}" bind:this={host}>
-    {#if project}
+    {#if project && handles}
       <LayoutOverlay layers={project.layers} family={profile.layout} {safe} selected={selectedLayer} {isOn} {onselect} {onlayout} />
     {/if}
     {#if safe}

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { LayerDef, LayoutFamily, Transform } from "../../../../../packages/core/src/index.ts";
-  import { placement } from "../lib/edits.ts";
+  import { placement, frontToBack } from "../lib/edits.ts";
   import { contains, moved, resized, rotated, toScreen, type Frame, type Guide } from "../lib/layoutDrag.ts";
 
   /**
@@ -19,7 +19,7 @@
 
   let W = $state(0), H = $state(0);
   const frame = $derived<Frame>({ W, H, safe });
-  const front = $derived([...layers].sort((a, b) => b.z - a.z));
+  const front = $derived(frontToBack(layers)); // (ties as the renderer draws them)
   const sel = $derived(layers.find((l) => l.id === selected) ?? null);
   let live = $state<Transform | null>(null); // while dragging: what's shown before the project catches up
   const t = $derived(live ?? (sel ? placement(sel, family) : null));

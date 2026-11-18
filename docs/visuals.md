@@ -170,7 +170,7 @@ resized.
 These belong to every layer, whatever draws it.
 
 - **Track**: which stem the layer listens to (default: the mix).
-- **Blend**: how the layer combines with what's behind it.
+- **Blend**: how the layer combines with what's behind it (the layers below it, and the background colour under them all).
   - **normal**: on top, covering what's behind where it's opaque.
   - **add**: brightens what's behind (light adds up; good for glowing lines).
   - **screen**: brightens too, more gently, never past white.

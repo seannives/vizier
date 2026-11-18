@@ -154,7 +154,7 @@
     </select>
   </label>
   <div class="field"><span>Track{#if ch({ field: "track" })}<button class="rs" title="Back to the base's track" onclick={(e) => { e.preventDefault(); reset({ field: "track" }, "track"); }}>↺</button>{/if}</span>
-    <select value={layer.track ?? ""} aria-label="Track" onchange={(e) => { const t = e.currentTarget.value; e.currentTarget.blur(); edit("track", (d) => patchLayer(d, video, layerId, { track: t || undefined })); }}>
+    <select value={layer.track ?? ""} aria-label="Track" onchange={(e) => { const t = e.currentTarget.value; e.currentTarget.blur(); edit("track", (d) => patchLayer(d, video, layerId, { track: t || (inherited ? mixId : undefined) })); }}>
       <option value="">{tracks.find((t) => t.mix)?.name ?? "Mix"} (mix)</option>
       {#each tracks.filter((t) => !t.mix) as t}<option value={t.id}>{t.name}</option>{/each}
     </select>

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { spansToSeconds, spanGain, splitSpans, validateSpans } from "../src/spans.ts";
+import { addBeats, beatsPerBarAt, nextBeatLine } from "../src/grid.ts";
 import { mergeVideos, validateProject, type Project } from "../src/index.ts";
 
 // 120 BPM, 4/4, bar 1 at 0 s: a bar is 2 s, a beat 0.5 s
@@ -82,5 +83,25 @@ describe("a video built on another: settings that no longer fit drop out", () =>
     const p: Project = { version: 2, title: "t", seed: 1, tracks: { mix: "m" }, mix: "mix", palette: {},
       layers: [{ id: "ring", generator: "acidRing", z: 0, layout: L, params: { radiuss: 1 } as any }], automation: [{ target: "rign.radius", points: [{ t: 0, v: 1 }] }] };
     expect(validateProject(p).length).toBe(2);
+  });
+});
+
+describe("beats across a metre change (4/4 until bar 17, then 3/4; 120 BPM: a beat is 0.5 s)", () => {
+  const g = { tempo: [{ bar: 1, bpm: 120, beatsPerBar: 4 }, { bar: 17, bpm: 120, beatsPerBar: 3 }], downbeat: 0 };
+  it("a fade counts beats in the metre where it lies", () => {
+    expect(spansToSeconds([{ from: 1, to: 17, fadeOut: 4 }], g)[0]!.fadeOut).toBeCloseTo(2);    // 4 beats of 4/4
+    expect(spansToSeconds([{ from: 16.5, to: 30, fadeIn: 4 }], g)[0]!.fadeIn).toBeCloseTo(2);   // 2 beats of 4/4, 2 of 3/4
+    expect(spansToSeconds([{ from: 17, to: 30, fadeIn: 3 }], g)[0]!.fadeIn).toBeCloseTo(1.5);   // a bar of 3/4
+  });
+  it("moves by beats and finds beat lines in each bar's own metre", () => {
+    expect(addBeats(17, -4, g)).toBeCloseTo(16);
+    expect(addBeats(16.5, 4, g)).toBeCloseTo(17 + 2 / 3);
+    expect(addBeats(18, -3, g)).toBeCloseTo(17);
+    expect(beatsPerBarAt(16.9, g)).toBe(4);
+    expect(beatsPerBarAt(17, g)).toBe(3);
+    expect(nextBeatLine(16.75, 1, g)).toBe(17);
+    expect(nextBeatLine(17, 1, g)).toBeCloseTo(17 + 1 / 3);
+    expect(nextBeatLine(17, -1, g)).toBeCloseTo(16.75);
+    expect(nextBeatLine(17 + 1 / 3, -1, g)).toBeCloseTo(17);
   });
 });

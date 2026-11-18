@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { PROFILES, videoFormat } from "../../../../../packages/core/src/index.ts";
+  import { PROFILES, videoFormat, resolveVideo } from "../../../../../packages/core/src/index.ts";
   import { setVideo, detachVideo } from "../lib/edits.ts";
   import type { Doc } from "../lib/session.ts";
 
@@ -14,8 +14,10 @@
   const FORMATS = Object.values(PROFILES).filter((p) => !p.id.startsWith("live"));
   const own = $derived(doc.videos[video]!);
   const base = $derived(own.base ?? null);
-  const baseFormat = $derived(base && doc.videos[base] ? videoFormat(doc.videos[base]) : undefined);
-  const format = $derived(videoFormat(own) ?? baseFormat ?? "youtube");
+  // (formats are inherited along the whole chain of bases, so read the combined videos, not just the files)
+  const fmtOf = (name: string) => { try { return videoFormat(resolveVideo(name, (n) => doc.videos[n]!)); } catch { return undefined; } };
+  const baseFormat = $derived(base && doc.videos[base] ? fmtOf(base) : undefined);
+  const format = $derived(fmtOf(video) ?? "youtube");
   const formatChanged = $derived(!!base && !!videoFormat(own) && !!baseFormat && videoFormat(own) !== baseFormat);
   const rangeChanged = $derived(!!base && own.range !== undefined);
   const baseName = $derived(base ? doc.videos[base]?.name ?? base : null);

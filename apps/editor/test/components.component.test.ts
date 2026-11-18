@@ -117,6 +117,11 @@ describe("Timeline", () => {
       await d.drag(15, 17.2, true); // ⇧: no snapping
       expect(d.onspans.mock.lastCall![1][0].from).toBeCloseTo(12.2, 1);
     });
+    it("a new span drawn before an existing one is the one selected (spans are kept in order of time)", async () => {
+      const { onselectlayer, drag } = await rows([on]);       // on 10–20 s
+      await drag(2, 6);                                       // a new one at 2–6 s: index 0 once sorted
+      expect(onselectlayer).toHaveBeenLastCalledWith("ring", 0);
+    });
     it("a click on a span selects it; a click in empty space selects the layer and moves the playhead", async () => {
       const { onspans, onselectlayer, onseek, drag } = await rows([on]);
       await drag(15, 15);
@@ -165,6 +170,14 @@ describe("Timeline", () => {
       expect(cb.onlanepoints.mock.lastCall![1][0]).toEqual({ t: 12, v: expect.closeTo(0.6, 1) });
       await drag([10, 0.2], [25, 0.6]);
       expect(cb.onlanepoints.mock.lastCall![1][0].t).toBe(20); // stops at the next point
+    });
+    it("a click at the time of an existing breakpoint (another height) adds and selects the new one", async () => {
+      const { cb, drag } = await lane();
+      await drag([20, 0.3], [20, 0.3]);                        // 20 s already has a point (0.8)
+      const out = cb.onlanepoints.mock.lastCall![1];
+      expect(out.map((p: any) => p.t)).toEqual([10, 20, 20]);
+      const [, i] = cb.onselectpoint.mock.lastCall!;
+      expect(out[i].v).toBeCloseTo(0.3, 1);                   // the selection is the new point, not the old one
     });
     it("a click on a breakpoint selects it without changing anything", async () => {
       const { cb, drag } = await lane();

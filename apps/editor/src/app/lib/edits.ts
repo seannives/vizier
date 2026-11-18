@@ -41,6 +41,9 @@ export function patchLayer(doc: Doc, video: string, id: string, patch: Partial<L
   const e = ownEntry(doc, video, id);
   const { params, layout, ...rest } = patch;
   Object.assign(e, rest);
+  // a field set to undefined is removed: JSON (the saved file) can't hold undefined, so keeping the key would make
+  // the editor and the saved file disagree
+  for (const [k, v] of Object.entries(rest)) if (v === undefined) delete (e as unknown as Record<string, unknown>)[k];
   if (params) e.params = { ...e.params, ...params };
   if (layout) e.layout = { ...e.layout, ...layout };
 }
@@ -82,9 +85,11 @@ export function moveEffect(doc: Doc, video: string, id: string, index: number, d
   setEffects(doc, video, id, effects);
 }
 
-/** A new id from a stem, unused by any layer of the video (inherited or removed ones too). */
-function freshId(doc: Doc, video: string, stem: string): string {
-  const used = new Set([...(resolved(doc, video).layers ?? []).map((l) => l.id), ...(doc.videos[video]!.layers ?? []).map((l) => l.id)]);
+/** A new id from a stem, unused anywhere in the project: by any video's layers, overrides or removals. Ids are
+ *  shared between a video and the videos built on it, so a new layer in the base must never take the id of a
+ *  reel's own layer (or of a layer a reel still overrides). */
+function freshId(doc: Doc, _video: string, stem: string): string {
+  const used = new Set(Object.values(doc.videos).flatMap((v) => (v.layers ?? []).map((l) => l.id)));
   const base = stem.replace(/[^A-Za-z0-9_-]/g, "").replace(/^[^A-Za-z0-9]+/, "") || "layer";
   if (!used.has(base)) return base;
   let n = 2;
@@ -472,4 +477,9 @@ export function resetMod(doc: Doc, video: string, target: string, source: string
   if (!v.modulations) return;
   v.modulations = v.modulations.filter((o) => !(o.target === target && o.source === source));
   if (!v.modulations.length) delete v.modulations;
+}
+
+/** Layers front first: the reverse of the renderer's drawing order (ascending z, ties in list order). */
+export function frontToBack<T extends { z: number }>(layers: T[]): T[] {
+  return layers.map((l, i) => ({ l, i })).sort((a, b) => b.l.z - a.l.z || b.i - a.i).map((x) => x.l);
 }

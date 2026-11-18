@@ -4,7 +4,7 @@ import {
   addLayer, removeLayer, moveLayer, duplicateLayer, setParam, setLayout, placement, hasOwnLayout, patchLayer,
   layerOrigin, isChanged, baseLayer, resetSetting, resetLayer, removedLayers, restoreLayer, newVideo, detachVideo, setVideo,
   laneOf, laneChanged, laneInherited, setLane, addLane, removeLane, resetLane, lanesOfLayer,
-  modsOf, modOrigin, addMod, setMod, removeMod, resetMod, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
+  modsOf, modOrigin, addMod, setMod, removeMod, resetMod, frontToBack, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
 } from "../src/app/lib/edits.ts";
 import { validateProject, buildProject, resolveVideo } from "../../../packages/core/src/index.ts";
 
@@ -299,5 +299,29 @@ describe("audio modulation", () => {
     expect(modsOf(d, "reel", "ring.lineWidth").map((m) => m.source)).toEqual(["mix.high"]);
     expect(modOrigin(d, "reel", { target: "ring.lineWidth", source: "mix.high" })).toBe("own");
     expect(valid(d, "reel")).toEqual([]);
+  });
+});
+
+describe("independent review fixes", () => {
+  it("a new layer's id is unused anywhere in the project, so a base layer never takes a reel's layer id", () => {
+    const d = doc();
+    const inReel = addLayer(d, "reel", "pulseGrid");
+    const inBase = addLayer(d, "full", "pulseGrid");
+    expect(inBase).not.toBe(inReel);
+    expect(layersOf(d, "reel").filter((l) => l.generator === "pulseGrid").length).toBe(2);
+    // removing a base layer and adding the same kind again doesn't revive the reel's changes to the old one
+    setParam(d, "reel", "ring", "radius", 0.9);
+    removeLayer(d, "full", "ring");
+    expect(addLayer(d, "full", "acidRing")).not.toBe("ring");
+  });
+  it("setting a field to undefined removes it (nothing the saved file would lose)", () => {
+    const d = doc();
+    patchLayer(d, "full", "ring", { track: undefined });
+    expect("track" in d.videos.full!.layers!.find((l) => l.id === "ring")!).toBe(false);
+  });
+  it("layers front first are exactly the reverse of the renderer's drawing order, ties included", () => {
+    const ls = [{ id: "a", z: 1 }, { id: "b", z: 5 }, { id: "c", z: 5 }, { id: "d", z: 0 }];
+    const drawn = [...ls].sort((x, y) => x.z - y.z).map((l) => l.id); // the renderer: d a b c (c drawn last, on top)
+    expect(frontToBack(ls).map((l) => l.id)).toEqual([...drawn].reverse());
   });
 });

@@ -28,8 +28,15 @@ Editor milestones:
   - [x] 3b. Audio modulation in the layer panel: M per parameter; track, feature, amount, curve; live meter;
         + another; inherited (base / changed / ↺)
 - [ ] **Bug sweep** (after 3b, before 4: milestone 4 changes tracks and tempo, which everything in bars rests on)
-  - [ ] Independent code review by a fresh reviewer, focused on the seams: seconds vs bars, pixels vs fractions
-        of the frame, preview vs export, a video vs its base, every conversion between units
+  - [x] Independent code review by a fresh reviewer, focused on the seams: seconds vs bars, pixels vs fractions
+        of the frame, preview vs export, a video vs its base, every conversion between units. Found and fixed,
+        each with a test: a new layer could take an id a reel already used; choosing Mix as an inherited
+        layer's track was lost on save; layers with equal z were listed in the wrong order; the wrong span or
+        breakpoint was selected after drawing one; beats counted across a metre change were off; a paused jump
+        of a few frames didn't redraw at full quality; glow was twice as wide on a reduced-resolution layer;
+        layers blended with transparent black, not the background colour; a modulation without an amount made
+        NaN; the preview's first frame could be in a fallback font; the video panel read the format from only
+        one base up; the full-screen output window could select and drag layers
   - [x] Rule-based tests over random sequences of edits (apps/editor/test/rules.test.ts): every edit leaves
         every video valid; undo then redo restores it exactly; saving and reloading changes nothing; only the
         edited video's file changes. Found: a reel broke when its base later added lanes for a layer the reel

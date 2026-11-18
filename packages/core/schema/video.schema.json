@@ -297,7 +297,28 @@
           "remove": {
             "type": "boolean"
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "not": {
+                "required": [
+                  "remove"
+                ],
+                "properties": {
+                  "remove": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            "then": {
+              "required": [
+                "amount"
+              ]
+            }
+          }
+        ]
       }
     },
     "format": {

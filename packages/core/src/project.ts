@@ -159,6 +159,7 @@ export function validateProject(p: Project): string[] {
   for (const s of p.sections ?? []) if (s.bar !== undefined && !p.grid) errs.push(`section ${s.name}: bars need a tempo (song grid)`);
   for (const m of p.modulations ?? []) {
     if (!targets.has(m.target)) errs.push(`modulation target "${m.target}" doesn't exist`);
+    if (typeof m.amount !== "number" || !Number.isFinite(m.amount)) errs.push(`modulation of "${m.target}" by ${m.source}: amount must be a number`);
     if (!(m.source.split(".")[0]! in p.tracks)) errs.push(`modulation uses unknown track: ${m.source}`);
   }
   return errs;

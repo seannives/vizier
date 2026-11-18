@@ -171,4 +171,27 @@ run("renderer in headless Chrome", () => {
       expect(scaled, `scaled preview ${scaled}, unscaled ${before}`).toBeLessThan(before * 0.7);
     } finally { await full.close(); await half.close(); await unscaled.close(); }
   }, 180_000);
+  it("glow sizes are in pixels of the video, also on a layer drawn at reduced resolution", async () => {
+    const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
+    const ring = (radius: number, resolutionScale?: number): Project => ({ ...project, automation: [{ target: "post.grain", points: [{ t: 0, v: 0 }] }],
+      layers: [{ ...project.layers[1]!, ...(resolutionScale ? { resolutionScale } : {}), effects: [{ type: "glow", params: { amount: 3, radius } }] }] });
+    const shot = async (p: Project) => { const r = await openRenderer(p, "draft", { mix: track, bass: track }, SMALL); try { return await r.frame(30); } finally { await r.close(); } };
+    const diff = (a: Buffer, b: Buffer) => { let d = 0; for (let i = 0; i < a.length; i += 4) d += Math.abs(a[i]! - b[i]!); return d / (a.length / 4); };
+    const full = await shot(ring(16)), half = await shot(ring(16, 0.5)), doubled = await shot(ring(32));
+    // the half-resolution layer's glow matches the same radius at full resolution, not twice it
+    expect(diff(half, full)).toBeLessThan(diff(half, doubled));
+  }, 180_000);
+
+  it("layers blend with the background colour (multiply darkens it)", async () => {
+    const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
+    const grey: Project = { ...project, palette: { bg: "#C08040" }, automation: [{ target: "post.grain", points: [{ t: 0, v: 0 }] }, { target: "post.vignette", points: [{ t: 0, v: 0 }] }],
+      layers: [{ id: "flow", track: "mix", generator: "flowField", z: 0, blend: "multiply", colors: { line: "#404040", highlight: "#404040" }, params: { thickness: 0.5, brightness: 3 }, layout: { landscape: { x: 0.5, y: 0.5, w: 1, h: 1 } } }] };
+    const r = await openRenderer(grey, "draft", { mix: track, bass: track }, SMALL);
+    try {
+      const px = await r.frame(30);
+      let darker = 0;
+      for (let i = 0; i < px.length; i += 4) if (px[i]! < 0xc0 - 30) darker++;
+      expect(darker / (px.length / 4)).toBeGreaterThan(0.02); // multiply darkened the background where the lines are
+    } finally { await r.close(); }
+  }, 180_000);
 });

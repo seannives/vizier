@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { barToSeconds, secondsToBar, barLabel, type Grid } from "../../../../../packages/core/src/index.ts";
+  import { barToSeconds, secondsToBar, barLabel, beatsPerBarAt, type Grid } from "../../../../../packages/core/src/index.ts";
   import { xOf, tOf, snapTime, type View } from "../lib/timeline.ts";
   import type { Waveform } from "../lib/api.ts";
 
@@ -178,13 +178,13 @@
       const b0 = Math.floor(secondsToBar(Math.max(0, t0), grid)) - 1, b1 = Math.ceil(secondsToBar(t1, grid)) + 1;
       const pxBar = (barToSeconds(b0 + 2, grid) - barToSeconds(b0 + 1, grid)) * v.pxPerSec;
       const every = [1, 2, 4, 8, 16, 32, 64].find((n) => n * pxBar >= 44) ?? 128;
-      const bpb = grid.tempo[0]?.beatsPerBar ?? 4;
       for (let b = Math.max(0, b0); b <= b1; b++) {
         const x = Math.round(xOf(barToSeconds(b, grid), v)) + 0.5;
         if (x < -2 || x > W + 2) continue;
         const major = (b - 1) % every === 0;
         ctx.fillStyle = major ? C.line2 : C.line;
         if (major || pxBar > 10) ctx.fillRect(x, H_RULER, 1, H - H_RULER);
+        const bpb = beatsPerBarAt(b, grid); // (each bar in its own metre)
         if (pxBar / bpb >= 9) for (let q = 1; q < bpb; q++) {
           const xb = Math.round(xOf(barToSeconds(b + q / bpb, grid), v)) + 0.5;
           ctx.fillStyle = "#ffffff0d"; ctx.fillRect(xb, H_RULER + H_SECT, 1, H - H_RULER - H_SECT);
@@ -349,7 +349,13 @@
   function layerUp(e: PointerEvent) {
     const d = spanDrag!; spanDrag = null;
     const ds = dragSpans; dragSpans = null;
-    if (d.moved && ds) { onspans(d.id, ds.spans); if (d.kind === "new") onselectlayer(d.id, ds.index); return; }
+    if (d.moved && ds) {
+      onspans(d.id, ds.spans);
+      // the spans are saved in order of time: select the dragged (or new) one where it lands, not where it was
+      const mine = ds.spans[ds.index]!;
+      onselectlayer(d.id, [...ds.spans].sort((a, b) => a.from - b.from).indexOf(mine));
+      return;
+    }
     if (d.kind === "new") onseek(snapT(d.t0, e)); // a click in empty space moves the playhead too
   }
 
@@ -371,9 +377,10 @@
     if (index < 0) { // a new breakpoint where you clicked
       const t = snapT(tOf(x, view), e);
       const prev = [...pts].reverse().find((p) => p.t <= t);
-      pts.push({ t, v: laneValue(ln, row, y), ...(prev?.curve ? { curve: prev.curve } : {}) });
+      const np: LanePoint = { t, v: laneValue(ln, row, y), ...(prev?.curve ? { curve: prev.curve } : {}) };
+      pts.push(np);
       pts.sort((a, b) => a.t - b.t);
-      index = pts.findIndex((p) => p.t === t);
+      index = pts.indexOf(np); // (not by time: a point may already sit at the same time)
       added = true;
       dragLane = { target: ln.target, points: pts };
     }

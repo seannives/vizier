@@ -65,6 +65,18 @@ describe("marking what a video inherits", () => {
   });
 });
 
+describe("an inherited layer on the mix", () => {
+  it("choosing the mix as an inherited layer's track saves it (not a value the file would drop)", async () => {
+    const { s, edit, seal } = setup();
+    s.apply("x", (d) => { d.videos.full!.layers![0]!.track = "bass"; });
+    const r = render(LayerPanel, { doc: s.doc, video: "reel", layerId: "ring", tracks: doc().song.tracks, playheadBar: 1, automated: new Set<string>(), edit, seal, onselect: () => {} });
+    const track = r.getByLabelText("Track") as HTMLSelectElement;
+    track.value = ""; await fireEvent.change(track);
+    const saved = JSON.parse(JSON.stringify(s.doc)) as Doc;   // what the file would hold
+    expect(layerOf(saved, "reel", "ring")!.track).toBe("mix");
+  });
+});
+
 describe("video settings", () => {
   const vprops = (s: Session, edit: any, onopen = vi.fn()) => ({ doc: s.doc, video: "reel", rangeLabel: "bars 9 – 17", rangeTime: "", rangeInherited: false, edit, onopen });
   it("renames, changes format (↺ back to the base's), resets the range, opens the base and detaches", async () => {

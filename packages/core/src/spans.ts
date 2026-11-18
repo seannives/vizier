@@ -3,7 +3,7 @@
  * video range: 1–49 is bars 1..48); fades are in beats, inside the span (a fade-in starts at `from`, a fade-out ends
  * at `to`). A layer that's off isn't drawn at all, and its feedback effects (trails) start fresh when it comes on.
  */
-import { barToSeconds, secondsToBar, type Grid } from "./grid.ts";
+import { barToSeconds, secondsToBar, addBeats, type Grid } from "./grid.ts";
 
 export interface Span {
   from: number;          // bar where the layer comes on
@@ -15,18 +15,13 @@ export interface Span {
 /** A span in seconds, fades as seconds. */
 export interface SpanSec { from: number; to: number; fadeIn: number; fadeOut: number }
 
-const beatsPerBar = (grid: Grid, bar: number) => {
-  const seg = [...grid.tempo].sort((a, b) => a.bar - b.bar).filter((s) => s.bar <= bar).pop() ?? grid.tempo[0];
-  return seg?.beatsPerBar ?? 4;
-};
-
 export function spansToSeconds(spans: Span[], grid: Grid): SpanSec[] {
   return spans.map((s) => {
     const from = barToSeconds(s.from, grid);
     const to = s.to === undefined ? Infinity : barToSeconds(s.to, grid);
-    const fadeIn = s.fadeIn ? barToSeconds(s.from + s.fadeIn / beatsPerBar(grid, s.from), grid) - from : 0;
-    const toBar = s.to ?? s.from;
-    const fadeOut = s.fadeOut && s.to !== undefined ? to - barToSeconds(toBar - s.fadeOut / beatsPerBar(grid, toBar), grid) : 0;
+    // fades count beats in the metre in effect where they lie (a fade-out before a metre change uses the old one)
+    const fadeIn = s.fadeIn ? barToSeconds(addBeats(s.from, s.fadeIn, grid), grid) - from : 0;
+    const fadeOut = s.fadeOut && s.to !== undefined ? to - barToSeconds(addBeats(s.to, -s.fadeOut, grid), grid) : 0;
     return { from, to, fadeIn: Math.max(0, fadeIn), fadeOut: Math.max(0, fadeOut) };
   }).sort((a, b) => a.from - b.from);
 }

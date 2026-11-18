@@ -13,13 +13,14 @@
   import VideoPanel from "./components/VideoPanel.svelte";
   import NewVideo from "./components/NewVideo.svelte";
   import type { LayerRow, SpanS, LaneRow, LanePoint } from "./components/Timeline.svelte";
+  import { frontToBack } from "./lib/edits.ts";
   import { setSpans, splitLayerAt, duplicateLayer, layerOf, setLayout, newVideo, lanesOfLayer, laneInherited, laneChanged, setLane, addLane, removeLane, resetLane } from "./lib/edits.ts";
   import type { Doc } from "./lib/session.ts";
   import { stats } from "./lib/stats.ts";
   import { openLink, type Msg } from "./lib/link.ts";
   import { featureAt } from "./lib/features.ts";
   import {
-    barToSeconds, secondsToBar, barLabel, sectionTimes, videoFormat, getProfile, spansToSeconds, laneToSeconds, paramTargets, EFFECTS, type Project, type BreakpointInput, type Span, type Transform,
+    barToSeconds, secondsToBar, barLabel, nextBeatLine, sectionTimes, videoFormat, getProfile, spansToSeconds, laneToSeconds, paramTargets, EFFECTS, type Project, type BreakpointInput, type Span, type Transform,
   } from "../../../../packages/core/src/index.ts";
   import type { FeatureTrack } from "../../../../packages/features/src/index.ts";
 
@@ -153,11 +154,10 @@
   function nudge(dir: number, beat: boolean) {
     const t = playing ? transport.time() : marker;
     if (!grid) return seek(Math.max(0, t + dir * 2));
-    const step = beat ? 1 / (grid.tempo[0]?.beatsPerBar ?? 4) : 1;
     const eps = 1e-4;
     const bar = secondsToBar(t, grid);
-    // the next bar/beat line strictly after (or before) the current position
-    const next = dir > 0 ? (Math.floor((bar + eps) / step) + 1) * step : (Math.ceil((bar - eps) / step) - 1) * step;
+    // the next bar/beat line strictly after (or before) the current position (beats in each bar's own metre)
+    const next = beat ? nextBeatLine(bar, dir > 0 ? 1 : -1, grid) : dir > 0 ? Math.floor(bar + eps) + 1 : Math.ceil(bar - eps) - 1;
     seek(Math.max(0, barToSeconds(next, grid)));
   }
 
@@ -260,7 +260,8 @@
   const bpm = $derived(grid?.tempo[0]?.bpm);
   const section = $derived([...sections].reverse().find((s) => s.t <= time + 1e-6)?.name ?? "");
   const tracks = $derived(doc ? doc.song.tracks.map((t) => ({ id: t.id, name: t.name, mix: t.mix, wave: waves[t.id] ?? null })) : []);
-  const layers = $derived(project ? [...project.layers].sort((a, b) => b.z - a.z) : []);
+  // front first: exactly the reverse of the renderer's drawing order (z, then the order in the file), ties included
+  const layers = $derived(project ? frontToBack(project.layers) : []);
 
   // ---- editing layers ----
   let selectedLayer = $state<string | null>(null);
