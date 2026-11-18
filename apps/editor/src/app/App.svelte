@@ -363,6 +363,15 @@
   }
   const family = $derived(getProfile(profileId).layout);
 
+  // ---- the side panel takes the room the preview doesn't need (300–600 px; the preview is as tall as the stage allows) ----
+  let mainW = $state(0), mainH = $state(0);
+  const sideW = $derived.by(() => {
+    const p = getProfile(profileId);
+    const boxH = Math.max(0, mainH - 24 - 22 - 6); // stage padding, the label under the preview, the gap
+    const previewW = (boxH * p.width) / p.height + 24 + 8;
+    return Math.round(Math.min(600, Math.max(300, mainW - previewW)));
+  });
+
   // ---- the preview in its own window (output window) ----
   // While it's open (it says so every second), the editor shows no preview of its own: the side panels spread out
   // and the timeline gets taller. Its layout handles and keys act on this editor.
@@ -516,7 +525,8 @@
     <button onclick={() => (help = true)} title="Keyboard shortcuts (?)">?</button>
   </header>
 
-  <main class:popped>
+  <main class:popped bind:clientWidth={mainW} bind:clientHeight={mainH}
+    style:grid-template-columns={popped ? null : `minmax(0, 1fr) ${sideW}px`}>
     {#if !popped}
       <section class="stage">
         {#if !previewOff}<Preview {project} {profileId} {features} {time} scaleOverride={previewScale} {loopWraps}

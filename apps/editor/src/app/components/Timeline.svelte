@@ -471,7 +471,7 @@
             <div class="h layer" class:sel={r.layer.id === selectedLayer} style:height="{H_LAYER}px" title={r.layer.name}
               onclick={() => onselectlayer(r.layer.id, null)} onkeydown={(e) => { if (e.key === "Enter") onselectlayer(r.layer.id, null); }} role="button" tabindex="-1">
               {#if r.layer.lanes}<button class="fold" class:open data-fold={r.layer.id} title="{open ? "Hide" : "Show"} its automation ({r.layer.lanes} lane{r.layer.lanes > 1 ? "s" : ""})"
-                onclick={(e) => { e.stopPropagation(); ontogglelanes(r.layer.id); }}>{open ? "▾" : "▸"}</button>{/if}{r.layer.name}</div>
+                onclick={(e) => { e.stopPropagation(); ontogglelanes(r.layer.id); }}><svg viewBox="0 0 10 10" width="12" height="12" aria-hidden="true"><path d="M2 0.5 L9 5 L2 9.5 Z" /></svg></button>{/if}{r.layer.name}</div>
           {:else}
             {@const ln = r.lane}
             {@const sp = selectedPoint?.target === ln.target ? selectedPoint.index : null}
@@ -526,8 +526,11 @@
   .h.layer { height: 18px; padding-left: 18px; font-size: 11px; text-transform: none; letter-spacing: 0; color: var(--dim); cursor: default;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 17px; }
   .h.layer.sel { color: var(--accent); background: var(--bg3); font-weight: 600; }
-  .fold { background: none; border: none; padding: 0; width: 18px; height: 18px; margin: -1px 0 0 -18px; vertical-align: top; color: var(--text); font-size: 17px; line-height: 17px; text-align: center; }
-  .fold:hover, .fold.open { color: var(--accent); }
+  .fold { background: none; border: none; padding: 0; width: 18px; height: 17px; margin: 0 0 0 -18px; vertical-align: top; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; }
+  .fold svg { fill: var(--text); transition: transform .1s; }
+  .fold.open svg { transform: rotate(90deg); }
+  .fold:hover svg, .fold.open svg { fill: var(--accent); }
   .h.lane { display: block; padding: 3px 6px 3px 18px; text-transform: none; letter-spacing: 0; font-size: 11px; color: var(--dim); background: var(--bg1); }
   .lt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
   .lb { display: flex; gap: 2px; margin-top: 3px; align-items: center; }

@@ -437,6 +437,19 @@ run("editor (headless Chrome)", () => {
     }
   }, 30_000);
 
+  it("the layer's name stays at the top of the panel when it scrolls; the panel widens into room the preview doesn't use", async () => {
+    await page.click('[data-layer="ring"]');
+    const insp = page.locator("aside.inspector").first();
+    await insp.evaluate((el) => (el.scrollTop = 600));
+    await page.waitForTimeout(100);
+    const top = await insp.evaluate((el) => el.getBoundingClientRect().top);
+    const title = await page.locator(".panel .title").evaluate((el) => el.getBoundingClientRect().top);
+    expect(Math.abs(title - top)).toBeLessThan(3);
+    await insp.evaluate((el) => (el.scrollTop = 0));
+    // (the preview is off in these tests, so the stage needs no room: the panel takes its widest)
+    expect(await insp.evaluate((el) => el.getBoundingClientRect().width)).toBe(600);
+  }, 30_000);
+
   it("shows the shortcuts with ?", async () => {
     await page.keyboard.press("Shift+Slash");
     expect(await page.locator("text=Keyboard shortcuts").count()).toBeGreaterThan(0);

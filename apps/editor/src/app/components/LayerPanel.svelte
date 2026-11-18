@@ -257,7 +257,9 @@
 
 <style>
   .panel { padding-top: 4px; }
-  .title { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  /* the layer's name stays at the top of the panel while it scrolls */
+  .title { display: flex; align-items: center; gap: 8px; margin: 0 -12px 8px; padding: 6px 12px; position: sticky; top: -10px; z-index: 2;
+    background: var(--bg1); border-bottom: 1px solid var(--line); }
   .name { font-weight: 600; }
   .inh { font-size: 10px; color: var(--dim); border: 1px dashed var(--line2); border-radius: 2px; padding: 0 4px; }
   .field { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; font-size: 12px; }
