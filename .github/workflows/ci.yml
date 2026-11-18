@@ -10,8 +10,14 @@ jobs:
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - name: Install ffmpeg
-        timeout-minutes: 5 # Ubuntu's package servers occasionally hang
-        run: command -v ffmpeg || (sudo apt-get update -q && sudo apt-get install -y -q ffmpeg)
+        timeout-minutes: 12 # Ubuntu's package servers occasionally hang: up to three tries of up to 3 minutes
+        run: |
+          command -v ffmpeg && exit 0
+          for i in 1 2 3; do
+            timeout 180 sudo apt-get update -q && timeout 180 sudo apt-get install -y -q ffmpeg && exit 0
+            echo "ffmpeg install attempt $i failed or hung; retrying"; sleep 10
+          done
+          exit 1
       - run: pnpm install --frozen-lockfile
       - run: npx tsc -p tsconfig.json
       - run: node scripts/svelte-check.cjs
