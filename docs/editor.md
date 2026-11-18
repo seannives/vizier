@@ -89,6 +89,24 @@ server isn't running, the editor says so and keeps your changes: start it again 
   (**changed**, with ↺ to go back to the base's); ✕ removes it here only.
 - Breakpoints are saved in bars, so they stay on the music if the tempo changes.
 
+### Audio modulation
+
+The music can move any parameter: **value = slider (or automation lane) + amount × feature**, every frame. A
+feature is a measurement of a track from 0 to 1, such as its loudness, low end or brightness (they're listed with
+what they're good for in [visuals.md](visuals.md#what-the-visuals-listen-to)).
+
+- **M** next to a parameter adds a modulation (the layer's own track, its smoothed loudness, a quarter of the
+  parameter's range) and shows it under the parameter; on a modulated parameter, M shows or hides its
+  modulations (highlighted while shown). Modulated parameters say **- modulated** after their name.
+- Each modulation has the **track** (any stem, or the mix), the **feature**, the **amount** (how far it can move
+  the value at full level; negative moves it down; double-click the slider for 0) and the **curve**: linear (in
+  proportion), peaks (only strong peaks move it much) or gentle (even quiet parts move it noticeably).
+- The **meter** shows the feature's level at the playhead and what it adds to the parameter right now, so you can
+  set the amount while the song plays.
+- **+ another** adds a second track or feature (they add up); ✕ removes one.
+- Modulation stacks with automation: the lane sets where the value sits over the song, the music moves it around
+  that. In a video built on another, modulations are inherited (base), changed here (↺ back) or removed here only.
+
 ### Layout on the preview
 
 - **Click a layer on the preview** to select it (only layers that are on at the playhead). Where layers overlap,
@@ -113,7 +131,7 @@ value); **Reset layer to base** drops all of this video's changes to the layer. 
 A base layer removed here is listed under the layers with **Restore**, which also brings back its automation.
 Changes always go to the open video; to change the base, open it.
 
-Next: audio modulation in the layer panel (milestone 3, part B),
+Next: a bug sweep, then tracks and tempo in milestone 4,
 automation lanes in milestone 3, tracks and tempo in 4, colour and render in 5 (see the [roadmap](roadmap.md)).
 
 ## Keyboard

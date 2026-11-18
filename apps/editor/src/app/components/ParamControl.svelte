@@ -2,12 +2,14 @@
   import type { ParamSpec } from "../../../../../packages/core/src/index.ts";
   /** One parameter: a slider and a number to type into. Double-click resets it to its default.
    *  `onchange(v, final)`: final is false while dragging, true when let go (or typed, or reset). */
-  let { spec, value, automated = false, laneShown = false, changed = false, baseValue, onreset, onchange, onautomate }: {
+  let { spec, value, automated = false, laneShown = false, changed = false, baseValue, onreset, onchange, onautomate, modulated = false, modsOpen = false, onmodulate }: {
     spec: ParamSpec; value: number; automated?: boolean; onchange: (v: number, final: boolean) => void;
     /** In a video built on another: this video changes the value (↺ goes back to the base's `baseValue`). */
     changed?: boolean; baseValue?: number; onreset?: () => void;
     /** Its automation lane is shown in the timeline (A is highlighted). */
     laneShown?: boolean;
+    /** Audio drives it (- modulated); its modulation rows are open (M highlighted); M: add one, or show / hide them. */
+    modulated?: boolean; modsOpen?: boolean; onmodulate?: () => void;
     /** A: start an automation lane for this parameter, or show / hide it. */
     onautomate?: () => void;
   } = $props();
@@ -25,7 +27,8 @@
 
 <div class="param" title={spec.description ?? ""}>
   <div class="row">
-    <span class="label" class:changed ondblclick={() => onchange(spec.default, true)} role="presentation">{spec.label}{#if automated}<em class="auto" title="An automation lane sets this while playing; the slider sets it only where no lane does">- automated</em>{/if}</span>
+    <span class="label" class:changed ondblclick={() => onchange(spec.default, true)} role="presentation">{spec.label}{#if automated}<em class="auto" title="An automation lane sets this while playing; the slider sets it only where no lane does">- automated</em>{/if}{#if modulated}<em class="auto" title="The music moves it (see its modulation: M)">- modulated</em>{/if}</span>
+    {#if onmodulate}<button class="auto-btn" class:on={modsOpen} title={modsOpen ? "Hide its modulation" : modulated ? "Show its modulation" : "Modulate: let a track's sound move it"} onclick={onmodulate} aria-label="Modulate {spec.label}">M</button>{/if}
     {#if onautomate}<button class="auto-btn" class:on={laneShown} title={laneShown ? "Hide its automation lane" : automated ? "Show its automation lane" : "Automate: start a lane at the playhead, with this value"} onclick={onautomate} aria-label="Automate {spec.label}">A</button>{/if}
     {#if changed && onreset}<button class="rs" title="Back to the base video's value ({baseValue === undefined ? "default" : Math.round(baseValue * 100) / 100})" onclick={onreset} aria-label="Reset {spec.label} to base">↺</button>{/if}
     {#if spec.type === "toggle"}

@@ -17,6 +17,7 @@
   import type { Doc } from "./lib/session.ts";
   import { stats } from "./lib/stats.ts";
   import { openLink, type Msg } from "./lib/link.ts";
+  import { featureAt } from "./lib/features.ts";
   import {
     barToSeconds, secondsToBar, barLabel, sectionTimes, videoFormat, getProfile, spansToSeconds, laneToSeconds, paramTargets, EFFECTS, type Project, type BreakpointInput, type Span, type Transform,
   } from "../../../../packages/core/src/index.ts";
@@ -477,6 +478,7 @@
   $effect(() => {
     (window as any).vizierEditor = {
       stats: () => ({ ...stats.summary(), ...stats.counts }),
+      featureAt: (track: string, feature: string, t: number) => featureAt(features, track, feature, t),
       get state() { return { shownLanes: [...shownLanes], selectedPoint, popped, selectedLayer, selectedSpan, status, error: loadError, playing, transportPlaying: transport.playing, loop, loopWraps, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
       timeline: () => timeline,
       clock: () => transport.clockInfo(),
@@ -542,7 +544,7 @@
 
   {#snippet layerPanel()}
     {#if videoName && selectedLayer && doc}
-      <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} {shownLanes} {edit} {seal} {family} onautomate={automate}
+      <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} {shownLanes} {edit} {seal} {family} onautomate={automate} {time} {features}
         onselect={(id) => selectLayer(id)} />
     {:else if videoName}
       <p class="hint">Select a layer to edit it. Each layer also has a row under its track in the timeline: drag there to set when it's on.</p>

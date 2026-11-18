@@ -1,15 +1,22 @@
 <script lang="ts">
   import { GENERATORS, EFFECTS, type Span, type ParamSpec, type BlendMode, type LayoutFamily, type Transform } from "../../../../../packages/core/src/index.ts";
   import ParamControl from "./ParamControl.svelte";
+  import ModRow from "./ModRow.svelte";
+  import { featureAt } from "../lib/features.ts";
+  import type { FeatureTrack } from "../../../../../packages/features/src/index.ts";
   import {
     layerOf, isInherited, splitLayerAt, patchLayer, setParam, setGenerator, setSpans, addEffect, removeEffect, moveEffect, setEffectParam,
     PANEL_LAYER_PARAMS, effectList, generatorList, placement, setLayout, hasOwnLayout,
     layerOrigin, isChanged, resetSetting, resetLayer, baseLayer, type Setting,
+    modsOf, modOrigin, addMod, setMod, removeMod, resetMod,
   } from "../lib/edits.ts";
   import type { Doc } from "../lib/session.ts";
 
   /** The selected layer's settings: what draws it, its track, parameters, effects and when it's on. */
-  let { doc, video, layerId, tracks, playheadBar, startBar = 1, automated, shownLanes = new Set<string>(), edit, seal, onselect, family = "landscape", onautomate }: {
+  let { doc, video, layerId, tracks, playheadBar, startBar = 1, automated, shownLanes = new Set<string>(), edit, seal, onselect, family = "landscape", onautomate,
+    time = 0, features = null }: {
+    /** The playhead (seconds) and the tracks' features, for the modulation meters. */
+    time?: number; features?: Record<string, FeatureTrack> | null;
     doc: Doc; video: string; layerId: string; tracks: { id: string; name: string; mix?: boolean }[];
     /** The playhead's position in bars (for "split at playhead"), or null without a tempo. */
     playheadBar: number | null;
@@ -89,8 +96,41 @@
   }
   const pct = (n: number) => String(Math.round(n * 1000) / 10);
   const fromPct = (e: Event) => { const v = Number((e.currentTarget as HTMLInputElement).value); return Number.isFinite(v) ? v / 100 : undefined; };
+  // ---- audio modulation: rows under a parameter, opened with M ----
+  let openMods = $state(new Set<string>());
+  const mixId = $derived(tracks.find((t) => t.mix)?.id ?? tracks[0]?.id ?? "mix");
+  const modsFor = (target: string) => modsOf(doc, video, target);
+  function modulate(target: string, spec: ParamSpec) {
+    const has = modsFor(target).length > 0;
+    const n = new Set(openMods);
+    if (has && n.has(target)) { n.delete(target); openMods = n; return; }
+    if (!has) addModFor(target, spec);
+    n.add(target); openMods = n;
+  }
+  /** A new modulation: the layer's own track, its smoothed loudness, a quarter of the parameter's range. */
+  function addModFor(target: string, spec: ParamSpec) {
+    const used = new Set(modsFor(target).map((m) => m.source));
+    const track = layer?.track ?? mixId;
+    const source = [`${track}.env`, ...tracks.map((t) => `${t.id}.env`)].find((x) => !used.has(x));
+    if (!source) return;
+    const amount = Math.round((spec.max - spec.min) * 0.25 * 1000) / 1000;
+    edit("add modulation", (d) => { addMod(d, video, { target, source, amount }); });
+  }
+  const levelOf = (source: string) => { const [t, f] = source.split(".") as [string, string]; return featureAt(features, t, f, time); };
   const removeSpan = (i: number) => edit("remove on-span", (d) => setSpans(d, video, layerId, spans.filter((_, j) => j !== i)));
 </script>
+
+{#snippet modRows(target: string, spec: ParamSpec)}
+  {#if openMods.has(target)}
+    {#each modsFor(target) as m (m.source)}
+      <ModRow mod={m} {spec} {tracks} level={levelOf(m.source)} origin={modOrigin(doc, video, m)}
+        onchange={(next, final) => { edit("modulation", (d) => setMod(d, video, target, m.source, next), next.source === m.source ? `mod:${target}<-${m.source}` : undefined); if (final) seal(); }}
+        onremove={() => edit("remove modulation", (d) => removeMod(d, video, target, m.source))}
+        onreset={() => edit("modulation: back to the base's", (d) => resetMod(d, video, target, m.source))} />
+    {/each}
+    <button class="addmod" onclick={() => addModFor(target, spec)} title="Another track or feature also moves it (they add up)">+ another</button>
+  {/if}
+{/snippet}
 
 {#if layer && gen}
 <div class="panel">
@@ -176,7 +216,9 @@
     <ParamControl spec={s} value={valueOf(s)} automated={automated.has(`${layerId}.${s.name}`)} laneShown={shownLanes.has(`${layerId}.${s.name}`)} onchange={(v, f) => param(s, v, f)}
       changed={ch({ param: s.name }) || (s.name === "opacity" && ch({ field: "opacity" }))} baseValue={base?.params?.[s.name] ?? (s.name === "opacity" ? base?.opacity : undefined)}
       onautomate={onautomate ? () => onautomate(`${layerId}.${s.name}`, valueOf(s)) : undefined}
-      onreset={() => edit(`reset ${s.label.toLowerCase()} to base`, (d) => { resetSetting(d, video, layerId, { param: s.name }); if (s.name === "opacity") resetSetting(d, video, layerId, { field: "opacity" }); })} />
+      onreset={() => edit(`reset ${s.label.toLowerCase()} to base`, (d) => { resetSetting(d, video, layerId, { param: s.name }); if (s.name === "opacity") resetSetting(d, video, layerId, { field: "opacity" }); })}
+      modulated={modsFor(`${layerId}.${s.name}`).length > 0} modsOpen={openMods.has(`${layerId}.${s.name}`)} onmodulate={() => modulate(`${layerId}.${s.name}`, s)} />
+    {@render modRows(`${layerId}.${s.name}`, s)}
   {/each}
 
   <h4>Effects{#if ch({ field: "effects" })}<button class="rs" title="Back to the base's effect chain" onclick={() => reset({ field: "effects" }, "effects")}>↺</button>{/if}</h4>
@@ -193,7 +235,10 @@
       </div>
       {#each def?.params ?? [] as s (s.name)}
         <ParamControl spec={s} value={e.params?.[s.name] ?? s.default} automated={automated.has(`${layerId}.${e.id ?? e.type}.${s.name}`)} laneShown={shownLanes.has(`${layerId}.${e.id ?? e.type}.${s.name}`)} onchange={(v, f) => effectParam(i, s, v, f)}
-          onautomate={onautomate ? () => onautomate(`${layerId}.${e.id ?? e.type}.${s.name}`, e.params?.[s.name] ?? s.default) : undefined} />
+          onautomate={onautomate ? () => onautomate(`${layerId}.${e.id ?? e.type}.${s.name}`, e.params?.[s.name] ?? s.default) : undefined}
+          modulated={modsFor(`${layerId}.${e.id ?? e.type}.${s.name}`).length > 0} modsOpen={openMods.has(`${layerId}.${e.id ?? e.type}.${s.name}`)}
+          onmodulate={() => modulate(`${layerId}.${e.id ?? e.type}.${s.name}`, s)} />
+        {@render modRows(`${layerId}.${e.id ?? e.type}.${s.name}`, s)}
       {/each}
     </div>
   {/each}
@@ -235,4 +280,5 @@
   .fxhead { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-weight: 500; }
   .fxbtns button { padding: 0 5px; font-size: 11px; line-height: 16px; }
   .add { width: 100%; color: var(--dim); }
+  .addmod { margin: 0 0 8px 10px; font-size: 10px; padding: 0 6px; color: var(--dim); }
 </style>

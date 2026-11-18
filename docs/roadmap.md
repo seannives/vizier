@@ -22,10 +22,11 @@ Editor milestones:
         Open base; Video section (name, format, base, range); New / Duplicate / Detach video
 - [x] Preview in its own window: Pop out moves the preview to an output window (follows the editor, layout
       handles, keys go to the editor, F for full screen); the editor splits its panels and the timeline grows
-- [ ] 3. In two parts:
+- [x] 3. In two parts:
   - [x] 3a. Automation lanes under their layer (unfold ▸): add/drag/delete breakpoints, curves, beat snapping;
         A in the panel starts a lane; inherited lanes (base / changed / ↺)
-  - [ ] 3b. Audio-modulation editor (track + feature + amount + curve) in the layer panel
+  - [x] 3b. Audio modulation in the layer panel: M per parameter; track, feature, amount, curve; live meter;
+        + another; inherited (base / changed / ↺)
 - [ ] **Bug sweep** (after 3b, before 4: milestone 4 changes tracks and tempo, which everything in bars rests on)
   - [ ] Independent code review by a fresh reviewer, focused on the seams: seconds vs bars, pixels vs fractions
         of the frame, preview vs export, a video vs its base, every conversion between units
@@ -38,6 +39,7 @@ Editor milestones:
 - [ ] 4. Tracks like Ableton's (create, name, drop/replace/remove a stem; warn on length or alignment mismatch);
       tempo panel (typed BPM with detected suggestion, downbeat, drag the grid, audible click)
 - [ ] 5. Colour pickers, palette panel and colour lanes; Render button with progress; list of renders
+- [ ] Modulation presets: one-click combinations such as "pulse with the kick" or "colour follows the filter"
 - [ ] Later: pencil drawing of automation; finer snapping; record control moves (mouse or MIDI) as automation
 
 ## Phase 4: Platform polish (then: Reels/Shorts and the YouTube video for the maleficus)

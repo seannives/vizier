@@ -3,7 +3,8 @@ import { Session, type Doc } from "../src/app/lib/session.ts";
 import {
   addLayer, removeLayer, moveLayer, duplicateLayer, setParam, setLayout, placement, hasOwnLayout, patchLayer,
   layerOrigin, isChanged, baseLayer, resetSetting, resetLayer, removedLayers, restoreLayer, newVideo, detachVideo, setVideo,
-  laneOf, laneChanged, laneInherited, setLane, addLane, removeLane, resetLane, lanesOfLayer, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
+  laneOf, laneChanged, laneInherited, setLane, addLane, removeLane, resetLane, lanesOfLayer,
+  modsOf, modOrigin, addMod, setMod, removeMod, resetMod, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
 } from "../src/app/lib/edits.ts";
 import { validateProject, buildProject, resolveVideo } from "../../../packages/core/src/index.ts";
 
@@ -265,5 +266,38 @@ describe("automation lanes", () => {
     expect(laneOf(d, "full", "ring.radius")).toBeDefined();
     resetLane(d, "reel", "ring.radius");
     expect(laneOf(d, "reel", "ring.radius")).toBeDefined();
+  });
+});
+
+describe("audio modulation", () => {
+  it("adds, changes (including its source) and removes a modulation", () => {
+    const d = doc();
+    expect(addMod(d, "full", { target: "ring.radius", source: "bass.env", amount: 0.5 })).toBe(true);
+    expect(addMod(d, "full", { target: "ring.radius", source: "bass.env", amount: 0.9 })).toBe(false); // that source already drives it
+    setMod(d, "full", "ring.radius", "bass.env", { target: "ring.radius", source: "bass.env", amount: 0.7, curve: "square" });
+    expect(modsOf(d, "full", "ring.radius")).toEqual([{ target: "ring.radius", source: "bass.env", amount: 0.7, curve: "square" }]);
+    setMod(d, "full", "ring.radius", "bass.env", { target: "ring.radius", source: "bass.low", amount: 0.7 });
+    expect(modsOf(d, "full", "ring.radius").map((m) => m.source)).toEqual(["bass.low"]);
+    removeMod(d, "full", "ring.radius", "bass.low");
+    expect(modsOf(d, "full", "ring.radius")).toEqual([]);
+    expect(valid(d, "full")).toEqual([]);
+  });
+  it("in a reel: inherited (base), changed here (↺ back), removed here only", () => {
+    const d = doc(); // the full video modulates ring.lineWidth from bass.env
+    expect(modOrigin(d, "reel", { target: "ring.lineWidth", source: "bass.env" })).toBe("base");
+    setMod(d, "reel", "ring.lineWidth", "bass.env", { target: "ring.lineWidth", source: "bass.env", amount: 3 });
+    expect(modOrigin(d, "reel", { target: "ring.lineWidth", source: "bass.env" })).toBe("changed");
+    expect(modsOf(d, "full", "ring.lineWidth")[0]!.amount).toBe(1); // base untouched
+    resetMod(d, "reel", "ring.lineWidth", "bass.env");
+    expect(modsOf(d, "reel", "ring.lineWidth")[0]!.amount).toBe(1);
+    removeMod(d, "reel", "ring.lineWidth", "bass.env");
+    expect(modsOf(d, "reel", "ring.lineWidth")).toEqual([]);
+    expect(modsOf(d, "full", "ring.lineWidth").length).toBe(1);
+    // switching an inherited modulation's source: the base's is cancelled here, the new one is the reel's own
+    resetMod(d, "reel", "ring.lineWidth", "bass.env");
+    setMod(d, "reel", "ring.lineWidth", "bass.env", { target: "ring.lineWidth", source: "mix.high", amount: 1 });
+    expect(modsOf(d, "reel", "ring.lineWidth").map((m) => m.source)).toEqual(["mix.high"]);
+    expect(modOrigin(d, "reel", { target: "ring.lineWidth", source: "mix.high" })).toBe("own");
+    expect(valid(d, "reel")).toEqual([]);
   });
 });

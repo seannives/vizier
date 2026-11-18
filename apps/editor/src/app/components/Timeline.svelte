@@ -526,7 +526,7 @@
   .h.layer { height: 18px; padding-left: 18px; font-size: 11px; text-transform: none; letter-spacing: 0; color: var(--dim); cursor: default;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 17px; }
   .h.layer.sel { color: var(--accent); background: var(--bg3); font-weight: 600; }
-  .fold { background: none; border: none; padding: 0; width: 15px; margin-left: -16px; color: var(--text); font-size: 13px; line-height: 17px; text-align: center; }
+  .fold { background: none; border: none; padding: 0; width: 18px; height: 18px; margin: -1px 0 0 -18px; vertical-align: top; color: var(--text); font-size: 17px; line-height: 17px; text-align: center; }
   .fold:hover, .fold.open { color: var(--accent); }
   .h.lane { display: block; padding: 3px 6px 3px 18px; text-transform: none; letter-spacing: 0; font-size: 11px; color: var(--dim); background: var(--bg1); }
   .lt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }

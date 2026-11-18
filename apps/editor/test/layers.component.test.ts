@@ -4,7 +4,7 @@ import ParamControl from "../src/app/components/ParamControl.svelte";
 import LayerList from "../src/app/components/LayerList.svelte";
 import LayerPanel from "../src/app/components/LayerPanel.svelte";
 import { Session, type Doc } from "../src/app/lib/session.ts";
-import { layersOf, layerOf } from "../src/app/lib/edits.ts";
+import { layersOf, layerOf, modsOf, addMod } from "../src/app/lib/edits.ts";
 import { stubDom } from "./setup-dom.ts";
 
 beforeAll(stubDom);
@@ -183,3 +183,44 @@ describe("LayerList: rename and duplicate", () => {
     expect(copy.z).toBeLessThan(layerOf(s.doc, "full", "ring")!.z);
   });
 });
+
+describe("audio modulation in the layer panel", () => {
+  const feats = { bass: { version: 1 as const, fps: 10, frameCount: 100, bins: 1, scalars: { env: Array(100).fill(0.5), low: Array(100).fill(0.8) } as any, spectrum: [] } };
+  const base = { video: "full", tracks: doc().song.tracks, startBar: 1, automated: new Set<string>(), onselect: () => {} };
+  const props = (s: Session, edit: any, seal: any, time = 2) => ({ ...base, doc: s.doc, layerId: "ring", playheadBar: 1, edit, seal, time, features: feats });
+  it("M adds a modulation from the layer's track (smoothed loudness) and shows it, with a live meter", async () => {
+    const { s, edit, seal } = setup();
+    const r = render(LayerPanel, props(s, edit, seal));
+    await fireEvent.click(r.getByLabelText("Modulate Radius"));
+    expect(modsOf(s.doc, "full", "ring.radius")).toEqual([{ target: "ring.radius", source: "bass.env", amount: 0.45 }]);
+    await r.rerender(props(s, edit, seal));
+    const row = r.container.querySelector('[data-mod="bass.env"]')!;
+    expect(row.querySelector(".fill")!.getAttribute("data-level")).toBe("0.500");
+    expect(row.querySelector(".adds")!.textContent).toBe("+0.23"); // 0.45 × 0.5
+    expect(r.getByText("- modulated")).toBeTruthy();
+    expect(r.getByLabelText("Modulate Radius").classList.contains("on")).toBe(true);
+  });
+  it("changes the feature, amount and curve; ✕ removes it; M hides and shows the rows", async () => {
+    const { s, edit, seal } = setup();
+    s.apply("x", (d) => addMod(d, "full", { target: "ring.radius", source: "bass.env", amount: 0.45 }));
+    const r = render(LayerPanel, props(s, edit, seal));
+    await fireEvent.click(r.getByLabelText("Modulate Radius")); // already modulated: shows its rows
+    const feature = r.getByLabelText("Modulation feature") as HTMLSelectElement;
+    feature.value = "low"; await fireEvent.change(feature);
+    expect(modsOf(s.doc, "full", "ring.radius")[0]!.source).toBe("bass.low");
+    await r.rerender(props(s, edit, seal));
+    const amount = r.getByLabelText("Modulation amount (number)") as HTMLInputElement;
+    amount.value = "-0.6"; await fireEvent.change(amount);
+    await r.rerender(props(s, edit, seal));
+    const curve = r.getByLabelText("Modulation curve") as HTMLSelectElement;
+    curve.value = "square"; await fireEvent.change(curve);
+    expect(modsOf(s.doc, "full", "ring.radius")).toEqual([{ target: "ring.radius", source: "bass.low", amount: -0.6, curve: "square" }]);
+    await r.rerender(props(s, edit, seal));
+    await fireEvent.click(r.getByLabelText("Modulate Radius")); // hides
+    expect(r.container.querySelector("[data-mod]")).toBeNull();
+    await fireEvent.click(r.getByLabelText("Modulate Radius")); // shows again
+    await fireEvent.click(r.getByLabelText("Remove modulation"));
+    expect(modsOf(s.doc, "full", "ring.radius")).toEqual([]);
+  });
+});
+

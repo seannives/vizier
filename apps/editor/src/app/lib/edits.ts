@@ -4,7 +4,7 @@
  * (only what changed) to this video, and the base is never touched.
  */
 import {
-  resolveVideo, GENERATORS, EFFECTS, LAYER_PARAMS, type VideoFile, type VideoLayer, type LayerDef, type EffectRef, type Span, splitSpans, type LaneInput, type BreakpointInput, layoutFor, type LayoutFamily, type Transform,
+  resolveVideo, GENERATORS, EFFECTS, LAYER_PARAMS, type VideoFile, type VideoLayer, type LayerDef, type EffectRef, type Span, splitSpans, type LaneInput, type BreakpointInput, type Modulation, layoutFor, type LayoutFamily, type Transform,
 } from "../../../../../packages/core/src/index.ts";
 import type { Doc } from "./session.ts";
 
@@ -420,4 +420,56 @@ export function resetLane(doc: Doc, video: string, target: string): void {
 /** The lanes aimed at a layer (its own parameters and its effects'), in a stable order. */
 export function lanesOfLayer(doc: Doc, video: string, layerId: string): LaneInput[] {
   return (resolved(doc, video).automation ?? []).filter((a) => a.points.length > 0 && a.target.startsWith(`${layerId}.`) && !a.points.some((p) => p.c !== undefined));
+}
+
+// ---- audio modulation: target += amount × curve(feature of a track) ----
+
+const modKey = (m: { target: string; source: string }) => `${m.target}<-${m.source}`;
+/** The modulations the video applies to a target (inherited or its own). */
+export function modsOf(doc: Doc, video: string, target: string): Modulation[] {
+  return (resolved(doc, video).modulations ?? []).filter((m) => m.target === target && !m.remove);
+}
+/** How a modulation relates to the base: added here, inherited unchanged, or changed here. */
+export function modOrigin(doc: Doc, video: string, m: { target: string; source: string }): "own" | "base" | "changed" {
+  const v = doc.videos[video]!;
+  const inBase = !!v.base && modsOf(doc, v.base, m.target).some((b) => b.source === m.source);
+  if (!inBase) return "own";
+  return v.modulations?.some((o) => modKey(o) === modKey(m) && !o.remove) ? "changed" : "base";
+}
+/** Add a modulation (a track's feature driving the target). Returns false if that source already drives it. */
+export function addMod(doc: Doc, video: string, m: Modulation): boolean {
+  if (modsOf(doc, video, m.target).some((o) => o.source === m.source)) return false;
+  const v = doc.videos[video]!;
+  // a base modulation this video removed: replace the removal
+  v.modulations = (v.modulations ?? []).filter((o) => modKey(o) !== modKey(m));
+  v.modulations.push(clean(m));
+  return true;
+}
+const clean = (m: Modulation): Modulation => ({ target: m.target, source: m.source, amount: m.amount, ...(m.curve && m.curve !== "linear" ? { curve: m.curve } : {}) });
+/** Change a modulation (identified by its current source). Changing the source replaces it with a new one. */
+export function setMod(doc: Doc, video: string, target: string, source: string, next: Modulation): void {
+  const v = doc.videos[video]!;
+  if (next.source !== source) {
+    if (modsOf(doc, video, target).some((o) => o.source === next.source)) return; // that source already drives it
+    removeMod(doc, video, target, source);
+    addMod(doc, video, next);
+    return;
+  }
+  const list = (v.modulations ??= []);
+  const i = list.findIndex((o) => o.target === target && o.source === source);
+  if (i >= 0) list[i] = clean(next); else list.push(clean(next));
+}
+/** Remove a modulation; in a video with a base that has it, a `remove` entry cancels it here. */
+export function removeMod(doc: Doc, video: string, target: string, source: string): void {
+  const v = doc.videos[video]!;
+  v.modulations = (v.modulations ?? []).filter((o) => !(o.target === target && o.source === source));
+  if (v.base && modsOf(doc, v.base, target).some((b) => b.source === source)) v.modulations.push({ target, source, amount: 0, remove: true });
+  if (!v.modulations.length) delete v.modulations;
+}
+/** Back to the base's version of a modulation (drop this video's change or removal). */
+export function resetMod(doc: Doc, video: string, target: string, source: string): void {
+  const v = doc.videos[video]!;
+  if (!v.modulations) return;
+  v.modulations = v.modulations.filter((o) => !(o.target === target && o.source === source));
+  if (!v.modulations.length) delete v.modulations;
 }

@@ -582,6 +582,24 @@ run("editor (headless Chrome)", () => {
     }
   }, 90_000);
 
+  it("audio modulation: M adds one; its meter follows the music while playing; it's saved in the video", async () => {
+    const E = <A,>(f: (a: A) => unknown, a?: A) => page.evaluate(f as any, a);
+    const startLabel = (await state()).undoLabel;
+    try {
+      await page.click('[data-layer="title"]');
+      const m = page.locator('button[aria-label="Modulate Blur"]');
+      await m.scrollIntoViewIfNeeded(); await m.click();
+      expect(await E(() => (window as any).vizierEditor.session().doc.videos.full.modulations.find((x: any) => x.target === "title.blur"))).toMatchObject({ source: "mix.env" });
+      await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+      await page.keyboard.press("Space");
+      await page.waitForFunction(() => Number(document.querySelector('[data-mod="mix.env"] .fill')?.getAttribute("data-level")) > 0.1, null, { timeout: 20_000 });
+      await page.keyboard.press("Space");
+    } finally {
+      if ((await state()).playing) await page.keyboard.press("Space");
+      for (let i = 0; i < 10 && (await state()).undoLabel !== startLabel; i++) await E(() => (window as any).vizierEditor.session().undo());
+    }
+  }, 60_000);
+
   it("switches videos and shows the reel in its own format", async () => {
     await page.selectOption("header select", "reel");
     await page.waitForFunction(() => (window as any).vizierEditor.state.videoName === "reel");
