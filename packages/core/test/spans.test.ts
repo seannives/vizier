@@ -46,3 +46,41 @@ describe("layer on-spans", () => {
     expect(validateProject(p).join()).toMatch(/ends before it starts/);
   });
 });
+
+describe("a video built on another: settings that no longer fit drop out", () => {
+  const L = { landscape: { x: 0.5, y: 0.5, w: 1, h: 1 } };
+  const base = () => ({ version: 2 as const, layers: [
+    { id: "ring", generator: "acidRing", z: 0, layout: L, params: { radius: 0.5 } },
+    { id: "grid", generator: "pulseGrid", z: 1, layout: L },
+  ], automation: [{ target: "grid.density", points: [{ bar: 1, v: 10 }] }], modulations: [{ target: "grid.brightness", source: "mix.env", amount: 1 }] });
+  it("a layer removed in the reel takes the base's lanes and modulations with it, even ones added later", () => {
+    const m = mergeVideos(base(), { version: 2, layers: [{ id: "grid", remove: true }] });
+    expect(m.layers!.map((l) => l.id)).toEqual(["ring"]);
+    expect(m.automation).toEqual([]);
+    expect(m.modulations).toEqual([]);
+  });
+  it("the reel's changes to a layer the base has since deleted are ignored, with their lanes and modulations", () => {
+    const b = base(); b.layers = b.layers.filter((l) => l.id !== "grid");
+    const m = mergeVideos(b, { version: 2, layers: [{ id: "grid", params: { density: 30 } }],
+      automation: [{ target: "grid.wave", points: [{ bar: 1, v: 1 }] }], modulations: [{ target: "grid.density", source: "mix.low", amount: 5 }] });
+    expect(m.layers!.map((l) => l.id)).toEqual(["ring"]);
+    expect(m.automation).toEqual([]);
+    expect(m.modulations).toEqual([]);
+  });
+  it("when the base changes a layer's generator, the reel's settings for the old one drop out (and the base's file is untouched)", () => {
+    const b = base(); b.layers[0]!.generator = "pulseGrid";
+    const before = JSON.stringify(b);
+    const m = mergeVideos(b, { version: 2, layers: [{ id: "ring", params: { spike: 0.9, density: 20 } }],
+      automation: [{ target: "ring.spin", points: [{ bar: 1, v: 1 }] }, { target: "post.grain", points: [{ bar: 1, v: 0 }] }],
+      modulations: [{ target: "ring.echoes", source: "mix.env", amount: 3 }, { target: "ring.wave", source: "mix.env", amount: 1 }] });
+    expect(m.layers![0]!.params).toEqual({ density: 20 });             // radius and spike aren't pulse grid parameters
+    expect(m.automation!.map((a) => a.target)).toEqual(["grid.density", "post.grain"]);
+    expect(m.modulations!.map((x) => x.target)).toEqual(["grid.brightness", "ring.wave"]);
+    expect(JSON.stringify(b)).toBe(before);
+  });
+  it("a video on its own still reports such settings as errors (typos are caught)", () => {
+    const p: Project = { version: 2, title: "t", seed: 1, tracks: { mix: "m" }, mix: "mix", palette: {},
+      layers: [{ id: "ring", generator: "acidRing", z: 0, layout: L, params: { radiuss: 1 } as any }], automation: [{ target: "rign.radius", points: [{ t: 0, v: 1 }] }] };
+    expect(validateProject(p).length).toBe(2);
+  });
+});

@@ -1,10 +1,10 @@
 // Renders real frames in headless Chrome (software GL). Skipped when no Chrome is available.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterAll } from "vitest";
 import { createHash } from "node:crypto";
 import { existsSync } from "node:fs";
 import { analyzeSignal } from "../../../packages/features/src/index.ts";
 import type { Project } from "../../../packages/core/src/index.ts";
-import { openRenderer } from "../src/browser.ts";
+import { openRenderer, closeSharedBrowsers } from "../src/browser.ts";
 
 // Find Chrome: $CHROME_PATH, else the standard install location on macOS or Linux.
 const candidates = [
@@ -40,10 +40,11 @@ const fxProject: Project = {
 
 // Software rendering is slow and these tests run alongside the editor's browser tests, so they draw at half size
 // in each direction (a quarter of the pixels) unless the size is what's being tested, and allow plenty of time.
-const SMALL = { gpu: false, scale: 0.5 };
+const SMALL = { gpu: false, scale: 0.5, shared: true }; // one Chrome for the file, a tab per renderer
 const W = 480, H = 270; // the draft profile (960×540) at half size
 
 run("renderer in headless Chrome", () => {
+  afterAll(closeSharedBrowsers);
   it("draws non-blank frames, and the same frame twice is byte-identical", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
     const r = await openRenderer(project, "draft", { mix: track, bass: track }, SMALL);
@@ -159,10 +160,10 @@ run("renderer in headless Chrome", () => {
       return sum / ((W / 2) * (H / 2) * 3);
     };
     const tracks = { mix: track, bass: track };
-    const full = await openRenderer(withGlow(20), "draft", tracks, { gpu: false });
-    const half = await openRenderer(withGlow(20), "draft", tracks, { gpu: false, scale: 0.5 });
+    const full = await openRenderer(withGlow(20), "draft", tracks, { gpu: false, shared: true });
+    const half = await openRenderer(withGlow(20), "draft", tracks, { gpu: false, scale: 0.5, shared: true });
     // what the half-size preview showed before glow sizes were scaled: twice the radius, relative to the picture
-    const unscaled = await openRenderer(withGlow(40), "draft", tracks, { gpu: false, scale: 0.5 });
+    const unscaled = await openRenderer(withGlow(40), "draft", tracks, { gpu: false, scale: 0.5, shared: true });
     try {
       const f = await full.frame(30);
       const scaled = diff(f, await half.frame(30)), before = diff(f, await unscaled.frame(30));

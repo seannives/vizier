@@ -15,7 +15,9 @@ export default defineGenerator({
   ],
   draw(g) {
     const { ctx, w, h } = g;
-    const step = Math.max(8, Math.min(w, h) / g.p("density"));
+    // spacing as a share of the layer, never in fixed pixels (a smaller preview would show fewer dots); at most
+    // 200 dots across, however large a typed or modulated density gets
+    const step = Math.min(w, h) / Math.min(200, Math.max(1, g.p("density")));
     const low = g.f("low"), env = g.f("env");
     let flash = 0;
     for (let k = 0; k < 6; k++) if (g.f("onset", k) > 0) { flash = 1 - k / 6; break; }

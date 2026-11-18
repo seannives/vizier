@@ -10,6 +10,9 @@
 import type { Grid } from "./grid.ts";
 import type { LaneInput } from "./automation.ts";
 import type { LayerDef, Modulation, Project, Section } from "./project.ts";
+import { GENERATORS } from "./generators/index.ts";
+import { EFFECTS } from "./effects/index.ts";
+import { LAYER_PARAMS } from "./plugins.ts";
 
 export interface TrackDef {
   id: string;        // fixed: referenced by layers and modulations; never changes when renamed
@@ -55,9 +58,13 @@ export function mergeVideos(base: VideoFile, child: VideoFile): VideoFile {
   if (child.format || child.profiles) { out.format = child.format ?? child.profiles?.[0]; delete out.profiles; }
   // layers by id: deep-merge params and layout; effects replace; `remove` drops
   const layers = new Map<string, VideoLayer>((base.layers ?? []).map((l) => [l.id, l]));
+  // Layers that are gone: removed here, or changed here but no longer in the base (the base deleted them). Their
+  // automation and modulations go with them, whichever video they come from.
+  const gone = new Set<string>();
   for (const l of child.layers ?? []) {
-    if (l.remove) { layers.delete(l.id); continue; }
+    if (l.remove) { if (layers.delete(l.id)) gone.add(l.id); continue; }
     const prev = layers.get(l.id);
+    if (!prev && l.generator === undefined) { gone.add(l.id); continue; } // a change to a layer the base no longer has
     if (!prev) { layers.set(l.id, l); continue; }
     const merged: VideoLayer = { ...prev, ...l };
     if (isObj(prev.params) || isObj(l.params)) merged.params = { ...prev.params, ...l.params };
@@ -67,13 +74,49 @@ export function mergeVideos(base: VideoFile, child: VideoFile): VideoFile {
   out.layers = [...layers.values()];
   const lanes = new Map<string, LaneInput>((base.automation ?? []).map((a) => [a.target, a]));
   for (const a of child.automation ?? []) lanes.set(a.target, a);
-  out.automation = [...lanes.values()].filter((a) => a.points.length > 0); // an empty lane removes the base's
+  const ofGone = (target: string) => gone.has(target.split(".")[0]!);
+  out.automation = [...lanes.values()].filter((a) => a.points.length > 0 && !ofGone(a.target)); // an empty lane removes the base's
   const key = (m: Modulation) => `${m.target}<-${m.source}`;
   const mods = new Map((base.modulations ?? []).map((m) => [key(m), m]));
   for (const m of child.modulations ?? []) { if (m.remove) mods.delete(key(m)); else mods.set(key(m), m); }
-  out.modulations = [...mods.values()];
+  out.modulations = [...mods.values()].filter((m) => !ofGone(m.target));
   if (base.palette || child.palette) out.palette = { ...base.palette, ...child.palette };
-  return out;
+  return pruneStale(out);
+}
+
+/**
+ * After merging a video with its base: drop settings that no longer fit, because one of the two files changed a
+ * layer after the other set them: a reel's modulation of a parameter the base's new generator doesn't have, or a
+ * reel's lane for a layer the base has since deleted. Only for videos built on another: a video on its own still reports such
+ * settings as errors, so typos are caught.
+ */
+function pruneStale(v: VideoFile): VideoFile {
+  const known = new Map<string, Set<string>>(); // layer id → its targets: "param", "effect.param", colour names
+  // (copies: the layers may be the base file's own objects, which merging must never change)
+  v.layers = (v.layers ?? []).map((l) => {
+    const gen = l.generator ? GENERATORS[l.generator] : undefined;
+    if (!gen) return l; // unknown generator: validation reports it
+    const names = new Set([...LAYER_PARAMS, ...gen.params].map((p) => p.name));
+    const colors = new Set((gen.colors ?? []).map((c) => c.name));
+    const out = { ...l };
+    if (l.params) out.params = Object.fromEntries(Object.entries(l.params).filter(([k]) => names.has(k)));
+    if (l.colors) out.colors = Object.fromEntries(Object.entries(l.colors).filter(([k]) => colors.has(k)));
+    const targets = new Set([...names, ...colors]);
+    for (const e of l.effects ?? []) for (const p of EFFECTS[e.type]?.params ?? []) targets.add(`${e.id ?? e.type}.${p.name}`);
+    known.set(l.id, targets);
+    return out;
+  });
+  const ids = new Set((v.layers ?? []).map((l) => l.id));
+  const fits = (target: string) => {
+    const [layer, ...rest] = target.split(".");
+    if (layer === "palette" || layer === "post") return true;
+    if (!ids.has(layer!)) return false; // a layer the base no longer has
+    const t = known.get(layer!);
+    return !t || t.has(rest.join(".")); // (a layer with an unknown generator is left to validation)
+  };
+  if (v.automation) v.automation = v.automation.filter((a) => fits(a.target));
+  if (v.modulations) v.modulations = v.modulations.filter((m) => fits(m.target));
+  return v;
 }
 
 /**

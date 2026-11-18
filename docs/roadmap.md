@@ -30,9 +30,13 @@ Editor milestones:
 - [ ] **Bug sweep** (after 3b, before 4: milestone 4 changes tracks and tempo, which everything in bars rests on)
   - [ ] Independent code review by a fresh reviewer, focused on the seams: seconds vs bars, pixels vs fractions
         of the frame, preview vs export, a video vs its base, every conversion between units
-  - [ ] Rule-based tests over random sequences of edits: every edit leaves the project valid; undo then redo
-        restores it exactly; saving and reloading changes nothing; editing a reel never changes its base
-  - [ ] Preview vs export for every generator and effect: the same moments rendered both ways and compared
+  - [x] Rule-based tests over random sequences of edits (apps/editor/test/rules.test.ts): every edit leaves
+        every video valid; undo then redo restores it exactly; saving and reloading changes nothing; only the
+        edited video's file changes. Found: a reel broke when its base later added lanes for a layer the reel
+        removed, deleted a layer the reel changed, or changed a layer's generator (fixed in how videos combine)
+  - [x] Preview vs export for every generator and effect (apps/offline/test/preview-match.test.ts). Found: the
+        pulse grid spaced dots at least 8 pixels apart, so a smaller preview showed fewer dots (fixed); the flow
+        field's thin lines broke up at small sizes (now drawn a pixel wide and dimmed where they'd break up)
   - [ ] A checklist session on the Mac with the maleficus (a reel, the pop-out on a second screen, shortcuts,
         speakers, GPU), fixing what turns up
   - Then a lighter sweep every couple of milestones (mainly the rule-based tests)

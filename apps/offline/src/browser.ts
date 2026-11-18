@@ -1,4 +1,4 @@
-import { chromium } from "playwright-core";
+import { chromium, type Browser } from "playwright-core";
 import { build } from "esbuild";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
@@ -6,6 +6,28 @@ import type { FeatureTrack } from "../../../packages/features/src/index.ts";
 import type { Project } from "../../../packages/core/src/index.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
+
+function launch(gpu: boolean): Promise<Browser> {
+  const executablePath = process.env.CHROME_PATH;
+  return chromium.launch({
+    headless: true,
+    ...(executablePath ? { executablePath } : { channel: "chrome" }),
+    args: gpu ? ["--enable-gpu", "--ignore-gpu-blocklist"] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
+  });
+}
+/** For tests: one Chrome per process (and GPU setting), each renderer in its own tab; `shared: true` uses it, and
+ *  closing the renderer closes just its tab. Call closeSharedBrowsers() when done. */
+const shared = new Map<boolean, Promise<Browser>>();
+function sharedBrowser(gpu: boolean): Promise<Browser> {
+  let b = shared.get(gpu);
+  if (!b) { b = launch(gpu); shared.set(gpu, b); }
+  return b;
+}
+export async function closeSharedBrowsers(): Promise<void> {
+  const all = [...shared.values()];
+  shared.clear();
+  await Promise.all(all.map(async (b) => (await b).close()));
+}
 
 /** Bundle the renderer for the browser (esbuild resolves @vizier/* through tsconfig paths); once per process. */
 let bundled: Promise<string> | null = null;
@@ -32,13 +54,8 @@ export interface RendererHandle {
  * Headless Chrome running the same renderer the live app uses.
  * Default: software GL (SwiftShader), which works anywhere, including CI. --gpu uses the machine's GPU (on a Mac: Metal via ANGLE).
  */
-export async function openRenderer(project: Project, profileId: string, tracks: Record<string, FeatureTrack>, opts: { gpu: boolean; scale?: number }): Promise<RendererHandle> {
-  const executablePath = process.env.CHROME_PATH;
-  const browser = await chromium.launch({
-    headless: true,
-    ...(executablePath ? { executablePath } : { channel: "chrome" }),
-    args: opts.gpu ? ["--enable-gpu", "--ignore-gpu-blocklist"] : ["--use-angle=swiftshader", "--enable-unsafe-swiftshader"],
-  });
+export async function openRenderer(project: Project, profileId: string, tracks: Record<string, FeatureTrack>, opts: { gpu: boolean; scale?: number; shared?: boolean }): Promise<RendererHandle> {
+  const browser = opts.shared ? await sharedBrowser(opts.gpu) : await launch(opts.gpu);
   const page = await browser.newPage();
   // Served from a localhost URL (intercepted, no real server) because WebCodecs needs a secure context.
   page.on("pageerror", (e) => process.stderr.write(`[page] ${e.message}\n`));
@@ -62,6 +79,6 @@ export async function openRenderer(project: Project, profileId: string, tracks: 
     encodeFinish: async () => Buffer.from(await page.evaluate(() => (window as any).vizier.encodeFinish()), "base64"),
     update: (p) => page.evaluate((x) => (window as any).vizier.update(x), p),
     bench: (start, count) => page.evaluate(([s, c]) => (window as any).vizier.bench(s, c), [start, count] as const),
-    close: () => browser.close(),
+    close: () => (opts.shared ? page.close() : browser.close()),
   };
 }

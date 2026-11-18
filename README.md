@@ -22,6 +22,7 @@ Needs Node 22+, pnpm, ffmpeg, and Google Chrome. On a Mac, follow [`docs/setup-m
 pnpm install
 pnpm test                                              # all tests (editor components in jsdom, the editor in Chrome)
 pnpm test:quick                                        # everything except the Chrome-driven tests: a few seconds
+VIZIER_FUZZ_SEED=random pnpm test                      # the rule-based tests try new random edit sequences
 pnpm typecheck                                         # TypeScript, including the editor's Svelte files
 vizier demo                                            # generates the demo project's audio (see below)
 vizier render projects/demo --video full --gpu         # → projects/demo/output/full-youtube.mp4

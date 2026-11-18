@@ -110,6 +110,12 @@ A video with `base` starts from that video and changes only what it lists:
 - a modulation replaces the base's one with the same target and source (`"remove": true` drops it);
 - everything else (`profiles`, `range`, `seed`, `palette`) overrides.
 
+Settings that no longer fit drop out when the two are combined, so editing one video can't break the other:
+a layer the video removes takes its inherited lanes and modulations with it (even ones the base adds later);
+changes to a layer the base has since deleted are ignored; and parameters, lanes and modulations for a
+generator or effect the layer no longer has are skipped. (A video on its own still reports such settings as
+errors, so typos are caught.)
+
 Because automation is placed in song bars, a Reel of bars 21–31 shows exactly what the full video shows there,
 plus its own changes. Improve the full video and every Reel built on it follows.
 

@@ -27,7 +27,11 @@ export default defineGenerator({
     float n = fbm(p + vec2(0.0, t) + u_warp * (1.0 + u_kick * 1.5 * u_hit) * q);
     float d = abs(fract(n * u_density) - 0.5);
     float w = u_thickness * (0.6 + 0.8 * u_high);
-    float line = 1.0 - smoothstep(w * 0.5, w, d);
+    // Lines look the same at any size: at a small size a thin line fades instead of breaking up.
+    // Only where a line is thinner than about a pixel (the soft edge narrower than the pattern changes across a
+    // pixel) is it widened to a pixel and dimmed to match; elsewhere it's exactly as before.
+    float aa = fwidth(n * u_density);
+    float line = (1.0 - smoothstep(w * 0.5, max(w, w * 0.5 + aa), d)) * clamp(w / max(aa, 1e-4), 0.0, 1.0);
     float a = line * clamp((0.12 + 0.9 * u_env + 0.9 * u_kick * u_hit) * u_brightness, 0.0, 1.0);
     vec3 col = mix(u_line, u_highlight, clamp(u_acid * (0.5 + u_centroid), 0.0, 1.0));
     return vec4(col * a, a);
