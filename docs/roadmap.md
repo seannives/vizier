@@ -22,8 +22,10 @@ Editor milestones:
         Open base; Video section (name, format, base, range); New / Duplicate / Detach video
 - [x] Preview in its own window: Pop out moves the preview to an output window (follows the editor, layout
       handles, keys go to the editor, F for full screen); the editor splits its panels and the timeline grows
-- [ ] 3. Automation lanes: one per parameter, add/drag/delete breakpoints, curve types, beat snapping;
-      audio-modulation editor (track + feature + amount)
+- [ ] 3. In two parts:
+  - [x] 3a. Automation lanes under their layer (unfold ▸): add/drag/delete breakpoints, curves, beat snapping;
+        A in the panel starts a lane; inherited lanes (base / changed / ↺)
+  - [ ] 3b. Audio-modulation editor (track + feature + amount + curve) in the layer panel
 - [ ] 4. Tracks like Ableton's (create, name, drop/replace/remove a stem; warn on length or alignment mismatch);
       tempo panel (typed BPM with detected suggestion, downbeat, drag the grid, audible click)
 - [ ] 5. Colour pickers, palette panel and colour lanes; Render button with progress; list of renders

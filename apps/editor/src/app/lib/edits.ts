@@ -4,7 +4,7 @@
  * (only what changed) to this video, and the base is never touched.
  */
 import {
-  resolveVideo, GENERATORS, EFFECTS, LAYER_PARAMS, type VideoFile, type VideoLayer, type LayerDef, type EffectRef, type Span, splitSpans, layoutFor, type LayoutFamily, type Transform,
+  resolveVideo, GENERATORS, EFFECTS, LAYER_PARAMS, type VideoFile, type VideoLayer, type LayerDef, type EffectRef, type Span, splitSpans, type LaneInput, type BreakpointInput, layoutFor, type LayoutFamily, type Transform,
 } from "../../../../../packages/core/src/index.ts";
 import type { Doc } from "./session.ts";
 
@@ -370,4 +370,54 @@ export function setVideo(doc: Doc, video: string, patch: Partial<Pick<VideoFile,
     else (v as unknown as Record<string, unknown>)[k] = val;
   }
   if (patch.format !== undefined) delete v.profiles;
+}
+
+// ---- automation lanes (number lanes; colour lanes come with the colour tools) ----
+
+/** The lane the video uses for a target (inherited or its own), or undefined. */
+export function laneOf(doc: Doc, video: string, target: string): LaneInput | undefined {
+  return resolved(doc, video).automation?.find((a) => a.target === target && a.points.length > 0);
+}
+/** Whether this video has its own version of a lane its base also has (↺ goes back to the base's). */
+export function laneChanged(doc: Doc, video: string, target: string): boolean {
+  const v = doc.videos[video]!;
+  if (!v.base) return false;
+  const own = v.automation?.some((a) => a.target === target && a.points.length > 0);
+  return !!own && !!laneOf(doc, v.base, target);
+}
+/** Whether the lane comes from the base unchanged. */
+export function laneInherited(doc: Doc, video: string, target: string): boolean {
+  const v = doc.videos[video]!;
+  return !!v.base && !v.automation?.some((a) => a.target === target) && !!laneOf(doc, v.base, target);
+}
+/** Replace a lane's points (written to the open video; in a video with a base, this lane becomes its own). */
+export function setLane(doc: Doc, video: string, target: string, points: BreakpointInput[]): void {
+  const v = doc.videos[video]!;
+  const sorted = [...points].sort((a, b) => (a.bar ?? a.t ?? 0) - (b.bar ?? b.t ?? 0));
+  const list = (v.automation ??= []);
+  const i = list.findIndex((a) => a.target === target);
+  if (i >= 0) list[i] = { target, points: sorted }; else list.push({ target, points: sorted });
+}
+/** Start a lane with one breakpoint (the lane then holds that value until more points are added). */
+export function addLane(doc: Doc, video: string, target: string, at: { bar?: number; t?: number }, v: number): void {
+  if (laneOf(doc, video, target)) return;
+  setLane(doc, video, target, [{ ...at, v }]);
+}
+/** Remove a lane. In a video with a base that has the lane, an empty lane here cancels it. */
+export function removeLane(doc: Doc, video: string, target: string): void {
+  const v = doc.videos[video]!;
+  v.automation = (v.automation ?? []).filter((a) => a.target !== target);
+  if (v.base && laneOf(doc, v.base, target)) v.automation.push({ target, points: [] });
+  if (!v.automation.length) delete v.automation;
+}
+/** Back to the base's lane (drop this video's version, or its removal). */
+export function resetLane(doc: Doc, video: string, target: string): void {
+  const v = doc.videos[video]!;
+  if (!v.automation) return;
+  v.automation = v.automation.filter((a) => a.target !== target);
+  if (!v.automation.length) delete v.automation;
+}
+/** The lanes aimed at a layer (its own parameters and its effects'), in a stable order. */
+export function lanesOfLayer(doc: Doc, video: string, layerId: string): LaneInput[] {
+  return (resolved(doc, video).automation ?? []).filter((a) => a.points.length > 0 && a.target.startsWith(`${layerId}.`) && !a.points.some((p) => p.c !== undefined));
 }

@@ -520,6 +520,41 @@ run("editor (headless Chrome)", () => {
     }
   }, 120_000);
 
+  it("automation: unfold a layer's lanes, add, move and delete breakpoints, set a curve, automate from the panel", async () => {
+    const E = <A,>(f: (a: A) => unknown, a?: A) => page.evaluate(f as any, a);
+    const startLabel = (await state()).undoLabel;
+    const lane = (t: string) => E((tt) => (window as any).vizierEditor.session().doc.videos.full.automation?.find((a: any) => a.target === tt)?.points, t);
+    const sec = (bar: number) => E((b) => { const g = (window as any).vizierEditor.session().doc.song.grid; return g.downbeat + ((b - 1) * 4 * 60) / g.tempo[0].bpm; }, bar) as Promise<number>;
+    const xy = async (t: string, s: number, v: number) => (await E(([tt, ss, vv]) => (window as any).vizierEditor.timeline().laneXY(tt, ss, vv), [t, s, v] as const)) as { x: number; y: number };
+    try {
+      const before = await lane("ring.radius") as unknown[];
+      await page.click('[data-fold="ring"]');
+      expect((await state()).expanded).toContain("ring");
+      let p = await xy("ring.radius", (await sec(20)) + 0.05, 1.5);
+      await page.mouse.click(p.x, p.y);
+      expect((await lane("ring.radius") as any[]).length).toBe(before.length + 1);
+      expect((await state()).selectedPoint).toEqual({ target: "ring.radius", index: 1 });
+      // drag it to bar 22
+      p = await xy("ring.radius", await sec(20), 1.5);
+      const to = await xy("ring.radius", await sec(22), 1.5);
+      await page.mouse.move(p.x, p.y); await page.mouse.down(); await page.mouse.move(to.x, to.y, { steps: 5 }); await page.mouse.up();
+      expect((await lane("ring.radius") as any[])[1].bar).toBe(22);
+      await page.click('[data-lane="ring.radius"] button[title^="Ease"]');
+      expect((await lane("ring.radius") as any[])[1].curve).toBe("smooth");
+      await page.keyboard.press("Backspace");
+      expect(await lane("ring.radius")).toEqual(before);
+      // automate a parameter from the panel: a lane appears at the playhead with the current value
+      await page.click('[data-layer="ring"]');
+      const a = page.locator('button[aria-label="Automate Spectrum spikes"]');
+      await a.scrollIntoViewIfNeeded(); await a.click();
+      expect((await lane("ring.spike") as any[]).length).toBe(1);
+      expect(await page.locator('[data-lane="ring.spike"]').count()).toBe(1);
+    } finally {
+      for (let i = 0; i < 20 && (await state()).undoLabel !== startLabel; i++) await E(() => (window as any).vizierEditor.session().undo());
+      if ((await state()).expanded.includes("ring")) await page.click('[data-fold="ring"]');
+    }
+  }, 90_000);
+
   it("switches videos and shows the reel in its own format", async () => {
     await page.selectOption("header select", "reel");
     await page.waitForFunction(() => (window as any).vizierEditor.state.videoName === "reel");

@@ -71,6 +71,22 @@ server isn't running, the editor says so and keeps your changes: start it again 
   layer from the base is marked "from base". Changing an inherited layer's generator replaces it with a new layer
   (same name, track, depth, layout and spans), because the base's settings wouldn't fit the new generator.
 
+### Automation lanes
+
+- A layer with automation has an **▸** in front of its row in the timeline: click it to unfold its lanes (one per
+  automated parameter, its effects' included). The line shows the value over the song.
+- **Click** in a lane to add a breakpoint there (time snapped to the beat unless ⇧); **drag** a breakpoint to move
+  it (it can't pass its neighbours); **click** one to select it, and **Delete** removes it (removing the last one
+  removes the lane).
+- The lane's header sets the **curve** after the selected breakpoint: ⟋ straight, ⌐ hold then jump, ∿ ease in
+  and out. ✕ removes the lane.
+- **A** next to a parameter in the layer panel starts a lane at the playhead with the current value (and unfolds
+  it); on an automated parameter it just shows the lane. While a lane exists, it sets the parameter: the slider
+  sets the value only where no lane does.
+- In a video built on another, inherited lanes are tagged **base**; editing one makes it this video's own
+  (**changed**, with ↺ to go back to the base's); ✕ removes it here only.
+- Breakpoints are saved in bars, so they stay on the music if the tempo changes.
+
 ### Layout on the preview
 
 - **Click a layer on the preview** to select it (only layers that are on at the playhead). Where layers overlap,
@@ -95,7 +111,7 @@ value); **Reset layer to base** drops all of this video's changes to the layer. 
 A base layer removed here is listed under the layers with **Restore**, which also brings back its automation.
 Changes always go to the open video; to change the base, open it.
 
-Next: automation lanes in milestone 3,
+Next: audio modulation in the layer panel (milestone 3, part B),
 automation lanes in milestone 3, tracks and tempo in 4, colour and render in 5 (see the [roadmap](roadmap.md)).
 
 ## Keyboard
@@ -113,8 +129,8 @@ Press **?** in the editor for the full list.
 | ⇧⌫ | clear the range (whole song) |
 | ⌘4 | snap to the beat on / off |
 | ⌘E | split the selected layer at the playhead |
-| Delete | remove the selected on-span |
 | ⌘D | duplicate the selected layer |
+| Delete | remove the selected breakpoint (or on-span) |
 | + / − / 0 | zoom in / out / fit the song |
 | ⌘Z / ⇧⌘Z | undo / redo |
 | ⌘S | save |

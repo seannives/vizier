@@ -12,13 +12,13 @@
   import LayerPanel from "./components/LayerPanel.svelte";
   import VideoPanel from "./components/VideoPanel.svelte";
   import NewVideo from "./components/NewVideo.svelte";
-  import type { LayerRow, SpanS } from "./components/Timeline.svelte";
-  import { setSpans, splitLayerAt, duplicateLayer, layerOf, setLayout, newVideo } from "./lib/edits.ts";
+  import type { LayerRow, SpanS, LaneRow, LanePoint } from "./components/Timeline.svelte";
+  import { setSpans, splitLayerAt, duplicateLayer, layerOf, setLayout, newVideo, lanesOfLayer, laneInherited, laneChanged, setLane, addLane, removeLane, resetLane } from "./lib/edits.ts";
   import type { Doc } from "./lib/session.ts";
   import { stats } from "./lib/stats.ts";
   import { openLink, type Msg } from "./lib/link.ts";
   import {
-    barToSeconds, secondsToBar, barLabel, sectionTimes, videoFormat, getProfile, spansToSeconds, type Project, type Span, type Transform,
+    barToSeconds, secondsToBar, barLabel, sectionTimes, videoFormat, getProfile, spansToSeconds, laneToSeconds, paramTargets, EFFECTS, type Project, type BreakpointInput, type Span, type Transform,
   } from "../../../../packages/core/src/index.ts";
   import type { FeatureTrack } from "../../../../packages/features/src/index.ts";
 
@@ -218,12 +218,12 @@
     { keys: "Shift+Mod+Z", label: "Redo", group: "Edit", run: redo },
     { keys: "Mod+S", label: "Save", group: "Edit", run: save },
     { keys: "Mod+E", label: "Split the selected layer at the playhead", group: "Layers", run: splitSelected },
-    { keys: "Delete", alt: ["Backspace"], display: "Delete", label: "Remove the selected on-span", group: "Layers", run: deleteSelectedSpan },
+    { keys: "Delete", alt: ["Backspace"], display: "Delete", label: "Remove the selected breakpoint or on-span", group: "Layers", run: () => { if (!deleteSelectedPoint()) deleteSelectedSpan(); } },
     { keys: "Mod+D", label: "Duplicate the selected layer", group: "Layers", run: duplicateSelected },
     { keys: "Mod+4", label: "Snap to the beat on / off", group: "Edit", run: () => { snap = !snap; flash(`snap to beat ${snap ? "on" : "off"}`); } },
     { keys: "I", label: "Show / hide frame timing (for diagnosing a jerky playhead)", group: "View", run: () => (showStats = !showStats) },
     { keys: "?", label: "Show / hide shortcuts", group: "View", run: () => (help = !help) },
-    { keys: "Escape", label: "Close the shortcuts window", group: "View", run: () => (help = false) },
+    { keys: "Escape", label: "Close the shortcuts window; deselect a breakpoint", group: "View", run: () => { help = false; selectedPoint = null; } },
   ];
   // Tell the server we're here and whether there are unsaved changes (it warns before quitting), and notice
   // when the server isn't running (saving needs it; changes stay in the browser meanwhile).
@@ -271,15 +271,68 @@
     try { session.apply(label, fn, { merge }); } catch (e) { flash(`couldn't ${label}: ${(e as Error).message}`); }
   }
   const seal = () => session?.seal();
-  const selectLayer = (id: string | null, span: number | null = null) => { selectedLayer = id; selectedSpan = span; };
+  const selectLayer = (id: string | null, span: number | null = null) => { selectedLayer = id; selectedSpan = span; selectedPoint = null; };
   const trackName = (id: string | undefined) => {
     const t = doc?.song.tracks.find((t) => (id ? t.id === id : t.mix));
     return t?.name ?? id ?? "mix";
   };
   const mixId = $derived(doc?.song.tracks.find((t) => t.mix)?.id ?? "");
+  // ---- automation lanes: shown under their layer when it's unfolded ----
+  let expanded = $state(new Set<string>());
+  let selectedPoint = $state<{ target: string; index: number } | null>(null);
+  const toggleLanes = (id: string) => { const n = new Set(expanded); if (n.has(id)) n.delete(id); else n.add(id); expanded = n; };
+  const targets = $derived(project ? paramTargets(project) : new Map());
+  const laneRows = $derived.by<LaneRow[]>(() => {
+    if (!doc || !videoName || !doc.videos[videoName]) return [];
+    const out: LaneRow[] = [];
+    for (const l of layers) for (const lane of lanesOfLayer(doc, videoName, l.id)) {
+      const spec = targets.get(lane.target);
+      if (!spec) continue;
+      const rest = lane.target.slice(l.id.length + 1);
+      const fx = rest.includes(".") ? l.effects?.find((e) => (e.id ?? e.type) === rest.split(".")[0]) : undefined;
+      let pts: LanePoint[] = [];
+      try { pts = laneToSeconds(lane, grid).points.sort((a, b) => a.t - b.t); } catch { continue; }
+      out.push({
+        target: lane.target, layer: l.id, label: fx ? `${EFFECTS[fx.type]?.label ?? fx.type}: ${spec.label}` : spec.label,
+        min: spec.min, max: spec.max, int: (spec as { type?: string }).type === "int" || (spec as { type?: string }).type === "toggle", points: pts,
+        origin: laneInherited(doc, videoName, lane.target) ? "base" : laneChanged(doc, videoName, lane.target) ? "changed" : "own",
+      });
+    }
+    return out;
+  });
+  /** Breakpoints from the timeline (seconds) back to the file (bars when there's a tempo). */
+  function lanePoints(target: string, pts: LanePoint[]) {
+    const v = videoName;
+    if (!v) return;
+    const file: BreakpointInput[] = pts.map((p) => ({ ...(grid ? { bar: toBar(p.t) } : { t: Math.round(p.t * 1000) / 1000 }), v: p.v, ...(p.curve && p.curve !== "linear" ? { curve: p.curve } : {}) }));
+    edit("automation", (d) => setLane(d, v, target, file));
+  }
+  function laneCurve(target: string, i: number, curve: "linear" | "hold" | "smooth") {
+    const ln = laneRows.find((l) => l.target === target);
+    if (!ln) return;
+    lanePoints(target, ln.points.map((p, j) => (j === i ? { ...p, curve } : p)));
+  }
+  function deleteSelectedPoint(): boolean {
+    const sp = selectedPoint, v = videoName;
+    const ln = sp && laneRows.find((l) => l.target === sp.target);
+    if (!sp || !ln || !v) return false;
+    if (ln.points.length <= 1) edit("remove lane", (d) => removeLane(d, v, sp.target));
+    else lanePoints(sp.target, ln.points.filter((_, j) => j !== sp.index));
+    selectedPoint = null;
+    return true;
+  }
+  /** Start a lane for a parameter at the playhead with its current value, and show it. */
+  function automate(target: string, value: number) {
+    const v = videoName, layer = target.split(".")[0]!;
+    if (!v) return;
+    edit("automate", (d) => addLane(d, v, target, grid ? { bar: toBar(playing ? time : marker) } : { t: playing ? time : marker }, value));
+    expanded = new Set([...expanded, layer]);
+  }
+  const lanesPerLayer = $derived(laneRows.reduce((m, l) => m.set(l.layer, (m.get(l.layer) ?? 0) + 1), new Map<string, number>()));
   const layerRows = $derived<LayerRow[]>(layers.map((l) => ({
     id: l.id, name: l.name ?? l.id, track: l.track ?? mixId,
     spans: l.spans?.length && grid ? spansToSeconds(l.spans, grid) : null,
+    lanes: lanesPerLayer.get(l.id) ?? 0,
   })));
   const automated = $derived(new Set((project?.automation ?? []).map((a) => a.target)));
   const playheadBar = $derived(grid ? secondsToBar(playing ? time : marker, grid) : null);
@@ -414,7 +467,7 @@
   $effect(() => {
     (window as any).vizierEditor = {
       stats: () => ({ ...stats.summary(), ...stats.counts }),
-      get state() { return { popped, selectedLayer, selectedSpan, status, error: loadError, playing, transportPlaying: transport.playing, loop, loopWraps, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
+      get state() { return { expanded: [...expanded], selectedPoint, popped, selectedLayer, selectedSpan, status, error: loadError, playing, transportPlaying: transport.playing, loop, loopWraps, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
       timeline: () => timeline,
       clock: () => transport.clockInfo(),
       session: () => session,
@@ -479,7 +532,7 @@
 
   {#snippet layerPanel()}
     {#if videoName && selectedLayer && doc}
-      <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} {edit} {seal} {family}
+      <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} {edit} {seal} {family} onautomate={automate}
         onselect={(id) => selectLayer(id)} />
     {:else if videoName}
       <p class="hint">Select a layer to edit it. Each layer also has a row under its track in the timeline: drag there to set when it's on.</p>
@@ -490,7 +543,12 @@
     <div class="grip" role="separator" aria-orientation="horizontal" aria-label="Resize the timeline"
       title="Drag to resize the timeline; double-click to fit its rows" onpointerdown={gripDown} ondblclick={fitTimeline}></div>
     <Timeline bind:this={timeline} bind:contentHeight={tlContent} {grid} {sections} {tracks} layers={layerRows} {selectedLayer} {selectedSpan} {duration} {time} range={rangeSec} {rangeInherited}
-      follow={playing} {marker} {snap} onseek={seek} onrange={setRange} onselectlayer={selectLayer} onspans={spansFromTimeline} />
+      follow={playing} {marker} {snap} onseek={seek} onrange={setRange} onselectlayer={selectLayer} onspans={spansFromTimeline}
+      lanes={laneRows} {expanded} {selectedPoint} ontogglelanes={toggleLanes}
+      onselectpoint={(t, i) => { if (t) selectLayer(t.split(".")[0]!); selectedPoint = t && i !== null ? { target: t, index: i } : null; }}
+      onlanepoints={lanePoints} onlanecurve={laneCurve}
+      onlaneremove={(t) => { const v = videoName; if (v) edit("remove lane", (d) => removeLane(d, v, t)); selectedPoint = null; }}
+      onlanereset={(t) => { const v = videoName; if (v) edit("lane: back to the base's", (d) => resetLane(d, v, t)); }} />
   </section>
 
   <footer class="status">

@@ -2,7 +2,8 @@ import { describe, it, expect } from "vitest";
 import { Session, type Doc } from "../src/app/lib/session.ts";
 import {
   addLayer, removeLayer, moveLayer, duplicateLayer, setParam, setLayout, placement, hasOwnLayout, patchLayer,
-  layerOrigin, isChanged, baseLayer, resetSetting, resetLayer, removedLayers, restoreLayer, newVideo, detachVideo, setVideo, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
+  layerOrigin, isChanged, baseLayer, resetSetting, resetLayer, removedLayers, restoreLayer, newVideo, detachVideo, setVideo,
+  laneOf, laneChanged, laneInherited, setLane, addLane, removeLane, resetLane, lanesOfLayer, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
 } from "../src/app/lib/edits.ts";
 import { validateProject, buildProject, resolveVideo } from "../../../packages/core/src/index.ts";
 
@@ -234,5 +235,35 @@ describe("video actions", () => {
     expect(d.videos.reel).toMatchObject({ format: "shorts", name: "A short" });
     setVideo(d, "reel", { range: undefined });
     expect(d.videos.reel!.range).toBeUndefined();
+  });
+});
+
+describe("automation lanes", () => {
+  it("adds, replaces and removes a lane", () => {
+    const d = doc();
+    addLane(d, "full", "ring.spike", { bar: 5 }, 0.5);
+    expect(laneOf(d, "full", "ring.spike")!.points).toEqual([{ bar: 5, v: 0.5 }]);
+    addLane(d, "full", "ring.spike", { bar: 9 }, 0.9); // already there: unchanged
+    expect(laneOf(d, "full", "ring.spike")!.points).toEqual([{ bar: 5, v: 0.5 }]);
+    setLane(d, "full", "ring.spike", [{ bar: 9, v: 1 }, { bar: 5, v: 0.5, curve: "smooth" }]);
+    expect(laneOf(d, "full", "ring.spike")!.points).toEqual([{ bar: 5, v: 0.5, curve: "smooth" }, { bar: 9, v: 1 }]);
+    expect(lanesOfLayer(d, "full", "ring").map((a) => a.target)).toEqual(["ring.radius", "ring.spike"]);
+    removeLane(d, "full", "ring.spike");
+    expect(laneOf(d, "full", "ring.spike")).toBeUndefined();
+    expect(valid(d, "full")).toEqual([]);
+  });
+  it("in a reel: an inherited lane, changed here (↺ back), or removed here", () => {
+    const d = doc();
+    expect(laneInherited(d, "reel", "ring.radius")).toBe(true);
+    setLane(d, "reel", "ring.radius", [{ bar: 9, v: 0.8 }]);
+    expect(laneChanged(d, "reel", "ring.radius")).toBe(true);
+    expect(laneOf(d, "full", "ring.radius")!.points).toEqual([{ bar: 1, v: 0.2 }, { bar: 9, v: 0.4 }]); // base untouched
+    resetLane(d, "reel", "ring.radius");
+    expect(laneOf(d, "reel", "ring.radius")).toEqual(laneOf(d, "full", "ring.radius"));
+    removeLane(d, "reel", "ring.radius");
+    expect(laneOf(d, "reel", "ring.radius")).toBeUndefined();
+    expect(laneOf(d, "full", "ring.radius")).toBeDefined();
+    resetLane(d, "reel", "ring.radius");
+    expect(laneOf(d, "reel", "ring.radius")).toBeDefined();
   });
 });

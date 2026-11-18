@@ -128,4 +128,58 @@ describe("Timeline", () => {
       expect(onspans).not.toHaveBeenCalled();
     });
   });
+
+  describe("automation lanes", () => {
+    // one track, one layer unfolded, one lane under it: 0..1, a point at 10 s (0.2) and 20 s (0.8)
+    const pts = [{ t: 10, v: 0.2 }, { t: 20, v: 0.8 }];
+    async function lane(points = pts) {
+      const cb = { onlanepoints: vi.fn(), onselectpoint: vi.fn(), onlanecurve: vi.fn(), onlaneremove: vi.fn(), ontogglelanes: vi.fn() };
+      const r = render(Timeline, { ...base, time: 0, snap: true, tracks: [{ id: "mix", name: "Mix", mix: true, wave: null }],
+        layers: [{ id: "ring", name: "Ring", track: "mix", spans: null, lanes: 1 }], expanded: new Set(["ring"]),
+        lanes: [{ target: "ring.spike", layer: "ring", label: "Spikes", min: 0, max: 1, int: false, points, origin: "own" }],
+        selectedPoint: { target: "ring.spike", index: 0 }, ...cb } as any);
+      await tick();
+      const tl = r.component as any;
+      const body = r.container.querySelectorAll("canvas")[1]!;
+      // lane row: below the track (46) and the layer row (18); 46 tall, values drawn from y+5 (1) to y+41 (0)
+      const yOf = (v: number) => 46 + 18 + 5 + (1 - v) * 36;
+      const ev = (type: string, t: number, v: number, shiftKey = false) => Object.defineProperties(new MouseEvent(type, { bubbles: true, shiftKey }), {
+        offsetX: { value: tl.pageX(t) }, offsetY: { value: yOf(v) }, pointerId: { value: 1 } });
+      const drag = async (from: [number, number], to: [number, number]) => {
+        await fireEvent(body, ev("pointerdown", ...from)); await fireEvent(body, ev("pointermove", ...to)); await fireEvent(body, ev("pointerup", ...to));
+      };
+      return { r, cb, drag };
+    }
+    it("a click adds a breakpoint (time snapped to the beat), with the value where you clicked", async () => {
+      const { cb, drag } = await lane();
+      await drag([15.1, 0.5], [15.1, 0.5]);
+      const [target, out] = cb.onlanepoints.mock.lastCall!;
+      expect(target).toBe("ring.spike");
+      expect(out.map((p: any) => p.t)).toEqual([10, 15, 20]);
+      expect(out[1].v).toBeCloseTo(0.5, 1);
+      expect(cb.onselectpoint).toHaveBeenLastCalledWith("ring.spike", 1);
+    });
+    it("drags a breakpoint, but not past its neighbours", async () => {
+      const { cb, drag } = await lane();
+      await drag([10, 0.2], [12, 0.6]);
+      expect(cb.onlanepoints.mock.lastCall![1][0]).toEqual({ t: 12, v: expect.closeTo(0.6, 1) });
+      await drag([10, 0.2], [25, 0.6]);
+      expect(cb.onlanepoints.mock.lastCall![1][0].t).toBe(20); // stops at the next point
+    });
+    it("a click on a breakpoint selects it without changing anything", async () => {
+      const { cb, drag } = await lane();
+      await drag([20, 0.8], [20, 0.8]);
+      expect(cb.onselectpoint).toHaveBeenLastCalledWith("ring.spike", 1);
+      expect(cb.onlanepoints).not.toHaveBeenCalled();
+    });
+    it("the lane's header sets the curve after the selected point, and removes the lane", async () => {
+      const { r, cb } = await lane();
+      await fireEvent.click(r.getByTitle(/^Hold/));
+      expect(cb.onlanecurve).toHaveBeenCalledWith("ring.spike", 0, "hold");
+      await fireEvent.click(r.getByTitle("Remove this lane"));
+      expect(cb.onlaneremove).toHaveBeenCalledWith("ring.spike");
+      await fireEvent.click(r.container.querySelector('[data-fold="ring"]')!);
+      expect(cb.ontogglelanes).toHaveBeenCalledWith("ring");
+    });
+  });
 });

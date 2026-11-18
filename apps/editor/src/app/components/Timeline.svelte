@@ -6,10 +6,23 @@
   export interface TrackRow { id: string; name: string; mix?: boolean; wave: Waveform | null }
   /** A layer under its track: when it's on, in seconds (`null`: the whole song). */
   export interface SpanS { from: number; to: number; fadeIn: number; fadeOut: number }
-  export interface LayerRow { id: string; name: string; track: string; spans: SpanS[] | null }
+  export interface LayerRow { id: string; name: string; track: string; spans: SpanS[] | null; lanes?: number }
+  /** An automation lane under its layer: breakpoints in seconds; the value range is the parameter's. */
+  export interface LanePoint { t: number; v: number; curve?: "linear" | "hold" | "smooth" }
+  export interface LaneRow { target: string; layer: string; label: string; min: number; max: number; int: boolean; points: LanePoint[]; origin: "own" | "base" | "changed" }
 
   let { grid, sections, tracks, layers = [], selectedLayer = null, selectedSpan = null, duration, time, range, rangeInherited, follow,
-    marker = 0, snap = true, onseek, onrange, onselectlayer = () => {}, onspans = () => {}, contentHeight = $bindable(0) }: {
+    marker = 0, snap = true, onseek, onrange, onselectlayer = () => {}, onspans = () => {}, contentHeight = $bindable(0),
+    lanes = [], expanded = new Set<string>(), selectedPoint = null, ontogglelanes = () => {}, onselectpoint = () => {}, onlanepoints = () => {},
+    onlanecurve = () => {}, onlaneremove = () => {}, onlanereset = () => {} }: {
+    /** Automation lanes of the unfolded layers. */
+    lanes?: LaneRow[]; expanded?: Set<string>; selectedPoint?: { target: string; index: number } | null;
+    ontogglelanes?: (layer: string) => void;
+    onselectpoint?: (target: string | null, index: number | null) => void;
+    /** A lane's breakpoints were added or moved (seconds). */
+    onlanepoints?: (target: string, points: LanePoint[]) => void;
+    onlanecurve?: (target: string, index: number, curve: "linear" | "hold" | "smooth") => void;
+    onlaneremove?: (target: string) => void; onlanereset?: (target: string) => void;
     /** Out: the height (px) the timeline needs to show every row without scrolling. */
     contentHeight?: number;
     grid?: Grid; sections: { t: number; name: string }[]; tracks: TrackRow[]; duration: number; time: number;
@@ -21,15 +34,19 @@
     onseek: (t: number) => void; onrange: (r: { from: number; to: number } | null) => void;
   } = $props();
 
-  const H_RULER = 28, H_SECT = 20, H_TRACK = 46, H_LAYER = 18;
+  const H_RULER = 28, H_SECT = 20, H_TRACK = 46, H_LAYER = 18, H_LANE = 46;
   // rows below the sections: each track, then the layers it drives
-  type Row = { kind: "track"; i: number; y: number; h: number } | { kind: "layer"; layer: LayerRow; y: number; h: number };
+  type Row = { kind: "track"; i: number; y: number; h: number } | { kind: "layer"; layer: LayerRow; y: number; h: number }
+    | { kind: "lane"; lane: LaneRow; y: number; h: number };
   const rows = $derived.by(() => {
     const out: Row[] = [];
     let y = H_RULER + H_SECT;
     tracks.forEach((t, i) => {
       out.push({ kind: "track", i, y, h: H_TRACK }); y += H_TRACK;
-      for (const l of layers.filter((l) => l.track === t.id)) { out.push({ kind: "layer", layer: l, y, h: H_LAYER }); y += H_LAYER; }
+      for (const l of layers.filter((l) => l.track === t.id)) {
+        out.push({ kind: "layer", layer: l, y, h: H_LAYER }); y += H_LAYER;
+        if (expanded.has(l.id)) for (const ln of lanes.filter((ln) => ln.layer === l.id)) { out.push({ kind: "lane", lane: ln, y, h: H_LANE }); y += H_LANE; }
+      }
     });
     return out;
   });
@@ -73,6 +90,15 @@
     const top = r.y - HEAD;
     if (top < scroller.scrollTop || top + r.h > scroller.scrollTop + scroller.clientHeight) scroller.scrollTop = Math.max(0, top - 20);
     return canvas.getBoundingClientRect().top + top + r.h / 2;
+  }
+  /** For tests: a lane's value v at time t, in page coordinates (scrolled into view). */
+  export function laneXY(target: string, t: number, v: number) {
+    const r = rows.find((r) => r.kind === "lane" && r.lane.target === target) as (Row & { kind: "lane" }) | undefined;
+    if (!r) return null;
+    const midY = rowY(r);
+    const top = midY - r.h / 2;
+    const u = Math.min(1, Math.max(0, (v - r.lane.min) / (r.lane.max - r.lane.min || 1)));
+    return { x: pageX(t), y: top + 5 + (1 - u) * (r.h - 10) };
   }
   /** For tests: the middle of a layer's row, in page coordinates (scrolled into view). */
   export function layerY(id: string) { return rowY(rows.find((r) => r.kind === "layer" && r.layer.id === id)); }
@@ -211,6 +237,37 @@
       }
     }
 
+    // automation lanes: the value over time, breakpoints as squares
+    for (const row of rows) {
+      if (row.kind !== "lane") continue;
+      const ln = row.lane;
+      const pts = dragLane && dragLane.target === ln.target ? dragLane.points : ln.points;
+      const y0 = row.y + 5, h = row.h - 10;
+      const yOf = (v: number) => y0 + (1 - Math.min(1, Math.max(0, (v - ln.min) / (ln.max - ln.min || 1)))) * h;
+      ctx.fillStyle = "#0000004d"; ctx.fillRect(0, row.y, W, row.h);
+      ctx.fillStyle = C.line; ctx.fillRect(0, row.y, W, 1);
+      if (!pts.length) continue;
+      ctx.strokeStyle = ln.origin === "base" ? "#f5a52488" : C.accent; ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(0, yOf(pts[0]!.v)); ctx.lineTo(xOf(pts[0]!.t, v), yOf(pts[0]!.v));
+      for (let j = 0; j < pts.length - 1; j++) {
+        const a = pts[j]!, b = pts[j + 1]!, xa = xOf(a.t, v), xb = xOf(b.t, v);
+        if (xb < 0 || xa > W) { ctx.lineTo(xb, yOf(b.v)); continue; }
+        if (a.curve === "hold") { ctx.lineTo(xb, yOf(a.v)); ctx.lineTo(xb, yOf(b.v)); }
+        else if (a.curve === "smooth") for (let k = 1; k <= 16; k++) { const u = k / 16, s2 = u * u * (3 - 2 * u); ctx.lineTo(xa + (xb - xa) * u, yOf(a.v + (b.v - a.v) * s2)); }
+        else ctx.lineTo(xb, yOf(b.v));
+      }
+      ctx.lineTo(W, yOf(pts[pts.length - 1]!.v));
+      ctx.stroke();
+      pts.forEach((p, j) => {
+        const x = xOf(p.t, v);
+        if (x < -4 || x > W + 4) return;
+        const on = selectedPoint?.target === ln.target && selectedPoint.index === j;
+        ctx.fillStyle = on ? C.accent : C.bg0; ctx.strokeStyle = C.accent; ctx.lineWidth = 1;
+        ctx.fillRect(x - 3.5, yOf(p.v) - 3.5, 7, 7); ctx.strokeRect(x - 3.5, yOf(p.v) - 3.5, 7, 7);
+      });
+    }
+
     // layers: when each is on
     for (const row of rows) {
       if (row.kind !== "layer") continue;
@@ -293,11 +350,60 @@
     if (d.kind === "new") onseek(snapT(d.t0, e)); // a click in empty space moves the playhead too
   }
 
+  // ---- automation lanes: click to add a breakpoint, drag one to move it (snap applies to time), click to select ----
+  type LaneDrag = { target: string; index: number; x0: number; y0: number; moved: boolean; orig: LanePoint[]; added: boolean };
+  let laneDrag: LaneDrag | null = null;
+  let dragLane = $state<{ target: string; points: LanePoint[] } | null>(null);
+  const laneValue = (ln: LaneRow, row: { y: number; h: number }, y: number) => {
+    const u = 1 - (y - row.y - 5) / (row.h - 10);
+    const v = ln.min + Math.min(1, Math.max(0, u)) * (ln.max - ln.min);
+    return ln.int ? Math.round(v) : Math.round(v * 1000) / 1000;
+  };
+  function laneDown(e: PointerEvent, row: { y: number; h: number; lane: LaneRow }) {
+    const ln = row.lane, x = e.offsetX, y = vy(e);
+    const yOf = (v: number) => row.y + 5 + (1 - Math.min(1, Math.max(0, (v - ln.min) / (ln.max - ln.min || 1)))) * (row.h - 10);
+    let index = ln.points.findIndex((p) => Math.abs(xOf(p.t, view) - x) < 6 && Math.abs(yOf(p.v) - y) < 7);
+    let pts = ln.points.map((p) => ({ ...p }));
+    let added = false;
+    if (index < 0) { // a new breakpoint where you clicked
+      const t = snapT(tOf(x, view), e);
+      const prev = [...pts].reverse().find((p) => p.t <= t);
+      pts.push({ t, v: laneValue(ln, row, y), ...(prev?.curve ? { curve: prev.curve } : {}) });
+      pts.sort((a, b) => a.t - b.t);
+      index = pts.findIndex((p) => p.t === t);
+      added = true;
+      dragLane = { target: ln.target, points: pts };
+    }
+    laneDrag = { target: ln.target, index, x0: x, y0: y, moved: false, orig: pts, added };
+    onselectpoint(ln.target, index);
+  }
+  function laneMove(e: PointerEvent, row: { y: number; h: number; lane: LaneRow } | undefined) {
+    const d = laneDrag!;
+    const x = e.offsetX, y = vy(e);
+    if (!d.moved && Math.abs(x - d.x0) < 3 && Math.abs(y - d.y0) < 3) return;
+    d.moved = true;
+    void row;
+    const lrow = rows.find((r) => r.kind === "lane" && r.lane.target === d.target) as Row & { kind: "lane" };
+    const ln = lrow.lane;
+    const pts = d.orig.map((p) => ({ ...p }));
+    const lo = d.index > 0 ? pts[d.index - 1]!.t : -Infinity, hi = d.index < pts.length - 1 ? pts[d.index + 1]!.t : Infinity;
+    // keep the order: a point can't pass its neighbours (it can sit on them, for a jump)
+    pts[d.index]!.t = Math.min(hi, Math.max(lo, snapT(tOf(x, view), e)));
+    pts[d.index]!.v = laneValue(ln, lrow, y);
+    dragLane = { target: d.target, points: pts };
+  }
+  function laneUp() {
+    const d = laneDrag!; laneDrag = null;
+    const dl = dragLane; dragLane = null;
+    if ((d.moved || d.added) && dl) onlanepoints(d.target, dl.points);
+  }
+
   function onpointerdown(e: PointerEvent) {
     (e.currentTarget as HTMLCanvasElement).setPointerCapture(e.pointerId);
     const x = e.offsetX, y = vy(e), t = tOf(x, view);
     const row = rowAt(y);
     if (row?.kind === "layer") return layerDown(e, row.layer);
+    if (row?.kind === "lane") return laneDown(e, row);
     const r = range;
     if (y < H_RULER) {
       if (r && Math.abs(x - xOf(r.from, view)) < 6) drag = { kind: "edgeL", x0: x, t0: t, orig: r, moved: false };
@@ -311,6 +417,7 @@
   function onpointermove(e: PointerEvent) {
     const x = e.offsetX, t = tOf(x, view);
     if (spanDrag) return layerMove(e);
+    if (laneDrag) { const r = rowAt(vy(e)); return laneMove(e, r?.kind === "lane" ? r : undefined); }
     if (!drag) {
       const r = range;
       const y = vy(e);
@@ -331,6 +438,7 @@
   function onpointerup(e: PointerEvent) {
     (e.currentTarget as HTMLCanvasElement).releasePointerCapture(e.pointerId);
     if (spanDrag) return layerUp(e);
+    if (laneDrag) return laneUp();
     const d = drag; drag = null;
     if (!d) return;
     if (!d.moved && (d.kind === "maybe" || d.kind === "edgeL" || d.kind === "edgeR")) { onseek(snapT(d.t0, e)); return; }
@@ -355,9 +463,28 @@
           {#if r.kind === "track"}
             {@const t = tracks[r.i]!}
             <div class="h track" style:height="{H_TRACK}px" title={t.id}><span class:mix={t.mix}>{t.name}</span>{#if t.mix}<em>mix</em>{/if}</div>
-          {:else}
+          {:else if r.kind === "layer"}
             <div class="h layer" class:sel={r.layer.id === selectedLayer} style:height="{H_LAYER}px" title={r.layer.name}
-              onclick={() => onselectlayer(r.layer.id, null)} onkeydown={(e) => { if (e.key === "Enter") onselectlayer(r.layer.id, null); }} role="button" tabindex="-1">{r.layer.name}</div>
+              onclick={() => onselectlayer(r.layer.id, null)} onkeydown={(e) => { if (e.key === "Enter") onselectlayer(r.layer.id, null); }} role="button" tabindex="-1">
+              {#if r.layer.lanes}<button class="fold" data-fold={r.layer.id} title="{expanded.has(r.layer.id) ? "Hide" : "Show"} automation ({r.layer.lanes})"
+                onclick={(e) => { e.stopPropagation(); ontogglelanes(r.layer.id); }}>{expanded.has(r.layer.id) ? "▾" : "▸"}</button>{/if}{r.layer.name}</div>
+          {:else}
+            {@const ln = r.lane}
+            {@const sp = selectedPoint?.target === ln.target ? selectedPoint.index : null}
+            {@const cur = sp !== null ? (ln.points[sp]?.curve ?? "linear") : null}
+            <div class="h lane" style:height="{H_LANE}px" data-lane={ln.target}>
+              <div class="lt" title={ln.target}>{ln.label}{#if ln.origin === "base"}<em class="tag">base</em>{:else if ln.origin === "changed"}<em class="tag ch">changed</em>{/if}</div>
+              <div class="lb">
+                {#if cur}
+                  {#each [["linear", "⟋", "Straight to the next point"], ["hold", "⌐", "Hold, then jump at the next point"], ["smooth", "∿", "Ease in and out"]] as [c, icon, tip]}
+                    <button class:on={cur === c} title="{tip} (after the selected point)" onclick={() => onlanecurve(ln.target, sp!, c as "linear")}>{icon}</button>
+                  {/each}
+                {/if}
+                <span class="sp"></span>
+                {#if ln.origin === "changed"}<button title="Back to the base video's lane" onclick={() => onlanereset(ln.target)}>↺</button>{/if}
+                <button title="Remove this lane" onclick={() => onlaneremove(ln.target)}>✕</button>
+              </div>
+            </div>
           {/if}
         {/each}
       </div>
@@ -391,6 +518,14 @@
   .h.layer { height: 18px; padding-left: 18px; font-size: 11px; text-transform: none; letter-spacing: 0; color: var(--dim); cursor: default;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 17px; }
   .h.layer.sel { color: var(--accent); background: var(--bg3); }
+  .fold { background: none; border: none; padding: 0 3px 0 0; margin-left: -12px; color: var(--dim); font-size: 10px; line-height: 17px; }
+  .h.lane { display: block; padding: 3px 6px 3px 18px; text-transform: none; letter-spacing: 0; font-size: 11px; color: var(--dim); background: var(--bg1); }
+  .lt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--text); }
+  .lb { display: flex; gap: 2px; margin-top: 3px; align-items: center; }
+  .lb .sp { flex: 1; }
+  .lb button { font-size: 10px; padding: 0 4px; line-height: 15px; }
+  .tag { font-style: normal; font-size: 9px; margin-left: 4px; color: var(--faint); border: 1px dashed var(--line2); border-radius: 2px; padding: 0 2px; }
+  .tag.ch { color: var(--accent); border-style: solid; }
   .h.track em { font-style: normal; font-size: 10px; color: var(--accent); border: 1px solid var(--accent-dim); border-radius: 2px; padding: 0 3px; }
   .wrap { flex: 1; min-width: 0; position: relative; overflow: hidden; }
   canvas { display: block; touch-action: none; }
