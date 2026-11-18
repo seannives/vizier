@@ -81,3 +81,5 @@ renderer first renders a few seconds of lead-in, so the frame matches the same m
 - Document it in [visuals.md](visuals.md) (what it does, what it listens to, every parameter) and add a shot to
   `scripts/make-docs-images.ts`, then `vizier docs-images`. A test fails until every generator, effect and
   parameter is in visuals.md with a picture.
+- A parameter that's a size in pixels (like glow's radius) should say `pixels: true`, so the editor's smaller
+  preview scales it and matches the export. Sizes as fractions of the layer need nothing.

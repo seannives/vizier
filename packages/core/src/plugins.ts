@@ -30,6 +30,8 @@ export interface ParamSpec {
   max: number;           // the UI range; audio modulation may push a value beyond it
   default: number;
   description?: string;
+  /** A size in pixels of the full-size video: a smaller preview scales it down, so the preview matches the export. */
+  pixels?: boolean;
 }
 
 /** What a Canvas 2D generator gets each frame. Drawing must be a pure function of this. */

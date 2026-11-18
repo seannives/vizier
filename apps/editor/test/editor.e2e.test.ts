@@ -330,6 +330,24 @@ run("editor (headless Chrome)", () => {
     } finally { await ctx.close(); }
   }, 120_000);
 
+  it("preview quality: a choice per window, remembered; the preview is redrawn at that size", async () => {
+    const p4 = await browser.newPage({ viewport: { width: 1440, height: 860 } });
+    try {
+      await p4.goto(`http://localhost:${PORT}/`);
+      await p4.waitForFunction(() => (window as any).vizierEditor?.state.status === "ready", null, { timeout: 60_000 });
+      await p4.waitForFunction(() => (window as any).vizierEditor.stats().renderersBuilt > 0, null, { timeout: 60_000 });
+      expect(await p4.locator(".preview .label").textContent()).toContain("960×540");
+      const built = await p4.evaluate(() => (window as any).vizierEditor.stats().renderersBuilt);
+      await p4.selectOption('select[aria-label="Preview quality"]', "0.25");
+      await p4.waitForFunction((n) => (window as any).vizierEditor.stats().renderersBuilt > n, built, { timeout: 30_000 });
+      expect(await p4.locator(".preview .label").textContent()).toContain("480×270");
+      await p4.reload();
+      await p4.waitForFunction(() => (window as any).vizierEditor?.state.status === "ready", null, { timeout: 60_000 });
+      expect(await p4.inputValue('select[aria-label="Preview quality"]')).toBe("0.25");
+      await p4.evaluate(() => localStorage.removeItem("vizier.previewQuality.in"));
+    } finally { await p4.close(); }
+  }, 180_000);
+
   it("I shows frame timing", async () => {
     await page.keyboard.press("i");
     await page.waitForTimeout(800);

@@ -24,7 +24,11 @@ server isn't running, the editor says so and keeps your changes: start it again 
   playhead where it stopped; the next Play jumps back to the marker, and ⇧Space continues from the stop point instead.
   Clicking the timeline or the arrow keys move the marker. With loop on (L), playback wraps at the range's end
   when it gets there; started after the range, it plays on, as in Ableton.
-- **Preview**: the open video in its format, at reduced resolution, with the safe area for vertical formats.
+- **Preview**: the open video in its format, with the safe area for vertical formats. **Quality** (the menu under
+  the picture) sets how sharp it is: Auto draws at most 960 pixels across (half size for 1080p), Full draws
+  exactly what the export will. Positions, sizes, line widths and glow look the same at any quality; only fine
+  detail is softer. The editor's preview and the popped-out window each remember their own choice (Full suits a
+  projector).
 - **Pop out** (top right of the preview): the preview moves to its own window, for a second screen or a
   projector. The editor then splits its side panel in two (video and layers on the left, the selected layer on the
   right) and gives the timeline more height. The output window follows the playhead and the open video; its

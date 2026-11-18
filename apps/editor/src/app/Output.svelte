@@ -68,7 +68,7 @@
   {#if !connected}
     <div class="wait">Waiting for the editor… (this window shows the editor's preview; keep the editor open)</div>
   {:else}
-    <Preview {project} {profileId} {features} {time} {loopWraps} {scaleOverride} selectedLayer={full ? null : selected}
+    <Preview {project} {profileId} {features} {time} {loopWraps} {scaleOverride} qualityKey="out" selectedLayer={full ? null : selected}
       onselect={(id) => { selected = id; link.send({ type: "select", id }); }}
       onlayout={(id, t, final) => link.send({ type: "layout", id, t: { x: t.x, y: t.y, w: t.w, h: t.h, rotation: t.rotation ?? 0 }, final })} />
     {#if !full}

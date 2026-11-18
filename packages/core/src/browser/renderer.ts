@@ -128,6 +128,8 @@ export class Renderer {
   private specBuf = new Uint8Array(32 * 64);
   private hasFeedback: boolean;
   private lastFrame = Number.NaN;
+  /** The preview's size as a share of the video's (1 for renders). */
+  readonly scale: number;
   /** When set, renderFrame adds each layer's draw+upload time (ms) here. */
   timing: Record<string, number> | null = null;
 
@@ -141,6 +143,7 @@ export class Renderer {
 
   constructor(private project: Project, profileId: string, private tracks: Record<string, FeatureTrack>, private font = "'Special Elite'", scale = 1) {
     const full = getProfile(profileId);
+    this.scale = scale;
     this.profile = scale === 1 ? full : { ...full, width: Math.max(2, Math.round(full.width * scale)), height: Math.max(2, Math.round(full.height * scale)) };
     const { width, height } = this.profile;
     this.canvas = document.createElement("canvas");
@@ -481,7 +484,7 @@ export class Renderer {
           gl.uniform2f(u("u_res"), L.w, L.h);
           gl.uniform1f(u("u_time"), t);
           gl.uniform1f(u("u_fps"), fps);
-          for (const s of e.def.params) gl.uniform1f(u(`u_${s.name}`), this.resolver.value(`${id}.${e.id}.${s.name}`, e.params[s.name]!, t, lookup));
+          for (const s of e.def.params) gl.uniform1f(u(`u_${s.name}`), this.resolver.value(`${id}.${e.id}.${s.name}`, e.params[s.name]!, t, lookup) * (s.pixels ? this.scale : 1));
           gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
           gl.viewport(0, 0, L.w, L.h);
           gl.disable(gl.BLEND);
@@ -528,7 +531,8 @@ export class Renderer {
     gl.bindTexture(gl.TEXTURE_2D, this.out.tex);
     const up = (n: string) => gl.getUniformLocation(this.progPost, n);
     gl.uniform3f(up("bg"), ...bg);
-    gl.uniform1f(up("grain"), this.resolver.value("post.grain", 0.05, t, lookup));
+    // grain is one speck per pixel: a smaller preview has bigger specks, so it's made fainter to look about the same
+    gl.uniform1f(up("grain"), this.resolver.value("post.grain", 0.05, t, lookup) * this.scale);
     gl.uniform1f(up("vignette"), this.resolver.value("post.vignette", 0.55, t, lookup));
     gl.uniform1f(up("seed"), (Math.floor(frame) % 997) * 0.731);
     gl.uniform2f(up("res"), width, height);

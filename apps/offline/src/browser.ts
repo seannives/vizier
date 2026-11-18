@@ -28,7 +28,7 @@ export interface RendererHandle {
  * Headless Chrome running the same renderer the live app uses.
  * Default: software GL (SwiftShader), which works anywhere, including CI. --gpu uses the machine's GPU (on a Mac: Metal via ANGLE).
  */
-export async function openRenderer(project: Project, profileId: string, tracks: Record<string, FeatureTrack>, opts: { gpu: boolean }): Promise<RendererHandle> {
+export async function openRenderer(project: Project, profileId: string, tracks: Record<string, FeatureTrack>, opts: { gpu: boolean; scale?: number }): Promise<RendererHandle> {
   const executablePath = process.env.CHROME_PATH;
   const browser = await chromium.launch({
     headless: true,
@@ -45,7 +45,7 @@ export async function openRenderer(project: Project, profileId: string, tracks: 
   await page.route("http://localhost/vizier", (route) => route.fulfill({ contentType: "text/html", body: html }));
   await page.goto("http://localhost/vizier");
   await page.addScriptTag({ content: await bundle() });
-  await page.evaluate(([p, id, t]) => (window as any).vizier.init(p, id, t), [project, profileId, tracks] as const);
+  await page.evaluate(([p, id, t, sc]) => (window as any).vizier.init(p, id, t, sc), [project, profileId, tracks, opts.scale ?? 1] as const);
   return {
     async frame(n) {
       const b64 = await page.evaluate((f) => (window as any).vizier.renderAndRead(f), n);

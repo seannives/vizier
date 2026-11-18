@@ -136,4 +136,17 @@ run("renderer in headless Chrome", () => {
       expect(hash(await a.frame(22))).not.toBe(hash(await b.frame(22)));
     } finally { await a.close(); await b.close(); }
   }, 90_000);
+  it("a smaller preview matches the export: glow spreads over the same share of the picture", async () => {
+    const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
+    const glowRing: Project = { ...project, layers: [{ ...project.layers[1]!, effects: [{ type: "glow", params: { amount: 3, radius: 20 } }] }] };
+    // the share of the picture that's clearly lit (well above the background)
+    const lit = (px: Buffer) => { let n = 0; for (let i = 0; i < px.length; i += 4) if (px[i]! > 90) n++; return n / (px.length / 4); };
+    const full = await openRenderer(glowRing, "draft", { mix: track, bass: track }, { gpu: false });
+    const half = await openRenderer(glowRing, "draft", { mix: track, bass: track }, { gpu: false, scale: 0.5 });
+    try {
+      const a = lit(await full.frame(30)), b = lit(await half.frame(30));
+      expect(a).toBeGreaterThan(0.01);
+      expect(Math.abs(b - a) / a).toBeLessThan(0.15);
+    } finally { await full.close(); await half.close(); }
+  }, 60_000);
 });

@@ -148,7 +148,7 @@ A soft halo around the bright parts of the layer: a blurred copy added back on t
 | Parameter | Range (default) | What it does |
 |---|---|---|
 | Amount (`amount`) | 0–3 (1) | Strength of the halo. |
-| Radius (`radius`) | 1–40 pixels (8) | How far the halo spreads (in the layer's own pixels). |
+| Radius (`radius`) | 1–40 pixels (8) | How far the halo spreads, in pixels of the full-size video (the editor's smaller preview scales it, so it looks the same). |
 
 ### Trails (`trails`)
 
@@ -203,7 +203,7 @@ Applied after all layers, automatable as `post.<name>`:
 
 | Parameter | Range (default) | What it does |
 |---|---|---|
-| Film grain (`grain`) | 0–0.3 (0.05) | Fine moving noise over the picture (seeded, the same in every render). |
+| Film grain (`grain`) | 0–0.3 (0.05) | Fine moving noise over the picture, one speck per pixel (seeded, the same in every render). A smaller preview can't show specks that fine, so it shows them fainter. |
 | Vignette (`vignette`) | 0–1 (0.55) | Darkens the corners. |
 
 The palette's **bg** colour is the background behind every layer.

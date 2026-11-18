@@ -7,9 +7,11 @@
   import { spansToSeconds, spanGain, type LayerDef, type Transform } from "../../../../../packages/core/src/index.ts";
   import type { FeatureTrack } from "../../../../../packages/features/src/index.ts";
 
-  let { project, profileId, features, time, scaleOverride = null, loopWraps = 0, selectedLayer = null, onselect = () => {}, onlayout = () => {} }: {
+  let { project, profileId, features, time, scaleOverride = null, loopWraps = 0, selectedLayer = null, onselect = () => {}, onlayout = () => {}, qualityKey = "in" }: {
     project: Project | null; profileId: string; features: Record<string, FeatureTrack> | null; time: number;
     scaleOverride?: number | null; loopWraps?: number;
+    /** Where the quality choice is remembered: the editor's preview ("in") and the output window ("out") each have one. */
+    qualityKey?: string;
     selectedLayer?: string | null; onselect?: (id: string | null) => void;
     onlayout?: (id: string, t: Transform, final: boolean) => void;
   } = $props();
@@ -21,8 +23,13 @@
   let renderer: Renderer | null = null;
   let error = $state<string | null>(null);
   const profile = $derived(getProfile(profileId));
-  // preview at about half size: plenty for judging, and cheap
-  const scale = $derived(scaleOverride ?? Math.min(1, 960 / Math.max(profile.width, profile.height)));
+  // Quality: the share of the video's size the preview is drawn at. "auto" is at most 960 px on the longer side
+  // (half size for 1080p: plenty for judging, and cheap); "full" draws exactly what the export will.
+  const QUALITIES = [["auto", "Auto"], ["0.25", "25%"], ["0.5", "50%"], ["0.75", "75%"], ["1", "Full"]] as const;
+  const storeKey = $derived(`vizier.previewQuality.${qualityKey}`);
+  let quality = $state(untrack(() => { try { return localStorage.getItem(`vizier.previewQuality.${qualityKey}`) ?? "auto"; } catch { return "auto"; } }));
+  function setQuality(q: string) { quality = q; try { localStorage.setItem(storeKey, q); } catch { /* not available */ } }
+  const scale = $derived(scaleOverride ?? (quality === "auto" ? Math.min(1, 960 / Math.max(profile.width, profile.height)) : Number(quality)));
 
   // The renderer is built once per format, preview size and analysis; edits to the project are applied to it in
   // place (Renderer.update), so trails flow on while you change parameters.
@@ -102,7 +109,14 @@
     {/if}
   </div>
   {#if error}<div class="err">{error}</div>{/if}
-  <div class="label mono">{profile.label} · {profile.width}×{profile.height} · {profile.fps} fps · preview {Math.round(scale * 100)}%</div>
+  <div class="label mono">{profile.label} · {profile.width}×{profile.height} · {profile.fps} fps ·
+    <label title="How sharp the preview is: the share of the video's size it's drawn at. Full shows exactly what the export will; lower is lighter on the computer.">
+      preview <select class="q mono" value={quality} onchange={(e) => { setQuality(e.currentTarget.value); e.currentTarget.blur(); }} disabled={scaleOverride !== null} aria-label="Preview quality">
+        {#each QUALITIES as [v, l]}<option value={v}>{v === "auto" ? `Auto (${Math.round(Math.min(1, 960 / Math.max(profile.width, profile.height)) * 100)}%)` : l}</option>{/each}
+      </select>
+      {Math.round(profile.width * scale)}×{Math.round(profile.height * scale)}
+    </label>
+  </div>
 </div>
 
 <style>
@@ -113,5 +127,6 @@
   .box :global(canvas.frame) { width: 100%; height: 100%; display: block; }
   .safe { position: absolute; border: 1px dashed #f5a52499; pointer-events: none; }
   .label { color: var(--faint); font-size: 11px; }
+  .q { font-size: 11px; padding: 0 2px; background: transparent; border-color: var(--line); color: var(--dim); }
   .err { position: absolute; inset: 12px; color: var(--danger); font: 12px var(--mono); white-space: pre-wrap; overflow: auto; background: #000c; padding: 8px; }
 </style>

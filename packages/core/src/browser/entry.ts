@@ -12,9 +12,9 @@ const b64 = (px: Uint8Array) => {
   return btoa(s);
 };
 (window as any).vizier = {
-  async init(project: Project, profileId: string, tracks: Record<string, FeatureTrack>) {
+  async init(project: Project, profileId: string, tracks: Record<string, FeatureTrack>, scale = 1) {
     await document.fonts.load("40px 'Special Elite'");
-    r = new Renderer(project, profileId, tracks);
+    r = new Renderer(project, profileId, tracks, "'Special Elite'", scale);
     document.body.appendChild(r.canvas);
     return { width: r.profile.width, height: r.profile.height, fps: r.profile.fps };
   },
