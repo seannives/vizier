@@ -108,3 +108,17 @@ export function validateGrid(g: Grid): string[] {
   if (g.downbeat !== undefined && !(g.downbeat >= 0)) errs.push("grid.downbeat must be ≥ 0 seconds");
   return errs;
 }
+
+/** The beats from `from` up to (not including) `to`, in seconds, with whether each starts a bar (for a click). */
+export function beatTimes(from: number, to: number, grid: Grid): { t: number; bar: number; downbeat: boolean }[] {
+  const out: { t: number; bar: number; downbeat: boolean }[] = [];
+  // the first beat line at or after `from` (a hair before it, so a beat exactly at `from` counts)
+  let b = nextBeatLine(secondsToBar(from, grid) - 1e-5, 1, grid);
+  for (let guard = 0; guard < 10000; guard++) {
+    const t = barToSeconds(b, grid);
+    if (t >= to) break;
+    if (t >= from - 1e-9) out.push({ t, bar: b, downbeat: Math.abs(b - Math.round(b)) < 1e-6 });
+    b = nextBeatLine(b, 1, grid);
+  }
+  return out;
+}

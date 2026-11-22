@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { spansToSeconds, spanGain, splitSpans, validateSpans } from "../src/spans.ts";
-import { addBeats, beatsPerBarAt, nextBeatLine } from "../src/grid.ts";
+import { addBeats, beatsPerBarAt, nextBeatLine, beatTimes } from "../src/grid.ts";
 import { mergeVideos, validateProject, type Project } from "../src/index.ts";
 
 // 120 BPM, 4/4, bar 1 at 0 s: a bar is 2 s, a beat 0.5 s
@@ -103,5 +103,17 @@ describe("beats across a metre change (4/4 until bar 17, then 3/4; 120 BPM: a be
     expect(nextBeatLine(17, 1, g)).toBeCloseTo(17 + 1 / 3);
     expect(nextBeatLine(17, -1, g)).toBeCloseTo(16.75);
     expect(nextBeatLine(17 + 1 / 3, -1, g)).toBeCloseTo(17);
+  });
+});
+
+describe("beat times (the click)", () => {
+  const g = { tempo: [{ bar: 1, bpm: 120, beatsPerBar: 4 }, { bar: 3, bpm: 60, beatsPerBar: 3 }], downbeat: 0.5 };
+  it("lists every beat in a stretch of time, marking the first of each bar, across a tempo and metre change", () => {
+    const b = beatTimes(0, 9, g);
+    expect(b.map((x) => x.t)).toEqual([0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5.5, 6.5, 7.5, 8.5]);
+    expect(b.filter((x) => x.downbeat).map((x) => x.t)).toEqual([0.5, 2.5, 4.5, 7.5]);
+  });
+  it("includes a beat exactly at the start, not at the end", () => {
+    expect(beatTimes(1, 2, g).map((x) => x.t)).toEqual([1, 1.5]);
   });
 });

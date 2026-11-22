@@ -31,6 +31,10 @@ export const api = {
     const r = await getJson(`/api/upload?name=${encodeURIComponent(file.name)}`, { method: "POST", body: file });
     return r.file;
   },
+  /** The tempo and where bar 1 starts, worked out from a file (the mix), with other likely tempos. */
+  async tempo(file: string): Promise<{ bpm: number; downbeat: number; beatsPerBar: number; candidates: { bpm: number; score: number }[] }> {
+    return getJson(`/api/tempo?file=${encodeURIComponent(file)}`);
+  },
   /** The audio files in media/. */
   async media(): Promise<{ file: string; bytes: number }[]> { return getJson("/api/media"); },
   /** A track's length, the mix's, and how far the track is shifted against the mix (seconds; null: can't tell). */

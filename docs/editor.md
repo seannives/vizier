@@ -34,6 +34,14 @@ server isn't running, the editor says so and keeps your changes: start it again 
   file is kept aside until you save: saving moves it into `media/` under its own name, overwriting the file the
   track used if it had the same name, or deleting the old file if nothing else uses it. Undo before saving
   leaves `media/` as it was. A removed track's file stays in `media/`.
+- **Tempo** (side panel, fold open with ▸): the song's grid, shared by every video. **Bar 1 starts at** is where
+  bar 1 begins in the mix (◂ ▸ slide the grid 10 ms, ⇧ for 1 ms). **Bar line to playhead**: put the playhead on a
+  downbeat you can hear or see, press it, and the nearest bar line moves there. The table sets the BPM and beats per
+  bar, from bar 1 and from any later bar (**+ Change at bar N** adds one at the playhead's bar; the ruler marks
+  changes). **From the mix** offers the tempo worked out from the mix (and other likely ones: half and double
+  tempos are common mix-ups) and where bar 1 starts; click one to use it. **⌥-drag in the bar ruler** slides the
+  whole grid. **Click** (C, also in the top bar) ticks on every beat while playing, higher on the first beat of each
+  bar, to check the grid by ear. Layers, lanes and ranges are in bars, so they move with the grid.
 - **Transport, Ableton-style**: Play starts from the start marker (the hollow triangle in the ruler). Stop leaves the
   playhead where it stopped; the next Play jumps back to the marker, and ⇧Space continues from the stop point instead.
   Clicking the timeline or the arrow keys move the marker. With loop on (L), playback wraps at the range's end

@@ -4,14 +4,14 @@ import {
   addLayer, removeLayer, moveLayer, duplicateLayer, setParam, setLayout, placement, hasOwnLayout, patchLayer,
   layerOrigin, isChanged, baseLayer, resetSetting, resetLayer, removedLayers, restoreLayer, newVideo, detachVideo, setVideo,
   laneOf, laneChanged, laneInherited, setLane, addLane, removeLane, resetLane, lanesOfLayer,
-  modsOf, modOrigin, addMod, setMod, removeMod, resetMod, frontToBack, addTrack, renameTrack, moveTrack, removeTrack, setTrackFile, trackIdFor, mixTrackId, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
+  modsOf, modOrigin, addMod, setMod, removeMod, resetMod, frontToBack, addTrack, renameTrack, moveTrack, removeTrack, setTrackFile, trackIdFor, mixTrackId, setTempo, addTempoChange, moveTempoChange, removeTempoChange, setDownbeat, tempoSegments, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
 } from "../src/app/lib/edits.ts";
 import { validateProject, buildProject, resolveVideo } from "../../../packages/core/src/index.ts";
 
 const L = { landscape: { x: 0.5, y: 0.5, w: 1, h: 1 } };
 const grid = { tempo: [{ bar: 1, bpm: 120, beatsPerBar: 4 }], downbeat: 0 };
 const doc = (): Doc => ({
-  song: { version: 2, title: "t", grid, tracks: [{ id: "mix", name: "Mix", file: "m.wav", mix: true }, { id: "bass", name: "303", file: "b.wav" }] },
+  song: { version: 2, title: "t", grid: structuredClone(grid), tracks: [{ id: "mix", name: "Mix", file: "m.wav", mix: true }, { id: "bass", name: "303", file: "b.wav" }] },
   videos: {
     full: {
       version: 2, format: "youtube",
@@ -374,5 +374,37 @@ describe("saving moved files", () => {
     s.undo();
     expect(s.doc.song.tracks.at(-1)!.file).toBe("media/pad.wav");
     expect(s.dirty).toBe(true);
+  });
+});
+
+describe("tempo", () => {
+  it("sets BPM and beats per bar, within sense", () => {
+    const d = doc();
+    setTempo(d, 1, { bpm: 155.0004, beatsPerBar: 3 });
+    expect(tempoSegments(d)).toEqual([{ bar: 1, bpm: 155, beatsPerBar: 3 }]);
+    setTempo(d, 1, { bpm: 0, beatsPerBar: 2.5 });                      // ignored
+    expect(tempoSegments(d)[0]).toMatchObject({ bpm: 155, beatsPerBar: 3 });
+  });
+  it("adds a change at a whole bar with the values in effect, moves and removes it; bar 1 stays", () => {
+    const d = doc();
+    expect(addTempoChange(d, 16.6)).toBe(17);
+    expect(addTempoChange(d, 17)).toBeNull();                           // already one there
+    expect(addTempoChange(d, 1)).toBeNull();
+    expect(tempoSegments(d)).toEqual([{ bar: 1, bpm: 120, beatsPerBar: 4 }, { bar: 17, bpm: 120, beatsPerBar: 4 }]);
+    setTempo(d, 17, { bpm: 90 });
+    moveTempoChange(d, 17, 9);
+    expect(tempoSegments(d).map((s) => [s.bar, s.bpm])).toEqual([[1, 120], [9, 90]]);
+    moveTempoChange(d, 1, 5);                                            // bar 1 doesn't move
+    removeTempoChange(d, 1);
+    removeTempoChange(d, 9);
+    expect(tempoSegments(d).map((s) => s.bar)).toEqual([1]);
+    expect(valid(d, "full")).toEqual([]);
+  });
+  it("sets where bar 1 starts, to the millisecond, never before the start of the audio", () => {
+    const d = doc();
+    setDownbeat(d, 0.12345);
+    expect(d.song.grid!.downbeat).toBe(0.123);
+    setDownbeat(d, -0.5);
+    expect(d.song.grid!.downbeat).toBe(0);
   });
 });

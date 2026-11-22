@@ -49,7 +49,7 @@ Editor milestones:
         on the M1 Pro. Found and fixed: trails left a faint haze that never faded (8-bit feedback), which showed as
         a lighter rectangle where the acid ring's box is; a still at a bar showed the frame just before it
   - Then a lighter sweep every couple of milestones (mainly the rule-based tests)
-- [ ] 4. In three parts:
+- [x] 4. In three parts:
   - [x] 4a. Tracks like Ableton's: Tracks panel; drop audio from Finder to add a track, or on a track to replace
         its audio (a replacement overwrites the old file on save); add or replace from media/; rename, reorder,
         remove (its layers and modulations move to the mix); each stem checked against the mix for length and
@@ -57,7 +57,10 @@ Editor milestones:
   - [x] New project from the editor: a dialog asks for the title; drop the mix and stems; makes projects/<title>/
         with a first guess at the tempo and bar 1, and an empty YouTube video. `vizier editor` without a project
         opens on it; the project name switches projects (decided 2026-11-22: between 4a and 4b)
-  - [ ] 4b. Tempo panel (typed BPM with detected suggestion, downbeat, drag the grid, audible click)
+  - [x] 4b. Tempo panel: where bar 1 starts (typed, nudged, bar line to playhead, ⌥-drag in the ruler), BPM and beats
+        per bar with changes at later bars (marked in the ruler), the tempo worked out from the mix as suggestions,
+        and a click on every beat (C)
+- [ ] Later: tap tempo; tempo ramps (see below); detect tempo changes in the mix
 - [ ] 5. Colour pickers, palette panel and colour lanes; Render button with progress; list of renders
 - [ ] Modulation presets: one-click combinations such as "pulse with the kick" or "colour follows the filter"
 - [ ] Later: pencil drawing of automation; finer snapping; record control moves (mouse or MIDI) as automation

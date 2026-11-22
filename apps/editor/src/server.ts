@@ -21,6 +21,7 @@ import { loadFeatures, decodeMono, SAMPLE_RATE } from "../../offline/src/audio.t
 import { listVideos, loadSong, loadVideoFile, projectDir } from "../../offline/src/project-io.ts";
 import { storeUpload, listMedia, settleMedia, clearIncoming, stemOffset } from "./media.ts";
 import { listProjects, beginProject, addProjectMedia, finishProject, discardProject } from "./projects.ts";
+import { analyze } from "../../offline/src/analyze.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const { values, positionals } = parseArgs({
@@ -184,6 +185,16 @@ const server = createServer(async (req, res) => {
       return json(res, { file });
     }
     if (p === "/api/media") return json(res, listMedia(need()));
+    // the tempo and where bar 1 starts, worked out from a file (the mix): suggestions for the tempo panel
+    if (p === "/api/tempo") {
+      const f = projectFile(url.searchParams.get("file")!);
+      const key = `tempo|${f}|${statSync(f).mtimeMs}`;
+      if (!checkCache.has(key)) {
+        const a = analyze([{ id: "mix", samples: decodeMono(f) }], "mix", SAMPLE_RATE);
+        checkCache.set(key, { bpm: a.bpm, downbeat: Math.round(a.downbeat * 1000) / 1000, beatsPerBar: a.beatsPerBar, candidates: a.tempo.slice(0, 5) });
+      }
+      return json(res, checkCache.get(key));
+    }
     // a track's length, and how far it's shifted against the mix
     if (p === "/api/trackcheck") {
       const file = url.searchParams.get("file")!, mix = url.searchParams.get("mix")!;

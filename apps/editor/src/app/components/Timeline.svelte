@@ -14,7 +14,9 @@
   let { grid, sections, tracks, layers = [], selectedLayer = null, selectedSpan = null, duration, time, range, rangeInherited, follow,
     marker = 0, snap = true, onseek, onrange, onselectlayer = () => {}, onspans = () => {}, contentHeight = $bindable(0),
     lanes = [], shownLanes = new Set<string>(), selectedPoint = null, ontogglelanes = () => {}, onselectpoint = () => {}, onlanepoints = () => {},
-    onlanecurve = () => {}, onlaneremove = () => {}, onlanereset = () => {}, onhidelane = () => {} }: {
+    onlanecurve = () => {}, onlaneremove = () => {}, onlanereset = () => {}, onhidelane = () => {}, ongrid = () => {}, ongriddone = () => {} }: {
+    /** ⌥-drag in the ruler slides the grid: where bar 1 starts (seconds), live while dragging; then done. */
+    ongrid?: (downbeat: number) => void; ongriddone?: () => void;
     /** Every automation lane, and which are shown (by target); hidden lanes keep working. */
     lanes?: LaneRow[]; shownLanes?: Set<string>; selectedPoint?: { target: string; index: number } | null;
     /** ▸ on a layer row: show all its lanes, or hide them if any are shown. */
@@ -194,6 +196,14 @@
           ctx.fillText(barLabel(b, grid).replace(/\.1$/, ""), x + 4, H_RULER - 9);
         }
       }
+      // tempo and metre changes: a mark at the top of the ruler
+      for (const seg of grid.tempo) {
+        if (seg.bar <= 1) continue;
+        const x = Math.round(xOf(barToSeconds(seg.bar, grid), v)) + 0.5;
+        if (x < -40 || x > W + 2) continue;
+        ctx.fillStyle = C.accent; ctx.fillRect(x, 0, 1, 9);
+        ctx.fillText(`${seg.bpm}${(seg.beatsPerBar ?? 4) !== 4 ? ` ${seg.beatsPerBar}/4` : ""}`, x + 3, 6);
+      }
     }
 
     // range bracket (in the ruler) and the area outside it dimmed
@@ -300,7 +310,7 @@
   }
 
   // ---- mouse: seek, scrub, create / move / resize the range ----
-  type Drag = { kind: "seek" | "edgeL" | "edgeR" | "move" | "maybe"; x0: number; t0: number; orig: { from: number; to: number } | null; moved: boolean };
+  type Drag = { kind: "seek" | "edgeL" | "edgeR" | "move" | "maybe" | "grid"; x0: number; t0: number; orig: { from: number; to: number } | null; moved: boolean; downbeat?: number };
   let drag: Drag | null = null;
   // snapping (clicks, scrubbing and range edges) follows the Snap setting; holding Shift does the opposite
   const snapT = (t: number, e: MouseEvent) => (grid && snap !== e.shiftKey ? snapTime(Math.min(Math.max(0, t), duration), grid) : Math.min(Math.max(0, t), duration));
@@ -415,6 +425,7 @@
     if (row?.kind === "layer") return layerDown(e, row.layer);
     if (row?.kind === "lane") return laneDown(e, row);
     const r = range;
+    if (y < H_RULER && e.altKey && grid) { drag = { kind: "grid", x0: x, t0: t, orig: null, moved: false, downbeat: grid.downbeat ?? 0 }; return; }
     if (y < H_RULER) {
       if (r && Math.abs(x - xOf(r.from, view)) < 6) drag = { kind: "edgeL", x0: x, t0: t, orig: r, moved: false };
       else if (r && Math.abs(x - xOf(r.to, view)) < 6) drag = { kind: "edgeR", x0: x, t0: t, orig: r, moved: false };
@@ -433,12 +444,13 @@
       const y = vy(e);
       const row = rowAt(y);
       const edge = row?.kind === "layer" ? spanHit(row.layer, x) : null;
-      (e.currentTarget as HTMLCanvasElement).style.cursor = (y < H_RULER && r && (Math.abs(x - xOf(r.from, view)) < 6 || Math.abs(x - xOf(r.to, view)) < 6)) || (edge && edge.part !== "move") ? "ew-resize" : "default";
+      (e.currentTarget as HTMLCanvasElement).style.cursor = y < H_RULER && e.altKey ? "grab" : (y < H_RULER && r && (Math.abs(x - xOf(r.from, view)) < 6 || Math.abs(x - xOf(r.to, view)) < 6)) || (edge && edge.part !== "move") ? "ew-resize" : "default";
       return;
     }
     if (Math.abs(x - drag.x0) > 3) drag.moved = true;
     if (!drag.moved) return;
     if (drag.kind === "seek") return onseek(snapT(t, e));
+    if (drag.kind === "grid") return ongrid(Math.max(0, drag.downbeat! + (t - drag.t0)));
     if (drag.kind === "maybe") drag.kind = drag.orig ? "move" : "edgeR", drag.orig ??= { from: snapT(drag.t0, e), to: snapT(drag.t0, e) };
     const o = drag.orig!;
     if (drag.kind === "edgeL") dragRange = { from: Math.min(snapT(t, e), o.to), to: o.to };
@@ -451,6 +463,7 @@
     if (laneDrag) return laneUp();
     const d = drag; drag = null;
     if (!d) return;
+    if (d.kind === "grid") { ongriddone(); return; }
     if (!d.moved && (d.kind === "maybe" || d.kind === "edgeL" || d.kind === "edgeR")) { onseek(snapT(d.t0, e)); return; }
     if (dragRange) { const r = dragRange; dragRange = null; if (r.to - r.from > 0.05) onrange(r); }
   }

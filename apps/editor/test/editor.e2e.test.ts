@@ -688,4 +688,49 @@ run("editor (headless Chrome)", () => {
     await page.click('.tracks [data-track="pad-copy"] button.rm');
     expect((await tracks()).some((x) => x.id === "pad-copy")).toBe(false);
   }, 120_000);
+
+  it("tempo: set BPM and beats per bar, add a change, slide the grid (⌥-drag, bar line to playhead), the click", async () => {
+    const grid = () => page.evaluate(() => (window as any).vizierEditor.session().doc.song.grid);
+    if (!(await page.locator(".tempo").count())) await page.click('button.fold-btn:has-text("Tempo")');
+    // the mix's tempo is worked out and offered (the demo is 128 BPM)
+    await page.waitForSelector(".tempo .detected button.best", { timeout: 60_000 });
+    expect(await page.textContent(".tempo .detected button.best")).toBe("128");
+    await page.fill('input[aria-label="BPM from bar 1"]', "130"); await page.press('input[aria-label="BPM from bar 1"]', "Tab");
+    expect((await grid()).tempo[0].bpm).toBe(130);
+    await page.click(".tempo .detected button.best");                       // back to what the mix says
+    expect((await grid()).tempo[0].bpm).toBe(128);
+    // a change at the playhead's bar: 3 beats a bar from there
+    await page.evaluate(() => { const ed = (window as any).vizierEditor, g = ed.session().doc.song.grid; ed.seek(g.downbeat + (8 * 4 * 60) / 128); });
+    await page.click('.tempo button:has-text("+ Change at bar 9")');
+    await page.fill('input[aria-label="Beats per bar from bar 9"]', "3"); await page.press('input[aria-label="Beats per bar from bar 9"]', "Tab");
+    expect((await grid()).tempo).toEqual([{ bar: 1, bpm: 128, beatsPerBar: 4 }, { bar: 9, bpm: 128, beatsPerBar: 3 }]);
+    await page.click('[data-tempo-bar="9"] button.x');
+    expect((await grid()).tempo).toHaveLength(1);
+    // ⌥-drag in the ruler slides the grid by the time dragged, as one undo step
+    const before = (await grid()).downbeat;
+    const xy = await page.evaluate(() => { const tl = (window as any).vizierEditor.timeline(); return { a: tl.pageX(10), b: tl.pageX(10.25), y: tl.rulerY() }; });
+    await page.keyboard.down("Alt");
+    await page.mouse.move(xy.a, xy.y); await page.mouse.down();
+    await page.mouse.move((xy.a + xy.b) / 2, xy.y, { steps: 3 }); await page.mouse.move(xy.b, xy.y, { steps: 3 });
+    await page.mouse.up();
+    await page.keyboard.up("Alt");
+    expect((await grid()).downbeat).toBeCloseTo(before + 0.25, 1);
+    expect((await state()).undoLabel).toBe("move the grid");
+    await page.keyboard.press("ControlOrMeta+z");
+    expect((await grid()).downbeat).toBeCloseTo(before, 3);
+    // bar line to playhead: the bar line nearest the playhead moves onto it
+    await page.evaluate(() => { const ed = (window as any).vizierEditor, g = ed.session().doc.song.grid; ed.seek(g.downbeat + (4 * 4 * 60) / 128 + 0.04); });
+    await page.click('.tempo button:has-text("Bar line to playhead")');
+    expect((await grid()).downbeat).toBeCloseTo(before + 0.04, 3);
+    await page.keyboard.press("ControlOrMeta+z");
+    // the click: C turns it on; playing schedules a tick on every beat, the first of each bar marked
+    await page.keyboard.press("c");
+    await page.keyboard.press("Space");
+    await page.waitForFunction(() => (window as any).vizierEditor.clicks().beats >= 4, null, { timeout: 20_000 });
+    await page.keyboard.press("Space");
+    await page.keyboard.press("c");
+    const c = await page.evaluate(() => (window as any).vizierEditor.clicks());
+    expect(c.downbeats).toBeGreaterThanOrEqual(1);
+    expect(c.beats / Math.max(1, c.downbeats)).toBeGreaterThan(1.5);          // about 3 beats to each downbeat
+  }, 120_000);
 });

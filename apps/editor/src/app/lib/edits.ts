@@ -538,3 +538,44 @@ export function removeTrack(doc: Doc, id: string): string[] {
 }
 /** The tracks' files, id → file (what the renderer's features are made from). */
 export const trackFiles = (doc: Doc): Record<string, string> => Object.fromEntries(doc.song.tracks.map((t) => [t.id, t.file]));
+
+// ---- tempo (the song's grid: shared by every video). Layers, lanes and ranges are in bars, so they move with it ----
+
+const gridOf = (doc: Doc) => (doc.song.grid ??= { tempo: [{ bar: 1, bpm: 120, beatsPerBar: 4 }], downbeat: 0 });
+/** The tempo list in order of bar. */
+export const tempoSegments = (doc: Doc) => [...gridOf(doc).tempo].sort((a, b) => a.bar - b.bar);
+
+/** Set the BPM and/or beats per bar of the tempo entry starting at `bar`. */
+export function setTempo(doc: Doc, bar: number, patch: { bpm?: number; beatsPerBar?: number }): void {
+  const seg = gridOf(doc).tempo.find((s) => s.bar === bar);
+  if (!seg) return;
+  if (patch.bpm !== undefined && patch.bpm >= 20 && patch.bpm <= 400) seg.bpm = Math.round(patch.bpm * 1000) / 1000;
+  if (patch.beatsPerBar !== undefined && Number.isInteger(patch.beatsPerBar) && patch.beatsPerBar >= 1 && patch.beatsPerBar <= 16) seg.beatsPerBar = patch.beatsPerBar;
+}
+/** A tempo or metre change from a whole bar (after bar 1), starting with the values in effect there. Returns its bar. */
+export function addTempoChange(doc: Doc, bar: number): number | null {
+  const g = gridOf(doc), b = Math.round(bar);
+  if (b <= 1 || g.tempo.some((s) => s.bar === b)) return null;
+  const cur = tempoSegments(doc).filter((s) => s.bar <= b).pop()!;
+  g.tempo.push({ bar: b, bpm: cur.bpm, beatsPerBar: cur.beatsPerBar ?? 4 });
+  g.tempo.sort((x, y) => x.bar - y.bar);
+  return b;
+}
+/** Move a tempo change to another whole bar (not bar 1, not onto another change). */
+export function moveTempoChange(doc: Doc, from: number, to: number): void {
+  const g = gridOf(doc), b = Math.round(to);
+  const seg = g.tempo.find((s) => s.bar === from);
+  if (!seg || from === 1 || b <= 1 || g.tempo.some((s) => s !== seg && s.bar === b)) return;
+  seg.bar = b;
+  g.tempo.sort((x, y) => x.bar - y.bar);
+}
+export function removeTempoChange(doc: Doc, bar: number): void {
+  if (bar === 1) return;
+  const g = gridOf(doc);
+  g.tempo = g.tempo.filter((s) => s.bar !== bar);
+}
+/** Where bar 1 starts in the audio, in seconds (≥ 0; to the millisecond). */
+export function setDownbeat(doc: Doc, seconds: number): void {
+  if (!Number.isFinite(seconds)) return;
+  gridOf(doc).downbeat = Math.max(0, Math.round(seconds * 1000) / 1000);
+}

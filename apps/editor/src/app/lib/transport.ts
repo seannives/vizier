@@ -23,6 +23,53 @@ export class Transport {
   /** Picture/sound sync correction in seconds: positive moves the playhead (and picture) later, negative earlier. */
   extraDelay = 0;
 
+  // ---- the click: a short tick on every beat while playing (higher on the first beat of a bar), scheduled a
+  // little ahead on the audio clock, so it's exactly in time with the mix whatever the page is doing ----
+  private clickBeats: ((from: number, to: number) => { t: number; downbeat: boolean }[]) | null = null;
+  private clickTimer = 0;
+  private clickUntil = 0;
+  private clickNodes: OscillatorNode[] = [];
+  /** Clicks scheduled so far (the first of a bar counted separately), for tests. */
+  clickCount = { beats: 0, downbeats: 0 };
+  /** Turn the click on (with the beats of the song's grid, in song seconds) or off (null). */
+  setClick(beats: ((from: number, to: number) => { t: number; downbeat: boolean }[]) | null) {
+    this.clickBeats = beats;
+    this.cancelClicks();
+    if (this.playing) this.startClicks();
+  }
+  get clicking() { return !!this.clickBeats; }
+  private startClicks() {
+    if (!this.clickBeats) return;
+    this.clickUntil = this.offset;
+    const tick = () => {
+      if (!this.playing || !this.clickBeats) return;
+      const now = this.offset + (this.ctx.currentTime - this.startedAt);  // song time being sent to the speakers
+      const until = now + 0.25;
+      for (const b of this.clickBeats(Math.max(this.clickUntil, now), until)) {
+        const when = this.startedAt + (b.t - this.offset);
+        if (when < this.ctx.currentTime) continue;
+        const osc = this.ctx.createOscillator(), gain = this.ctx.createGain();
+        osc.frequency.value = b.downbeat ? 1600 : 1000;
+        gain.gain.setValueAtTime(0.0001, when);
+        gain.gain.exponentialRampToValueAtTime(b.downbeat ? 0.5 : 0.3, when + 0.002);
+        gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
+        osc.connect(gain).connect(this.ctx.destination);
+        osc.start(when); osc.stop(when + 0.06);
+        osc.onended = () => { this.clickNodes = this.clickNodes.filter((n) => n !== osc); };
+        this.clickNodes.push(osc);
+        if (b.downbeat) this.clickCount.downbeats++; else this.clickCount.beats++;
+      }
+      this.clickUntil = Math.max(this.clickUntil, until);
+    };
+    tick();
+    this.clickTimer = window.setInterval(tick, 50);
+  }
+  private cancelClicks() {
+    clearInterval(this.clickTimer); this.clickTimer = 0;
+    for (const n of this.clickNodes) { n.onended = null; try { n.stop(); } catch { /* not started */ } }
+    this.clickNodes = [];
+  }
+
   async load(url: string): Promise<number> {
     const data = await (await fetch(url)).arrayBuffer();
     this.buffer = await this.ctx.decodeAudioData(data);
@@ -84,14 +131,15 @@ export class Transport {
     this.startedAt = this.ctx.currentTime;
     this.smooth = null;
     src.start(0, this.offset);
-    src.onended = () => { if (this.source === src) { this.playing = false; this.offset = this.duration; this.source = null; } };
+    src.onended = () => { if (this.source === src) { this.playing = false; this.offset = this.duration; this.source = null; this.cancelClicks(); } };
     this.source = src;
     this.playing = true;
+    this.startClicks();
   }
   stop() { if (this.playing) this.offset = this.time(); this.stopSource(); this.playing = false; this.smooth = null; }
   seek(t: number) {
     if (this.playing && this.buffer) this.startSource(t);
     else this.offset = Math.min(Math.max(0, t), this.duration);
   }
-  private stopSource() { if (this.source) { this.source.onended = null; try { this.source.stop(); } catch { /* already stopped */ } this.source = null; } }
+  private stopSource() { this.cancelClicks(); if (this.source) { this.source.onended = null; try { this.source.stop(); } catch { /* already stopped */ } this.source = null; } }
 }

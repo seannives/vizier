@@ -14,15 +14,16 @@
   import NewVideo from "./components/NewVideo.svelte";
   import TracksPanel, { type TrackCheck } from "./components/TracksPanel.svelte";
   import Projects from "./components/Projects.svelte";
+  import TempoPanel, { type TempoGuess } from "./components/TempoPanel.svelte";
   import type { LayerRow, SpanS, LaneRow, LanePoint } from "./components/Timeline.svelte";
-  import { frontToBack, addTrack, setTrackFile, removeTrack, trackFiles } from "./lib/edits.ts";
+  import { frontToBack, addTrack, setTrackFile, removeTrack, trackFiles, setDownbeat } from "./lib/edits.ts";
   import { setSpans, splitLayerAt, duplicateLayer, layerOf, setLayout, newVideo, lanesOfLayer, laneInherited, laneChanged, setLane, addLane, removeLane, resetLane } from "./lib/edits.ts";
   import type { Doc } from "./lib/session.ts";
   import { stats } from "./lib/stats.ts";
   import { openLink, type Msg } from "./lib/link.ts";
   import { featureAt } from "./lib/features.ts";
   import {
-    barToSeconds, secondsToBar, barLabel, nextBeatLine, sectionTimes, videoFormat, getProfile, spansToSeconds, laneToSeconds, paramTargets, EFFECTS, type Project, type BreakpointInput, type Span, type Transform,
+    barToSeconds, secondsToBar, barLabel, beatTimes, nextBeatLine, sectionTimes, videoFormat, getProfile, spansToSeconds, laneToSeconds, paramTargets, EFFECTS, type Project, type BreakpointInput, type Span, type Transform,
   } from "../../../../packages/core/src/index.ts";
   import type { FeatureTrack } from "../../../../packages/features/src/index.ts";
 
@@ -303,10 +304,29 @@
     for (const f of files) await addTrackFrom(f);
   }
 
+  // ---- tempo: the panel, what the mix suggests, the click ----
+  let showTempo = $state(load("vizier.tempoOpen", "0") === "1");
+  $effect(() => save_("vizier.tempoOpen", showTempo ? "1" : "0"));
+  let detected = $state<TempoGuess | null>(null);
+  let detectedFor = "";
+  $effect(() => {
+    if (!showTempo || !mixFile || detectedFor === mixFile) return;
+    const f = mixFile; detectedFor = f; detected = null;
+    api.tempo(f).then((d) => { if (detectedFor === f) detected = d; }).catch((e) => flash((e as Error).message));
+  });
+  let clicking = $state(false);
+  function toggleClick() {
+    clicking = !clicking;
+    // (reads the grid as it is when each beat is scheduled, so tempo edits are heard straight away)
+    transport.setClick(clicking ? (a, b) => { const g = session?.doc.song.grid; return g ? beatTimes(a, b, g) : []; } : null);
+    flash(`click ${clicking ? "on" : "off"}`);
+  }
+
   const shortcuts: Shortcut[] = [
     { keys: "Space", label: "Play / stop (stop returns to the start marker)", group: "Transport", run: togglePlay },
     { keys: "Shift+Space", label: "Continue from where playback stopped", group: "Transport", run: continuePlay },
     { keys: "L", label: "Loop the range", group: "Transport", run: () => (loop = !loop) },
+    { keys: "C", label: "Click on every beat while playing (to check the grid)", group: "Transport", run: toggleClick },
     { keys: "ArrowRight", label: "Forward a bar", group: "Transport", run: () => nudge(1, false) },
     { keys: "ArrowLeft", label: "Back a bar", group: "Transport", run: () => nudge(-1, false) },
     { keys: "Shift+ArrowRight", label: "Forward a beat", group: "Transport", run: () => nudge(1, true) },
@@ -594,6 +614,8 @@
     (window as any).vizierEditor = {
       stats: () => ({ ...stats.summary(), ...stats.counts }),
       featureAt: (track: string, feature: string, t: number) => featureAt(features, track, feature, t),
+      clicks: () => ({ ...transport.clickCount }),
+      seek: (t: number) => seek(t),
       get state() { return { shownLanes: [...shownLanes], selectedPoint, popped, selectedLayer, selectedSpan, status, error: loadError, playing, transportPlaying: transport.playing, loop, loopWraps, time, marker, snap, syncMs, reportedLatency, videoName, dirtyFiles, range: rangeBars, undoLabel, serverOnline }; },
       timeline: () => timeline,
       clock: () => transport.clockInfo(),
@@ -621,6 +643,7 @@
       <button class:on={playing} onclick={togglePlay} title="Play / stop ({displayKeys("Space")})">{playing ? "■" : "▶"}</button>
       <button class:on={loop} onclick={() => (loop = !loop)} title="Loop the range ({displayKeys("L")})">⟲</button>
       <button class="snap" class:on={snap} onclick={() => (snap = !snap)} title="Snap to the beat ({displayKeys("Mod+4")})">Snap</button>
+      <button class="snap" class:on={clicking} onclick={toggleClick} title="Click on every beat while playing ({displayKeys("C")})">Click</button>
     </div>
     <div class="pos mono"><span class="bar">{position}</span><span class="dim">{clock(time)}</span>{#if bpm}<span class="dim">{bpm} BPM</span>{/if}</div>
     <div class="sect">{section}</div>
@@ -653,6 +676,12 @@
       {#if showTracks && doc}
         <TracksPanel {doc} checks={checksByFile} {media} {edit} onadd={addTrackFrom} onreplace={replaceTrackWith} onremove={removeTrackNow} onrefreshmedia={refreshMedia} />
       {/if}
+      <h3 class="fold-h"><button class="fold-btn" onclick={() => (showTempo = !showTempo)} aria-expanded={showTempo}
+        title="{showTempo ? "Hide" : "Show"} the song's tempo and grid (shared by every video)">{showTempo ? "▾" : "▸"} Tempo</button>
+        <span class="hint-inline">{doc?.song.grid ? `${doc.song.grid.tempo[0]?.bpm} BPM${doc.song.grid.tempo.length > 1 ? ` + ${doc.song.grid.tempo.length - 1} change${doc.song.grid.tempo.length > 2 ? "s" : ""}` : ""}` : ""}</span></h3>
+      {#if showTempo && doc}
+        <TempoPanel {doc} {time} {detected} {clicking} {edit} seal={() => session?.seal()} onclick={toggleClick} />
+      {/if}
       <h3>Layers <span class="hint-inline">front to back</span></h3>
       {#if videoName}
         <LayerList {layers} video={videoName} doc={doc ?? undefined} selected={selectedLayer} defaultTrack={undefined} {trackName} {edit} onselect={(id) => selectLayer(id)} />
@@ -680,6 +709,7 @@
       title="Drag to resize the timeline; double-click to fit its rows" onpointerdown={gripDown} ondblclick={fitTimeline}></div>
     <Timeline bind:this={timeline} bind:contentHeight={tlContent} {grid} {sections} {tracks} layers={layerRows} {selectedLayer} {selectedSpan} {duration} {time} range={rangeSec} {rangeInherited}
       follow={playing} {marker} {snap} onseek={seek} onrange={setRange} onselectlayer={selectLayer} onspans={spansFromTimeline}
+      ongrid={(d) => edit("move the grid", (doc) => setDownbeat(doc, d), "grid-drag")} ongriddone={() => session?.seal()}
       lanes={laneRows} {shownLanes} {selectedPoint} ontogglelanes={toggleLanes} onhidelane={hideLane}
       onselectpoint={(t, i) => { if (t) selectLayer(t.split(".")[0]!); selectedPoint = t && i !== null ? { target: t, index: i } : null; }}
       onlanepoints={lanePoints} onlanecurve={laneCurve}
