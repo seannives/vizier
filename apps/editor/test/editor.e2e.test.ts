@@ -626,4 +626,15 @@ run("editor (headless Chrome)", () => {
     await page.waitForFunction(() => (window as any).vizierEditor.state.videoName === "reel");
     expect(await page.locator("text=Instagram Reels").count()).toBeGreaterThan(0);
   }, 90_000);
+
+  it("opening a video puts the playhead at the start of its range", async () => {
+    if ((await state()).playing) await page.keyboard.press("Space");
+    await page.selectOption("header select", "full");
+    await page.waitForFunction(() => (window as any).vizierEditor.state.videoName === "full");
+    await page.selectOption("header select", "reel");                      // the reel is bars 21–31
+    await waitUntil("the playhead is at bar 21", () => {
+      const ed = (window as any).vizierEditor, g = ed.session().doc.song.grid;
+      return Math.abs(ed.state.time - (g.downbeat + (20 * 4 * 60) / g.tempo[0].bpm)) < 0.01;
+    }, null);
+  }, 90_000);
 });

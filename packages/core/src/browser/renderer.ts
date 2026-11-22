@@ -26,8 +26,16 @@ in vec2 a; out vec2 uv;
 void main(){ uv = a*0.5+0.5; gl_Position = vec4(a, 0., 1.); }`;
 const FS_LAYER = `#version 300 es
 precision highp float; in vec2 uv; out vec4 o;
-uniform sampler2D tex; uniform float opacity;
-void main(){ o = texture(tex, uv) * opacity; }`;
+uniform sampler2D tex; uniform float opacity; uniform float softEdge; uniform vec2 boxPx;
+void main(){
+  o = texture(tex, uv) * opacity;
+  if (softEdge > 0.0) {
+    // distance in pixels to the nearest edge of the box, against a fade as wide as softEdge × the shorter side
+    vec2 d = min(uv, 1.0 - uv) * boxPx;
+    float e = softEdge * min(boxPx.x, boxPx.y);
+    o *= smoothstep(0.0, e, d.x) * smoothstep(0.0, e, d.y);
+  }
+}`;
 const FS_POST = `#version 300 es
 precision highp float; in vec2 uv; out vec4 o;
 uniform sampler2D tex; uniform vec3 bg; uniform float grain, vignette, seed; uniform vec2 res;
@@ -523,6 +531,8 @@ export class Renderer {
       gl.uniform1f(u("rot"), (pv("rotation", base.rotation ?? 0) * Math.PI) / 180);
       gl.uniform1f(u("aspect"), width / height);
       gl.uniform1f(u("opacity"), Math.min(1, pv("opacity", L.def.opacity ?? 1) * gains[i]!));
+      gl.uniform1f(u("softEdge"), Math.max(0, pv("softEdge", 0)));
+      gl.uniform2f(u("boxPx"), pv("w", base.w) * width, pv("h", base.h) * height);
       this.setBlend(L.def.blend ?? "normal");
       gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
     });

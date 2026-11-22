@@ -112,6 +112,8 @@ const server = createServer(async (req, res) => {
       const videos: Record<string, VideoFile> = Object.fromEntries(listVideos(dir).map((v) => [v, loadVideoFile(dir, v)]));
       return json(res, { id: dir.split("/").pop(), song, videos, initialVideo: values.video ?? Object.keys(videos)[0] ?? null });
     }
+    // lets a second `vizier editor` tell whether the port it wants is taken by a vizier editor, and on which project
+    if (p === "/api/whoami") return json(res, { app: "vizier-editor", dir, pid: process.pid });
     if (p === "/api/waveform") return json(res, waveform(url.searchParams.get("file")!));
     if (p === "/api/features") {
       // features of every track, at a frame rate (the open video's): doesn't depend on any video file, so it works
@@ -161,11 +163,34 @@ process.on("SIGINT", () => {
   process.exit(0);
 });
 
-server.listen(Number(values.port), values.host, () => {
-  const url = `http://localhost:${values.port}`;
-  log(`ready: ${url} · ${dir}`);
-  if (!values["no-open"] && !process.env.CI) openBrowser(url);
-});
+// Listen on the port asked for. If it's taken: by an editor on this project, open that one and stop; otherwise
+// (another project's editor, or some other program) try the next few ports.
+const firstPort = Number(values.port);
+function listen(port: number) {
+  server.once("error", async (e: NodeJS.ErrnoException) => {
+    if (e.code !== "EADDRINUSE") throw e;
+    const other = await fetch(`http://${values.host}:${port}/api/whoami`, { signal: AbortSignal.timeout(1500) })
+      .then((r) => r.json() as Promise<{ app?: string; dir?: string; pid?: number }>).catch(() => null);
+    const url = `http://localhost:${port}`;
+    if (other?.app === "vizier-editor" && other.dir === dir) {
+      log(`already running for this project at ${url} (process ${other.pid}); opening that one`);
+      log(`(to stop it: Ctrl-C in its Terminal, or   kill ${other.pid})`);
+      if (!values["no-open"] && !process.env.CI) openBrowser(url);
+      process.exit(0);
+    }
+    log(other?.app === "vizier-editor"
+      ? `port ${port} is in use by the editor for ${other.dir} (process ${other.pid}); trying ${port + 1}`
+      : `port ${port} is in use by another program; trying ${port + 1}`);
+    if (port + 1 > firstPort + 10) die(`No free port between ${firstPort} and ${port}. Choose one with --port.`);
+    listen(port + 1);
+  });
+  server.listen(port, values.host, () => {
+    const url = `http://localhost:${port}`;
+    log(`ready: ${url} · ${dir}`);
+    if (!values["no-open"] && !process.env.CI) openBrowser(url);
+  });
+}
+listen(firstPort);
 
 /** Open the editor in Chrome (falls back to the default browser). macOS and Linux desktops. */
 function openBrowser(url: string) {

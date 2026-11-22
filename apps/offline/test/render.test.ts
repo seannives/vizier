@@ -208,4 +208,19 @@ run("renderer in headless Chrome", () => {
     for (let i = 0; i < faded.length; i++) if (faded[i] !== never[i]) left++;
     expect(left).toBe(0);
   }, 180_000);
+  it("a soft edge fades the layer out towards the edges of its box", async () => {
+    const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
+    // flow lines all over its box
+    const block = (softEdge: number): Project => ({ ...project, palette: { bg: "#000000", ink: "#FFFFFF" },
+      automation: [{ target: "post.grain", points: [{ t: 0, v: 0 }] }, { target: "post.vignette", points: [{ t: 0, v: 0 }] }],
+      layers: [{ id: "b", generator: "flowField", z: 0, params: { density: 20, thickness: 1, brightness: 3, softEdge }, layout: { landscape: { x: 0.5, y: 0.5, w: 0.5, h: 0.5 } } }] });
+    const shot = async (p: Project) => { const r = await openRenderer(p, "draft", { mix: track, bass: track }, SMALL); try { return await r.frame(10); } finally { await r.close(); } };
+    // mean brightness of a patch 8 pixels wide, half way down: just inside the box's left edge, and at its centre
+    const col = (px: Buffer, x0: number) => { let s = 0, n = 0; for (let y = Math.floor(H * 0.45); y < H * 0.55; y++) for (let x = x0; x < x0 + 8; x++, n++) s += px[(y * W + x) * 4]!; return s / n; };
+    const hard = await shot(block(0)), soft = await shot(block(0.3));
+    const edge = Math.floor(W * 0.25) + 1, mid = Math.floor(W / 2) - 4;
+    expect(col(hard, edge)).toBeGreaterThan(100);                           // (there is something to fade)
+    expect(col(soft, edge)).toBeLessThan(col(hard, edge) * 0.25);        // faded out at the edge
+    expect(col(soft, mid)).toBeGreaterThan(col(hard, mid) * 0.9);        // as before in the middle
+  }, 180_000);
 });

@@ -151,6 +151,18 @@
     await startFrom(stoppedAt);
   }
   const seek = (t: number) => { marker = t; stoppedAt = t; transport.seek(t); time = t; };
+  // Opening a video (at start, or from the menu) puts the playhead at the start of its range: a reel opens on
+  // its first bar. Only when the video changes, not when its range is edited.
+  let openedVideo: string | null = null;
+  $effect(() => {
+    const v = videoName;
+    if (!v || !session || v === openedVideo || status !== "ready") return;
+    openedVideo = v;
+    let p: Project;
+    try { p = session.project(v); } catch { return; } // (read the video itself: `project` may still be the last one)
+    const from = p.range?.from;
+    if (from !== undefined && p.grid && !playing) seek(barToSeconds(from, p.grid));
+  });
   function nudge(dir: number, beat: boolean) {
     const t = playing ? transport.time() : marker;
     if (!grid) return seek(Math.max(0, t + dir * 2));

@@ -105,6 +105,7 @@ export const LAYER_PARAMS: ParamSpec[] = [
   { name: "rotation", label: "Rotation (degrees)", min: -180, max: 180, default: 0 },
   { name: "hueShift", label: "Hue shift (degrees)", min: -180, max: 180, default: 0, description: "Rotates all of the layer's colours" },
   { name: "lightness", label: "Lightness", min: -1, max: 1, default: 0, description: "−1 black … 0 as is … +1 white, for all of the layer's colours" },
+  { name: "softEdge", label: "Soft edge", min: 0, max: 0.5, default: 0, description: "Fades the layer out towards the edges of its box, so trails and glow that reach the box don't end in a straight line. The width of the fade, as a fraction of the box's shorter side" },
 ];
 
 /** Global post-processing parameters, automatable as "post.<name>". */

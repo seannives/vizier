@@ -189,6 +189,7 @@ These belong to every layer, whatever draws it.
 | Opacity (`opacity`) | 0–1 (1) | How visible the layer is. |
 | Hue shift (`hueShift`) | −180–180° (0) | Rotates all the layer's colours around the colour wheel (keeps brightness). |
 | Lightness (`lightness`) | −1–1 (0) | Pushes all the layer's colours towards black (−1) or white (+1). |
+| Soft edge (`softEdge`) | 0–0.5 (0) | Fades the layer out towards the edges of its box, as a fraction of the box's shorter side. A layer is cut off at its box, so trails or glow that reach it end in a straight line; 0.15–0.25 hides that. |
 | X, Y (`x`, `y`) | 0–1 (layout) | Centre position. As parameters they override the layout, for automating movement. |
 | Width, Height (`w`, `h`) | 0–2 (layout) | Size, likewise for automation. |
 | Rotation (`rotation`) | −180–180° (layout) | Rotation, likewise for automation. |
