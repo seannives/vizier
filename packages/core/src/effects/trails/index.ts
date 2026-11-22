@@ -24,7 +24,10 @@ export default defineEffect({
     c = mat2(cos(r), -sin(r), sin(r), cos(r)) * c / z;
     c.x /= u_res.x / u_res.y;
     vec2 puv = c + 0.5;
-    vec4 prev = (puv.x < 0.0 || puv.y < 0.0 || puv.x > 1.0 || puv.y > 1.0) ? vec4(0.0) : texture(u_fb, puv) * decay;
+    // The feedback buffer holds 8 bits a channel: a faint value times the decay rounds back to itself (at
+    // persistence 1.6 s anything up to 10/255 never fades), leaving a haze over the whole layer. Taking one
+    // more step off each frame makes every value reach zero.
+    vec4 prev = (puv.x < 0.0 || puv.y < 0.0 || puv.x > 1.0 || puv.y > 1.0) ? vec4(0.0) : max(texture(u_fb, puv) * decay - 1.0 / 255.0, 0.0);
     vec4 s = texture(u_in, uv);
     return s + prev * (1.0 - s.a);`,
   ],

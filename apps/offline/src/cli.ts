@@ -17,6 +17,7 @@ import { getProfile, validateProject, rangeSeconds, positionToSeconds, videoForm
 import { loadFeatures } from "./audio.ts";
 import { openRenderer } from "./browser.ts";
 import { startEncoder, startMuxer, probeVideo } from "./encode.ts";
+import { frameAtOrAfter } from "./frames.ts";
 import { loadProject } from "./project-io.ts";
 
 const { values, positionals } = parseArgs({
@@ -68,7 +69,7 @@ if (values.bars) {
 } else {
   ({ from: fromSec, to: toSec } = rangeSeconds(project, duration));
 }
-const start = Math.max(0, Math.round(fromSec * profile.fps));
+const start = Math.max(0, frameAtOrAfter(fromSec, profile.fps));
 const end = Math.min(totalFrames, Math.round(toSec * profile.fps));
 if (end <= start) die(`Nothing to render: the range is empty (${fromSec.toFixed(2)}–${toSec.toFixed(2)} s)`);
 
@@ -98,7 +99,7 @@ try {
     log(`  per layer (draw + upload, avg ms): ${Object.entries(b.layersMs).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(" · ")}`);
   } else if (values.still !== undefined || values["still-bar"] !== undefined) {
     const frame = values["still-bar"] !== undefined
-      ? Math.round(positionToSeconds({ bar: Number(values["still-bar"]) }, project.grid) * profile.fps)
+      ? frameAtOrAfter(positionToSeconds({ bar: Number(values["still-bar"]) }, project.grid), profile.fps)
       : Number(values.still);
     const tag = values["still-bar"] !== undefined ? `bar${values["still-bar"]}` : `f${frame}`;
     const out = outPath(`${lp.videoName}-${profile.id}-${tag}`, ".png");

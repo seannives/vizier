@@ -194,4 +194,18 @@ run("renderer in headless Chrome", () => {
       expect(darker / (px.length / 4)).toBeGreaterThan(0.02); // multiply darkened the background where the lines are
     } finally { await r.close(); }
   }, 180_000);
+  it("trails fade all the way out (an 8-bit feedback buffer would keep a faint haze for ever)", async () => {
+    const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
+    const text = (reveal: { t: number; v: number; curve?: "hold" }[]): Project => ({ ...project,
+      automation: [{ target: "post.grain", points: [{ t: 0, v: 0 }] }, { target: "post.vignette", points: [{ t: 0, v: 0 }] }, { target: "title.reveal", points: reveal }],
+      layers: [{ id: "title", generator: "typeText", z: 0, blend: "add", text: "HAZE", params: { size: 0.9 },
+        effects: [{ type: "trails", params: { persistence: 1, zoom: 1, rotate: 0 } }], layout: { landscape: { x: 0.5, y: 0.5, w: 0.8, h: 0.6 } } }] });
+    const shot = async (p: Project) => { const r = await openRenderer(p, "draft", { mix: track, bass: track }, SMALL); try { await r.frame(0); return await r.frame(57); } finally { await r.close(); } };
+    // the text shows until 0.3 s, then 1.6 s of fading: by 1.9 s nothing is left, so the frame is the background
+    const faded = await shot(text([{ t: 0, v: 1 }, { t: 0.3, v: 1, curve: "hold" }, { t: 0.31, v: 0 }]));
+    const never = await shot(text([{ t: 0, v: 0 }]));
+    let left = 0;
+    for (let i = 0; i < faded.length; i++) if (faded[i] !== never[i]) left++;
+    expect(left).toBe(0);
+  }, 180_000);
 });

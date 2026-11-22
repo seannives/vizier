@@ -44,8 +44,10 @@ Editor milestones:
   - [x] Preview vs export for every generator and effect (apps/offline/test/preview-match.test.ts). Found: the
         pulse grid spaced dots at least 8 pixels apart, so a smaller preview showed fewer dots (fixed); the flow
         field's thin lines broke up at small sizes (now drawn a pixel wide and dimmed where they'd break up)
-  - [ ] A checklist session on the Mac with the maleficus (a reel, the pop-out on a second screen, shortcuts,
-        speakers, GPU), fixing what turns up
+  - [x] A checklist session on the Mac with the maleficus (a reel, the pop-out on a second screen, shortcuts,
+        speakers, GPU). Sync with AirPods matches the built-in speakers; a full 1080p render takes under a minute
+        on the M1 Pro. Found and fixed: trails left a faint haze that never faded (8-bit feedback), which showed as
+        a lighter rectangle where the acid ring's box is; a still at a bar showed the frame just before it
   - Then a lighter sweep every couple of milestones (mainly the rule-based tests)
 - [ ] 4. Tracks like Ableton's (create, name, drop/replace/remove a stem; warn on length or alignment mismatch);
       tempo panel (typed BPM with detected suggestion, downbeat, drag the grid, audible click)
@@ -96,8 +98,6 @@ Editor milestones:
 - [ ] Live window: a seek renders up to 3 s of feedback lead-in (about half a second on the M1 Pro); shorten
       it live, or render the lead-in at a lower frame rate
 - [ ] Golden-image tests per machine (pixels differ between software GL and the Mac GPU)
-- [ ] Test the editor's sync control with Bluetooth headphones and external speakers (it lines up at 0 ms on the
-      MacBook's built-in speakers), to check it works as expected
 - [ ] Mute and solo for layers, like tracks in Live: M hides a layer, S shows only the soloed layers (several
       can be soloed). To decide: whether they affect only the preview while editing, or exports too
 
