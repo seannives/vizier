@@ -18,6 +18,7 @@ const sveltePlugin = ((sveltePluginModule as unknown as { default?: unknown }).d
 import { getProfile, buildProject, resolveVideo, videoFormat, type SongFile, type VideoFile } from "../../../packages/core/src/index.ts";
 import { loadFeatures, decodeMono, SAMPLE_RATE } from "../../offline/src/audio.ts";
 import { listVideos, loadSong, loadVideoFile, projectDir } from "../../offline/src/project-io.ts";
+import { storeUpload, listMedia, settleMedia, clearIncoming, stemOffset } from "./media.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const { values, positionals } = parseArgs({
@@ -32,6 +33,9 @@ let dir: string;
 try { dir = projectDir(positionals[0]); } catch (e) { die((e as Error).message); }
 const song0 = loadSong(dir);
 const trackPath = (file: string) => resolve(dir, file);
+/** A project file the page names, refused if it's outside the project folder. */
+const projectFile = (file: string) => { const p = trackPath(file); if (!p.startsWith(dir + "/")) throw new Error(`not in the project: ${file}`); return p; };
+clearIncoming(dir); // files dropped in an earlier session but never saved
 
 // ---- the app bundle (Svelte 5 + TypeScript), built at startup ----
 log("building the editor…");
@@ -66,9 +70,10 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>
 
 // ---- caches ----
 const waveCache = new Map<string, unknown>();
+const checkCache = new Map<string, unknown>();
 /** Min/max peaks at 100 per second, as signed bytes, base64: small enough to send every track. */
 function waveform(file: string) {
-  const path = trackPath(file);
+  const path = projectFile(file);
   const key = `${path}|${statSync(path).mtimeMs}`;
   if (waveCache.has(key)) return waveCache.get(key);
   const x = decodeMono(path);
@@ -90,6 +95,10 @@ const json = (res: ServerResponse, body: unknown, status = 200) => {
   res.writeHead(status, { "content-type": "application/json", "cache-control": "no-store" });
   res.end(JSON.stringify(body));
 };
+const readBytes = (req: IncomingMessage) => new Promise<Buffer>((ok, fail) => {
+  const parts: Buffer[] = [];
+  req.on("data", (c: Buffer) => parts.push(c)); req.on("end", () => ok(Buffer.concat(parts))); req.on("error", fail);
+});
 const readBody = (req: IncomingMessage) => new Promise<string>((ok, fail) => {
   let s = ""; req.setEncoding("utf8"); req.on("data", (c) => (s += c)); req.on("end", () => ok(s)); req.on("error", fail);
 });
@@ -116,17 +125,37 @@ const server = createServer(async (req, res) => {
     if (p === "/api/whoami") return json(res, { app: "vizier-editor", dir, pid: process.pid });
     if (p === "/api/waveform") return json(res, waveform(url.searchParams.get("file")!));
     if (p === "/api/features") {
-      // features of every track, at a frame rate (the open video's): doesn't depend on any video file, so it works
-      // for videos that haven't been saved yet
-      const song = loadSong(dir);
+      // features of every track, at a frame rate (the open video's). The page sends its tracks (id → file), so
+      // tracks added since the last save are included; without them, the saved song's
       const fps = Number(url.searchParams.get("fps") ?? 30);
       if (!(fps > 0 && fps <= 240)) return json(res, { error: `bad fps ${fps}` }, 400);
-      const tracks = Object.fromEntries(song.tracks.map((t) => [t.id, trackPath(t.file)]));
+      const given = url.searchParams.get("tracks");
+      const files: Record<string, string> = given ? JSON.parse(given) : Object.fromEntries(loadSong(dir).tracks.map((t) => [t.id, t.file]));
+      const tracks = Object.fromEntries(Object.entries(files).map(([id, f]) => [id, projectFile(f)]));
       return json(res, await loadFeatures(tracks, fps, join(dir, ".cache", "features")));
+    }
+    // a file dropped on the editor: kept in media/.incoming until the project is saved
+    if (p === "/api/upload" && req.method === "POST") {
+      const name = url.searchParams.get("name") ?? "audio.wav";
+      const file = storeUpload(dir, name, await readBytes(req));
+      log(`received ${name}`);
+      return json(res, { file });
+    }
+    if (p === "/api/media") return json(res, listMedia(dir));
+    // a track's length, and how far it's shifted against the mix
+    if (p === "/api/trackcheck") {
+      const file = url.searchParams.get("file")!, mix = url.searchParams.get("mix")!;
+      const fa = projectFile(mix), fb = projectFile(file);
+      const key = `${fa}|${statSync(fa).mtimeMs}|${fb}|${statSync(fb).mtimeMs}`;
+      if (!checkCache.has(key)) {
+        const a = decodeMono(fa), b = file === mix ? a : decodeMono(fb);
+        checkCache.set(key, { seconds: b.length / SAMPLE_RATE, mixSeconds: a.length / SAMPLE_RATE, offset: file === mix ? 0 : stemOffset(a, b, SAMPLE_RATE) ?? null });
+      }
+      return json(res, checkCache.get(key));
     }
     if (p === "/api/audio") {
       const path = trackPath(url.searchParams.get("file")!);
-      if (!path.startsWith(dir) || !existsSync(path)) return json(res, { error: "not found" }, 404);
+      if (!path.startsWith(dir + "/") || !existsSync(path)) return json(res, { error: "not found" }, 404);
       res.writeHead(200, { "content-type": "audio/wav", "content-length": statSync(path).size });
       return void createReadStream(path).pipe(res);
     }
@@ -138,14 +167,21 @@ const server = createServer(async (req, res) => {
     if (p === "/api/save" && req.method === "POST") {
       const body = JSON.parse(await readBody(req)) as { song?: SongFile; videos?: Record<string, VideoFile> };
       const written: string[] = [];
-      if (body.song) { writeJson(join(dir, "song.json"), body.song); written.push("song.json"); }
+      let media: ReturnType<typeof settleMedia> | undefined;
+      if (body.song) {
+        // dropped files move into media/ now; the song is written with their final names
+        media = settleMedia(dir, loadSong(dir), body.song);
+        writeJson(join(dir, "song.json"), media.song); written.push("song.json");
+        for (const to of Object.values(media.moved)) log(`added ${to}`);
+        for (const f of media.deleted) log(`deleted ${f} (replaced)`);
+      }
       for (const [name, v] of Object.entries(body.videos ?? {})) {
         if (!/^[A-Za-z0-9][A-Za-z0-9_-]*$/.test(name)) return json(res, { error: `bad video name ${name}` }, 400);
         writeJson(join(dir, "videos", `${name}.json`), v);
         written.push(`videos/${name}.json`);
       }
       log(`saved ${written.join(", ")}`);
-      return json(res, { written });
+      return json(res, { written, moved: media?.moved ?? {} });
     }
     res.writeHead(404).end("not found");
   } catch (e) {

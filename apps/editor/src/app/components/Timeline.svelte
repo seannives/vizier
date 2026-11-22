@@ -472,7 +472,7 @@
         {#each rows as r}
           {#if r.kind === "track"}
             {@const t = tracks[r.i]!}
-            <div class="h track" style:height="{H_TRACK}px" title={t.id}><span class:mix={t.mix}>{t.name}</span>{#if t.mix}<em>mix</em>{/if}</div>
+            <div class="h track" style:height="{H_TRACK}px" title="{t.name}: drop an audio file here to replace it" data-track={t.id}><span class:mix={t.mix}>{t.name}</span>{#if t.mix}<em>mix</em>{/if}</div>
           {:else if r.kind === "layer"}
             {@const open = lanes.some((ln) => ln.layer === r.layer.id && shownLanes.has(ln.target))}
             <div class="h layer" class:sel={r.layer.id === selectedLayer} style:height="{H_LAYER}px" title={r.layer.name}

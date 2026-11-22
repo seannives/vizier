@@ -27,7 +27,7 @@ Editor milestones:
         A in the panel starts a lane; inherited lanes (base / changed / ↺)
   - [x] 3b. Audio modulation in the layer panel: M per parameter; track, feature, amount, curve; live meter;
         + another; inherited (base / changed / ↺)
-- [ ] **Bug sweep** (after 3b, before 4: milestone 4 changes tracks and tempo, which everything in bars rests on)
+- [x] **Bug sweep** (after 3b, before 4: milestone 4 changes tracks and tempo, which everything in bars rests on)
   - [x] Independent code review by a fresh reviewer, focused on the seams: seconds vs bars, pixels vs fractions
         of the frame, preview vs export, a video vs its base, every conversion between units. Found and fixed,
         each with a test: a new layer could take an id a reel already used; choosing Mix as an inherited
@@ -49,8 +49,14 @@ Editor milestones:
         on the M1 Pro. Found and fixed: trails left a faint haze that never faded (8-bit feedback), which showed as
         a lighter rectangle where the acid ring's box is; a still at a bar showed the frame just before it
   - Then a lighter sweep every couple of milestones (mainly the rule-based tests)
-- [ ] 4. Tracks like Ableton's (create, name, drop/replace/remove a stem; warn on length or alignment mismatch);
-      tempo panel (typed BPM with detected suggestion, downbeat, drag the grid, audible click)
+- [ ] 4. In three parts:
+  - [x] 4a. Tracks like Ableton's: Tracks panel; drop audio from Finder to add a track, or on a track to replace
+        its audio (a replacement overwrites the old file on save); add or replace from media/; rename, reorder,
+        remove (its layers and modulations move to the mix); each stem checked against the mix for length and
+        for starting early or late
+  - [ ] New project from the editor: a folder in projects/, a title, the mix and stems dropped in, a first video
+        (decided 2026-11-22: between 4a and 4b, since a new song goes straight on to setting its tempo)
+  - [ ] 4b. Tempo panel (typed BPM with detected suggestion, downbeat, drag the grid, audible click)
 - [ ] 5. Colour pickers, palette panel and colour lanes; Render button with progress; list of renders
 - [ ] Modulation presets: one-click combinations such as "pulse with the kick" or "colour follows the filter"
 - [ ] Later: pencil drawing of automation; finer snapping; record control moves (mouse or MIDI) as automation

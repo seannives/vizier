@@ -483,3 +483,58 @@ export function resetMod(doc: Doc, video: string, target: string, source: string
 export function frontToBack<T extends { z: number }>(layers: T[]): T[] {
   return layers.map((l, i) => ({ l, i })).sort((a, b) => b.l.z - a.l.z || b.i - a.i).map((x) => x.l);
 }
+
+// ---- tracks (the song's audio: the mix and its stems; shared by every video) ----
+
+/** The mix track's id. */
+export const mixTrackId = (doc: Doc) => (doc.song.tracks.find((t) => t.mix) ?? doc.song.tracks[0]!).id;
+
+/** A track id from a name ("Bass (303)" → "bass-303"), not used by another track. */
+export function trackIdFor(doc: Doc, name: string): string {
+  const base = name.toLowerCase().replace(/\.[a-z0-9]+$/, "").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "") || "track";
+  const taken = new Set(doc.song.tracks.map((t) => t.id));
+  if (!taken.has(base)) return base;
+  for (let i = 2; ; i++) if (!taken.has(`${base}-${i}`)) return `${base}-${i}`;
+}
+
+/** A track's name from its file name: "Bass bounce.wav" → "Bass bounce". */
+export const trackNameFor = (file: string) => file.split("/").pop()!.replace(/\.[A-Za-z0-9]+$/, "");
+
+export function addTrack(doc: Doc, file: string, name = trackNameFor(file)): string {
+  const id = trackIdFor(doc, name);
+  doc.song.tracks.push({ id, name, file });
+  return id;
+}
+export function renameTrack(doc: Doc, id: string, name: string): void {
+  const t = doc.song.tracks.find((x) => x.id === id);
+  if (t && name.trim()) t.name = name.trim();
+}
+/** A new file for a track (a new bounce): everything that listens to the track keeps listening. */
+export function setTrackFile(doc: Doc, id: string, file: string): void {
+  const t = doc.song.tracks.find((x) => x.id === id);
+  if (t) t.file = file;
+}
+/** Move a track up (−1) or down (+1) in the list. */
+export function moveTrack(doc: Doc, id: string, dir: -1 | 1): void {
+  const ts = doc.song.tracks, i = ts.findIndex((t) => t.id === id), j = i + dir;
+  if (i < 0 || j < 0 || j >= ts.length) return;
+  [ts[i], ts[j]] = [ts[j]!, ts[i]!];
+}
+/**
+ * Remove a track (not the mix). In every video, layers that listened to it listen to the mix, and modulations by
+ * it are moved by the same feature of the mix. Returns the names of the layers that changed track.
+ */
+export function removeTrack(doc: Doc, id: string): string[] {
+  const t = doc.song.tracks.find((x) => x.id === id);
+  if (!t || t.mix) return [];
+  const mix = mixTrackId(doc);
+  doc.song.tracks = doc.song.tracks.filter((x) => x.id !== id);
+  const moved = new Set<string>();
+  for (const v of Object.values(doc.videos)) {
+    for (const l of v.layers ?? []) if (l.track === id) { delete l.track; moved.add(l.name ?? l.id); }
+    for (const m of v.modulations ?? []) if (m.source.startsWith(`${id}.`)) m.source = `${mix}.${m.source.slice(id.length + 1)}`;
+  }
+  return [...moved];
+}
+/** The tracks' files, id → file (what the renderer's features are made from). */
+export const trackFiles = (doc: Doc): Record<string, string> => Object.fromEntries(doc.song.tracks.map((t) => [t.id, t.file]));

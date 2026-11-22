@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { Session } from "./lib/session.ts";
   import { Transport } from "./lib/transport.ts";
   import { api, type Waveform } from "./lib/api.ts";
@@ -12,8 +12,9 @@
   import LayerPanel from "./components/LayerPanel.svelte";
   import VideoPanel from "./components/VideoPanel.svelte";
   import NewVideo from "./components/NewVideo.svelte";
+  import TracksPanel, { type TrackCheck } from "./components/TracksPanel.svelte";
   import type { LayerRow, SpanS, LaneRow, LanePoint } from "./components/Timeline.svelte";
-  import { frontToBack } from "./lib/edits.ts";
+  import { frontToBack, addTrack, setTrackFile, removeTrack, trackFiles } from "./lib/edits.ts";
   import { setSpans, splitLayerAt, duplicateLayer, layerOf, setLayout, newVideo, lanesOfLayer, laneInherited, laneChanged, setLane, addLane, removeLane, resetLane } from "./lib/edits.ts";
   import type { Doc } from "./lib/session.ts";
   import { stats } from "./lib/stats.ts";
@@ -58,7 +59,13 @@
   let time = $state(0);
   let playing = $state(false);
   let loop = $state(false);
+  /** Waveforms by audio file (a track that gets a new file gets a new waveform). */
   let waves = $state<Record<string, Waveform | null>>({});
+  async function loadWave(file: string) {
+    if (file in waves) return;
+    waves[file] = null;
+    try { waves[file] = await api.waveform(file); } catch (e) { flash((e as Error).message); }
+  }
   let features = $state<Record<string, FeatureTrack> | null>(null);
   let featuresFor = "";
 
@@ -73,8 +80,8 @@
       const mix = data.song.tracks.find((t) => t.mix) ?? data.song.tracks[0]!;
       status = "loading audio…";
       duration = await transport.load(api.audioUrl(mix.file));
-      for (const t of data.song.tracks) waves[t.id] = null;
-      await Promise.all(data.song.tracks.map(async (t) => { waves[t.id] = await api.waveform(t.file); }));
+      loadedMix = mix.file;
+      await Promise.all(data.song.tracks.map((t) => loadWave(t.file)));
       status = "ready";
     } catch (e) { loadError = (e as Error).message; }
   });
@@ -84,10 +91,11 @@
   $effect(() => {
     if (!videoName) return;
     const fps = getProfile(profileId).fps;
-    const key = String(fps);
+    const files = doc ? trackFiles(doc) : {};
+    const key = `${fps}|${JSON.stringify(files)}`;
     if (key === featuresFor) return;
     featuresFor = key; features = null;
-    api.features(fps).then((f) => { if (featuresFor === key) features = f; }).catch((e) => { projectErr = (e as Error).message; });
+    api.features(fps, files).then((f) => { if (featuresFor === key) features = f; }).catch((e) => { projectErr = (e as Error).message; });
   });
 
   // ---- clock ----
@@ -197,10 +205,11 @@
   }
   async function save() {
     if (!session || !session.dirty) { flash("nothing to save"); return; }
-    let res: { written?: string[]; error?: string };
+    let res: { written?: string[]; moved?: Record<string, string>; error?: string };
     try { res = await api.save(session.savePayload()); }
     catch { serverOnline = false; flash("can't reach the editor server: start it again (vizier editor …), then save; your changes are kept"); return; }
     if (res.error) { flash(`save failed: ${res.error}`); return; }
+    session.renameFiles(res.moved ?? {});
     session.markSaved();
     flash(`saved ${res.written?.join(", ")}`);
   }
@@ -212,6 +221,82 @@
 
   let timeline = $state<Timeline>();
   let help = $state(false);
+  // ---- tracks: waveforms, the mix's audio, checks against the mix, adding and replacing ----
+  let loadedMix = "";
+  // a track's new file (added, replaced, undone): its waveform; a new mix file: play that
+  $effect(() => {
+    if (!doc || status !== "ready") return;
+    const files = doc.song.tracks.map((t) => t.file);
+    untrack(() => { for (const f of files) void loadWave(f); });
+    const mix = doc.song.tracks.find((t) => t.mix) ?? doc.song.tracks[0]!;
+    if (mix.file !== loadedMix) {
+      const f = mix.file; loadedMix = f;
+      if (playing) togglePlay();
+      transport.load(api.audioUrl(f)).then((d) => { if (loadedMix === f) duration = d; }).catch((e) => flash((e as Error).message));
+    }
+  });
+  /** Each track's length and shift against the mix, by `file|mix file`. */
+  let checks = $state<Record<string, TrackCheck | "checking">>({});
+  const mixFile = $derived(doc ? (doc.song.tracks.find((t) => t.mix) ?? doc.song.tracks[0]!).file : "");
+  $effect(() => {
+    if (!doc || status !== "ready") return;
+    const mix = mixFile, files = doc.song.tracks.map((t) => t.file);
+    untrack(() => {
+      for (const file of files) {
+        const k = `${file}|${mix}`;
+        if (k in checks) continue;
+        checks[k] = "checking";
+        api.trackCheck(file, mix).then((c) => { checks[k] = c; }).catch(() => { delete checks[k]; });
+      }
+    });
+  });
+  const checksByFile = $derived(Object.fromEntries((doc?.song.tracks ?? []).map((t) => [t.file, checks[`${t.file}|${mixFile}`]])));
+  let media = $state<string[]>([]);
+  const refreshMedia = () => api.media().then((m) => { media = m.map((x) => x.file); }).catch(() => {});
+  let showTracks = $state(load("vizier.tracksOpen", "0") === "1");
+  $effect(() => save_("vizier.tracksOpen", showTracks ? "1" : "0"));
+  const isAudioName = (n: string) => /\.(wav|aif|aiff|flac|mp3|m4a|ogg)$/i.test(n);
+  /** A dropped file goes to the server first (kept until the project is saved); a media/ file is used as is. */
+  async function fileFor(f: File | string): Promise<string | null> {
+    if (typeof f === "string") return f;
+    if (!isAudioName(f.name)) { flash(`${f.name} isn't an audio file (wav, aiff, flac, mp3, m4a, ogg)`); return null; }
+    flash(`adding ${f.name}…`);
+    try { return await api.upload(f); } catch (e) { flash((e as Error).message); return null; }
+  }
+  async function addTrackFrom(f: File | string) {
+    const file = await fileFor(f);
+    if (!file) return;
+    let id = "";
+    edit(`add track ${typeof f === "string" ? f : f.name}`, (d) => { id = addTrack(d, file); });
+    showTracks = true;
+    flash(`added track "${doc?.song.tracks.find((t) => t.id === id)?.name}": save (${displayKeys("Mod+S")}) to keep it`);
+  }
+  async function replaceTrackWith(id: string, f: File | string) {
+    const file = await fileFor(f);
+    if (!file) return;
+    const name = doc?.song.tracks.find((t) => t.id === id)?.name ?? id;
+    edit(`replace ${name}`, (d) => setTrackFile(d, id, file));
+    flash(`replaced the audio of ${name}: save (${displayKeys("Mod+S")}) to keep it (the old file is replaced)`);
+  }
+  function removeTrackNow(id: string) {
+    const name = doc?.song.tracks.find((t) => t.id === id)?.name ?? id;
+    let moved: string[] = [];
+    edit(`remove track ${name}`, (d) => { moved = removeTrack(d, id); });
+    flash(moved.length ? `removed ${name}: ${moved.join(", ")} now listen${moved.length === 1 ? "s" : ""} to the mix` : `removed ${name}`);
+  }
+  // Files dropped anywhere: on a track (its row in the panel or the timeline) replace its audio; elsewhere, add tracks
+  let dragging = $state(false);
+  function ondragover(e: DragEvent) { if (e.dataTransfer?.types.includes("Files")) { e.preventDefault(); dragging = true; } }
+  function ondragleave(e: DragEvent) { if (!e.relatedTarget) dragging = false; }
+  async function ondrop(e: DragEvent) {
+    if (!e.dataTransfer?.types.includes("Files")) return;
+    e.preventDefault(); dragging = false;
+    const files = [...e.dataTransfer.files];
+    const onTrack = (e.target as HTMLElement | null)?.closest?.("[data-track]")?.getAttribute("data-track");
+    if (onTrack && files[0]) { await replaceTrackWith(onTrack, files[0]); return; }
+    for (const f of files) await addTrackFrom(f);
+  }
+
   const shortcuts: Shortcut[] = [
     { keys: "Space", label: "Play / stop (stop returns to the start marker)", group: "Transport", run: togglePlay },
     { keys: "Shift+Space", label: "Continue from where playback stopped", group: "Transport", run: continuePlay },
@@ -271,7 +356,7 @@
   const clock = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
   const bpm = $derived(grid?.tempo[0]?.bpm);
   const section = $derived([...sections].reverse().find((s) => s.t <= time + 1e-6)?.name ?? "");
-  const tracks = $derived(doc ? doc.song.tracks.map((t) => ({ id: t.id, name: t.name, mix: t.mix, wave: waves[t.id] ?? null })) : []);
+  const tracks = $derived(doc ? doc.song.tracks.map((t) => ({ id: t.id, name: t.name, mix: t.mix, wave: waves[t.file] ?? null })) : []);
   // front first: exactly the reverse of the renderer's drawing order (z, then the order in the file), ties included
   const layers = $derived(project ? frontToBack(project.layers) : []);
 
@@ -514,7 +599,7 @@
 {#if loadError}
   <div class="fatal">Couldn't open the project: {loadError}</div>
 {:else}
-<div class="app" class:popped style:grid-template-rows="42px minmax(0, 1fr) {tlRows} 24px">
+<div class="app" class:popped class:dragging {ondragover} {ondragleave} {ondrop} role="application" style:grid-template-rows="42px minmax(0, 1fr) {tlRows} 24px">
   <header class="top">
     <div class="brand">vizier</div>
     <div class="proj" title="project folder">{doc?.song.title ?? projectId}</div>
@@ -553,6 +638,12 @@
       <h3>Video</h3>
       {#if doc && videoName && doc.videos[videoName]}
         <VideoPanel {doc} video={videoName} {rangeLabel} {rangeTime} {rangeInherited} {edit} onopen={(v) => (videoName = v)} />
+      {/if}
+      <h3 class="fold-h"><button class="fold-btn" onclick={() => { showTracks = !showTracks; if (showTracks) refreshMedia(); }} aria-expanded={showTracks}
+        title="{showTracks ? "Hide" : "Show"} the song's tracks (shared by every video)">{showTracks ? "▾" : "▸"} Tracks</button>
+        <span class="hint-inline">{doc?.song.tracks.length ?? 0} · shared by every video</span></h3>
+      {#if showTracks && doc}
+        <TracksPanel {doc} checks={checksByFile} {media} {edit} onadd={addTrackFrom} onreplace={replaceTrackWith} onremove={removeTrackNow} onrefreshmedia={refreshMedia} />
       {/if}
       <h3>Layers <span class="hint-inline">front to back</span></h3>
       {#if videoName}
@@ -643,6 +734,8 @@
   .err { position: absolute; bottom: 30px; left: 12px; right: 12px; color: var(--danger); font: 12px var(--mono); }
   .inspector { background: var(--bg1); border-left: 1px solid var(--line2); padding: 10px 12px; overflow: auto; }
   h3 { margin: 6px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); font-weight: 500; }
+  .fold-btn { background: none; border: none; padding: 0; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+  .app.dragging { outline: 2px dashed var(--accent); outline-offset: -4px; }
   .hint-inline { text-transform: none; letter-spacing: 0; color: var(--faint); font-weight: 400; margin-left: 4px; }
   .hint { color: var(--faint); font-size: 11px; margin: 8px 0 14px; }
   .tl { position: relative; min-height: 0; min-width: 0; overflow: hidden; }

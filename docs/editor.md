@@ -20,6 +20,17 @@ server isn't running, the editor says so and keeps your changes: start it again 
 - **Video** (side panel): the open video's name, format, what it builds on (click the name to open the base;
   **Detach** copies everything it inherits into it, so it looks the same but no longer follows the base) and its
   range.
+- **Tracks** (side panel, fold open with ▸): the song's audio, shared by every video. Drag audio files from
+  Finder anywhere onto the editor to add tracks (named after the file), or onto a track (its row in the panel or
+  its name in the timeline) to replace its audio with a new bounce; **+ Add from media/** and **Replace…** use
+  files already in the project's `media/` folder. Rename a track by typing its name (layers and modulations refer
+  to its id, which doesn't change); ↑ ↓ reorder; ✕ removes it, and layers that listened to it listen to the mix
+  (the mix itself can't be removed, only replaced). Each stem is checked against the mix: a warning says if it's
+  shorter or longer, or starts early or late (bounce stems from the same start as the mix); "lines up?" means it
+  couldn't tell (a stem with little in common with the mix, or a whole bar out), so listen to check. A dropped
+  file is kept aside until you save: saving moves it into `media/` under its own name, overwriting the file the
+  track used if it had the same name, or deleting the old file if nothing else uses it. Undo before saving
+  leaves `media/` as it was. A removed track's file stays in `media/`.
 - **Transport, Ableton-style**: Play starts from the start marker (the hollow triangle in the ruler). Stop leaves the
   playhead where it stopped; the next Play jumps back to the marker, and ⇧Space continues from the stop point instead.
   Clicking the timeline or the arrow keys move the marker. With loop on (L), playback wraps at the range's end

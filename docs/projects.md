@@ -39,6 +39,8 @@ Keep `media/`, `output/` and `.cache/` out of it.
 - **Tracks** work like Ableton's: a track has a fixed `id` (used everywhere else), a display `name` you can
   change freely, and an audio `file`. Exactly one track is the `mix`: its audio goes into the video.
   Every stem must start at the same moment as the mix, so export them all from the same start point in Live.
+  The editor's Tracks panel adds, replaces, renames and removes tracks (see [editor.md](editor.md)); files dropped
+  there wait in `media/.incoming/` until the project is saved.
 - **Grid**: `tempo` is a list (one entry for a steady song; add entries for tempo or time-signature changes).
   `downbeat` is where bar 1 starts in the mix file, in seconds: set it when your export starts with a lead-in
   before the music. Bars are vizier's own: bar 1 is the first downbeat, the lead-in is bar 0.x.

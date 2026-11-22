@@ -4,7 +4,7 @@ import {
   addLayer, removeLayer, moveLayer, duplicateLayer, setParam, setLayout, placement, hasOwnLayout, patchLayer,
   layerOrigin, isChanged, baseLayer, resetSetting, resetLayer, removedLayers, restoreLayer, newVideo, detachVideo, setVideo,
   laneOf, laneChanged, laneInherited, setLane, addLane, removeLane, resetLane, lanesOfLayer,
-  modsOf, modOrigin, addMod, setMod, removeMod, resetMod, frontToBack, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
+  modsOf, modOrigin, addMod, setMod, removeMod, resetMod, frontToBack, addTrack, renameTrack, moveTrack, removeTrack, setTrackFile, trackIdFor, mixTrackId, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
 } from "../src/app/lib/edits.ts";
 import { validateProject, buildProject, resolveVideo } from "../../../packages/core/src/index.ts";
 
@@ -323,5 +323,56 @@ describe("independent review fixes", () => {
     const ls = [{ id: "a", z: 1 }, { id: "b", z: 5 }, { id: "c", z: 5 }, { id: "d", z: 0 }];
     const drawn = [...ls].sort((x, y) => x.z - y.z).map((l) => l.id); // the renderer: d a b c (c drawn last, on top)
     expect(frontToBack(ls).map((l) => l.id)).toEqual([...drawn].reverse());
+  });
+});
+
+describe("tracks", () => {
+  it("adds a track named after its file, with an id of its own", () => {
+    const d = doc();
+    expect(addTrack(d, "media/.incoming/1/Pad bounce.wav")).toBe("pad-bounce");
+    expect(d.song.tracks.at(-1)).toEqual({ id: "pad-bounce", name: "Pad bounce", file: "media/.incoming/1/Pad bounce.wav" });
+    expect(trackIdFor(d, "Pad bounce")).toBe("pad-bounce-2");
+    expect(trackIdFor(d, "Bass (303)")).toBe("bass-303");
+    expect(valid(d, "full")).toEqual([]);
+  });
+  it("renames, reorders and gives a track a new file without touching what listens to it", () => {
+    const d = doc();
+    renameTrack(d, "bass", "Bass (303)");
+    setTrackFile(d, "bass", "media/b2.wav");
+    moveTrack(d, "bass", -1);
+    expect(d.song.tracks.map((t) => t.id)).toEqual(["bass", "mix"]);
+    expect(d.song.tracks[0]).toMatchObject({ id: "bass", name: "Bass (303)", file: "media/b2.wav" });
+    expect(layerOf(d, "full", "ring")!.track).toBe("bass");
+  });
+  it("removing a track moves its layers and modulations to the mix, in every video", () => {
+    const d = doc();
+    d.videos.reel!.modulations = [{ target: "ring.spin", source: "bass.onset", amount: 0.2 }];
+    expect(removeTrack(d, "bass")).toEqual(["Acid ring"]);
+    expect(d.song.tracks.map((t) => t.id)).toEqual(["mix"]);
+    expect(layerOf(d, "full", "ring")!.track).toBeUndefined();
+    expect(modsOf(d, "full", "ring.lineWidth")[0]!.source).toBe("mix.env");
+    expect(modsOf(d, "reel", "ring.spin")[0]!.source).toBe("mix.onset");
+    expect(valid(d, "full")).toEqual([]);
+    expect(valid(d, "reel")).toEqual([]);
+  });
+  it("the mix can't be removed", () => {
+    const d = doc();
+    removeTrack(d, "mix");
+    expect(mixTrackId(d)).toBe("mix");
+    expect(d.song.tracks).toHaveLength(2);
+  });
+});
+
+describe("saving moved files", () => {
+  it("renames them through the whole undo history (undo never brings back a path that's gone)", () => {
+    const s = new Session(doc());
+    s.apply("add track", (d) => { addTrack(d, "media/.incoming/1/pad.wav"); });
+    s.apply("rename", (d) => renameTrack(d, "pad", "Pad"));
+    s.renameFiles({ "media/.incoming/1/pad.wav": "media/pad.wav" });
+    s.markSaved();
+    expect(s.doc.song.tracks.at(-1)!.file).toBe("media/pad.wav");
+    s.undo();
+    expect(s.doc.song.tracks.at(-1)!.file).toBe("media/pad.wav");
+    expect(s.dirty).toBe(true);
   });
 });

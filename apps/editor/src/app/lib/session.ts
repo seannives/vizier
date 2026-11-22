@@ -79,6 +79,14 @@ export class Session {
   }
   markSaved() { this.saved = fileJsons(this.doc); this.emit(); }
 
+  /** Saving moved some audio files (dropped files into media/): point every track at the new path, through the
+   *  whole undo history, so undo and redo never bring back a path that's gone. Not an undo step itself. */
+  renameFiles(moved: Record<string, string>) {
+    if (!Object.keys(moved).length) return;
+    for (const e of this.history) for (const t of e.doc.song.tracks) if (moved[t.file]) t.file = moved[t.file]!;
+    this.emit();
+  }
+
   /** A video with its `base` chain resolved. */
   video(name: string): VideoFile {
     return resolveVideo(name, (n) => {

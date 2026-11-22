@@ -648,4 +648,44 @@ run("editor (headless Chrome)", () => {
       return Math.abs(ed.state.time - (g.downbeat + (20 * 4 * 60) / g.tempo[0].bpm)) < 0.01;
     }, null);
   }, 90_000);
+
+  it("tracks: drop a file to add a track, drop on a track to replace it, saving moves the files into media/", async () => {
+    // a new bounce of the drums, 0.5 s late (as if bounced from the wrong start), and a copy of the pad
+    const t = makeDemoTracks(), late = new Float32Array(t.drums.length);
+    late.set(t.drums.subarray(0, t.drums.length - DEMO.sampleRate / 2), DEMO.sampleRate / 2);
+    const drop = async (target: string, name: string, bytes: Buffer) => {
+      await page.evaluate(async ({ target, name, b64 }) => {
+        const bin = atob(b64), u = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+        const dt = new DataTransfer();
+        dt.items.add(new File([u], name, { type: "audio/wav" }));
+        const el = document.querySelector(target)!;
+        el.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, bubbles: true, cancelable: true }));
+        el.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }));
+      }, { target, name, b64: bytes.toString("base64") });
+    };
+    const tracks = () => page.evaluate(() => (window as any).vizierEditor.session().doc.song.tracks as { id: string; name: string; file: string }[]);
+    // dropped on the preview: a new track, named after the file, waiting until saved
+    await drop("main", "Pad copy.wav", wav(t.pad, DEMO.sampleRate));
+    await page.waitForFunction(() => (window as any).vizierEditor.session().doc.song.tracks.some((t: any) => t.id === "pad-copy"));
+    expect((await tracks()).find((x) => x.id === "pad-copy")!.file).toMatch(/^media\/\.incoming\/\d+\/Pad copy\.wav$/);
+    // dropped on the drums' row in the timeline: replaces its audio; the panel warns it's late against the mix
+    await drop('.heads [data-track="drums"]', "drums v2.wav", wav(late, DEMO.sampleRate));
+    await page.waitForFunction(() => (window as any).vizierEditor.session().doc.song.tracks.find((t: any) => t.id === "drums").file.includes(".incoming"));
+    if (!(await page.locator(".tracks").count())) await page.click("button.fold-btn");
+    await page.waitForSelector('.tracks [data-track="drums"] .warn', { timeout: 30_000 });
+    expect(await page.textContent('.tracks [data-track="drums"] .warn')).toMatch(/0\.50 s late/);
+    // saving: the files move into media/, the song points at them, the replaced drums file is gone
+    await page.keyboard.press("ControlOrMeta+s");
+    await page.waitForFunction(() => !(window as any).vizierEditor.state.dirtyFiles.includes("song.json"));
+    const saved = JSON.parse(readFileSync(join(dir, "song.json"), "utf8")) as { tracks: { id: string; file: string }[] };
+    expect(saved.tracks.find((x) => x.id === "pad-copy")!.file).toBe("media/Pad copy.wav");
+    expect(saved.tracks.find((x) => x.id === "drums")!.file).toBe("media/drums v2.wav");
+    expect(existsSync(join(dir, "media/drums v2.wav"))).toBe(true);
+    expect(existsSync(join(dir, "media/drums.wav"))).toBe(false);
+    expect((await tracks()).find((x) => x.id === "drums")!.file).toBe("media/drums v2.wav");
+    // removing a track: its layers go to the mix
+    await page.click('.tracks [data-track="pad-copy"] button.rm');
+    expect((await tracks()).some((x) => x.id === "pad-copy")).toBe(false);
+  }, 120_000);
 });
