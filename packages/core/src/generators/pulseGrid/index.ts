@@ -9,9 +9,9 @@ export default defineGenerator({
   kind: "canvas2d",
   colors: [{ name: "dots", label: "Dots", default: "ink" }],
   params: [
-    { name: "density", label: "Density (dots across)", min: 4, max: 60, default: 18 },
-    { name: "brightness", label: "Brightness", min: 0, max: 2, default: 1 },
-    { name: "wave", label: "Ripple speed", min: 0, max: 4, default: 1 },
+    { name: "density", label: "Density (dots across)", min: 4, max: 60, default: 18, description: "How many dots fit across the layer's shorter side." },
+    { name: "brightness", label: "Brightness", min: 0, max: 2, default: 1, description: "Overall brightness of the dots." },
+    { name: "wave", label: "Ripple speed", min: 0, max: 4, default: 1, description: "How fast the rings of large and small dots travel outward. 0 freezes the pattern (it still pulses)." },
   ],
   draw(g) {
     const { ctx, w, h } = g;

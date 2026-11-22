@@ -148,7 +148,7 @@ A soft halo around the bright parts of the layer: a blurred copy added back on t
 | Parameter | Range (default) | What it does |
 |---|---|---|
 | Amount (`amount`) | 0–3 (1) | Strength of the halo. |
-| Radius (`radius`) | 1–40 pixels (8) | How far the halo spreads, in pixels of the full-size video (the editor's smaller preview scales it, so it looks the same). |
+| Radius (`radius`) | 1–40 pixels (8) | How far the halo spreads, in pixels of the full-size video (a smaller preview scales it to match). |
 
 ### Trails (`trails`)
 
@@ -189,7 +189,7 @@ These belong to every layer, whatever draws it.
 | Opacity (`opacity`) | 0–1 (1) | How visible the layer is. |
 | Hue shift (`hueShift`) | −180–180° (0) | Rotates all the layer's colours around the colour wheel (keeps brightness). |
 | Lightness (`lightness`) | −1–1 (0) | Pushes all the layer's colours towards black (−1) or white (+1). |
-| Soft edge (`softEdge`) | 0–0.5 (0) | Fades the layer out towards the edges of its box, as a fraction of the box's shorter side. A layer is cut off at its box, so trails or glow that reach it end in a straight line; 0.15–0.25 hides that. |
+| Soft edge (`softEdge`) | 0–0.5 (0) | Fades the layer out towards the edges of its box (a fraction of its shorter side), so trails or glow that reach the box don't end in a straight line. Try 0.15–0.25. |
 | X, Y (`x`, `y`) | 0–1 (layout) | Centre position. As parameters they override the layout, for automating movement. |
 | Width, Height (`w`, `h`) | 0–2 (layout) | Size, likewise for automation. |
 | Rotation (`rotation`) | −180–180° (layout) | Rotation, likewise for automation. |
@@ -204,7 +204,7 @@ Applied after all layers, automatable as `post.<name>`:
 
 | Parameter | Range (default) | What it does |
 |---|---|---|
-| Film grain (`grain`) | 0–0.3 (0.05) | Fine moving noise over the picture, one speck per pixel (seeded, the same in every render). A smaller preview can't show specks that fine, so it shows them fainter. |
+| Film grain (`grain`) | 0–0.3 (0.05) | Fine moving noise over the picture, one speck per pixel, the same in every render. A smaller preview shows it fainter. |
 | Vignette (`vignette`) | 0–1 (0.55) | Darkens the corners. |
 
 The palette's **bg** colour is the background behind every layer.

@@ -14,13 +14,13 @@ export default defineGenerator({
     { name: "highlight", label: "Highlight (open filter)", default: "accent" },
   ],
   params: [
-    { name: "radius", label: "Radius", min: 0.2, max: 2, default: 1 },
-    { name: "spike", label: "Spectrum spikes", min: 0, max: 1, default: 0.3 },
-    { name: "spin", label: "Spin (turns/s)", min: -1, max: 1, default: 0.05 },
-    { name: "acid", label: "Highlight amount", min: 0, max: 2, default: 1 },
-    { name: "echoes", label: "Echoes", type: "int", min: 0, max: 30, default: 10 },
-    { name: "echoSpacing", label: "Echo spacing (frames)", type: "int", min: 1, max: 10, default: 2 },
-    { name: "lineWidth", label: "Line width", min: 0.5, max: 10, default: 2 },
+    { name: "radius", label: "Radius", min: 0.2, max: 2, default: 1, description: "Size of the ring. 1 is about a fifth of the layer's shorter side; loudness adds up to a third more." },
+    { name: "spike", label: "Spectrum spikes", min: 0, max: 1, default: 0.3, description: "How far the spectrum pushes the line outward. 0 is a smooth circle that only breathes." },
+    { name: "spin", label: "Spin (turns/s)", min: -1, max: 1, default: 0.05, description: "Rotation speed; positive turns clockwise." },
+    { name: "acid", label: "Highlight amount", min: 0, max: 2, default: 1, description: "How strongly the line moves to the highlight colour as the sound gets brighter. 0 keeps it the line colour." },
+    { name: "echoes", label: "Echoes", type: "int", min: 0, max: 30, default: 10, description: "How many fading copies of earlier moments are drawn behind the current ring, each a little larger." },
+    { name: "echoSpacing", label: "Echo spacing (frames)", type: "int", min: 1, max: 10, default: 2, description: "Time between echoes. Larger reaches further back, so the echoes differ more." },
+    { name: "lineWidth", label: "Line width", min: 0.5, max: 10, default: 2, description: "Line thickness (in pixels at 1080p; scales with the layer). The current ring is drawn thicker." },
   ],
   draw(g) {
     const { ctx, w, h } = g;

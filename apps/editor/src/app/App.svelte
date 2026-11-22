@@ -518,7 +518,7 @@
   <header class="top">
     <div class="brand">vizier</div>
     <div class="proj" title="project folder">{doc?.song.title ?? projectId}</div>
-    <select bind:value={videoName} title="video" disabled={!doc}>
+    <select bind:value={videoName} disabled={!doc} aria-label="Video">
       {#each videoNames as v}<option value={v}>{doc?.videos[v]?.name ?? v}{doc?.videos[v]?.base ? `  ← ${doc.videos[v].base}` : ""}</option>{/each}
     </select>
     <button class="small" onclick={() => (newDialog = "base")} disabled={!doc} title="Make a new video (build on this one, copy it, or start blank)">+ New</button>
@@ -535,7 +535,7 @@
     <button onclick={undo} disabled={!undoLabel} title="Undo {undoLabel ?? ""} ({displayKeys("Mod+Z")})">↶</button>
     <button onclick={redo} disabled={!redoLabel} title="Redo {redoLabel ?? ""} ({displayKeys("Shift+Mod+Z")})">↷</button>
     <button class:on={dirtyFiles.length > 0} onclick={save} title="Save ({displayKeys("Mod+S")})">Save{dirtyFiles.length ? " •" : ""}</button>
-    <button onclick={() => (help = true)} title="Keyboard shortcuts (?)">?</button>
+    <button onclick={() => (help = true)} title="Keyboard shortcuts ({displayKeys("?")})">?</button>
   </header>
 
   <main class:popped bind:clientWidth={mainW} bind:clientHeight={mainH}

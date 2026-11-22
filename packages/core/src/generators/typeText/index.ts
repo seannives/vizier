@@ -10,11 +10,11 @@ export default defineGenerator({
   usesText: true,
   colors: [{ name: "text", label: "Text", default: "ink" }],
   params: [
-    { name: "size", label: "Size (of layer height)", min: 0.05, max: 1, default: 0.35 },
-    { name: "reveal", label: "Typed (0–1)", min: 0, max: 1, default: 1 },
-    { name: "shake", label: "Shake", min: 0, max: 3, default: 0 },
-    { name: "stutter", label: "Stutter", min: 0, max: 2, default: 0 },
-    { name: "blur", label: "Blur", min: 0, max: 20, default: 0 },
+    { name: "size", label: "Size (of layer height)", min: 0.05, max: 1, default: 0.35, description: "Letter height as a share of the layer's height. Make the layer wider than the text needs." },
+    { name: "reveal", label: "Typed (0–1)", min: 0, max: 1, default: 1, description: "How much of the text is shown: automate 0 → 1 to type it out. A caret blinks while typing." },
+    { name: "shake", label: "Shake", min: 0, max: 3, default: 0, description: "Random jitter of the whole text, every frame (the same in every render)." },
+    { name: "stutter", label: "Stutter", min: 0, max: 2, default: 0, description: "Glitch: horizontal strips of the text slide sideways on hits, and sometimes in between." },
+    { name: "blur", label: "Blur", min: 0, max: 20, default: 0, description: "Softens the letters; automate it down to bring text into focus." },
   ],
   draw(g) {
     const { ctx, w, h } = g;

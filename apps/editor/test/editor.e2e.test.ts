@@ -527,7 +527,7 @@ run("editor (headless Chrome)", () => {
       await page.click('button[aria-label="Reset Radius to base"]');
       expect(await tag("ring")).toBe("base");
       // remove an inherited layer, then restore it
-      await page.click('[data-layer="title"] button[title="Remove"]');
+      await page.click('[data-layer="title"] button.rm');
       expect(await page.locator('[data-removed="title"]').count()).toBe(1);
       await page.click('[data-removed="title"] button');
       expect(await tag("title")).toBe("base");
@@ -626,6 +626,17 @@ run("editor (headless Chrome)", () => {
     await page.waitForFunction(() => (window as any).vizierEditor.state.videoName === "reel");
     expect(await page.locator("text=Instagram Reels").count()).toBeGreaterThan(0);
   }, 90_000);
+
+  it("buttons that have a keyboard shortcut show it in their tooltip", async () => {
+    await page.click('[data-layer="ring"]');                                  // (the layer panel's buttons)
+    const titles = await page.evaluate(() => [...document.querySelectorAll("button[title]")].map((b) => b.getAttribute("title")!));
+    const has = (start: string, keys: string) => titles.some((t) => t.startsWith(start) && t.includes(keys));
+    const mac = await page.evaluate(() => /Mac/.test(navigator.platform));
+    const k = (mods: string, key: string) => (mac ? mods.replace("Mod", "⌘").replace("Shift", "⇧") : mods.replace("Mod", "Ctrl+").replace("Shift", "Shift+")) + key;
+    const want: [string, string][] = [["Play / stop", "Space"], ["Loop the range", "L"], ["Snap to the beat", k("Mod", "4")], ["Undo", k("Mod", "Z")],
+      ["Redo", k("ShiftMod", "Z")], ["Save", k("Mod", "S")], ["Keyboard shortcuts", "?"], ["Duplicate", k("Mod", "D")], ["Split at the playhead", k("Mod", "E")]];
+    expect(want.filter(([start, keys]) => !has(start, keys))).toEqual([]);
+  }, 60_000);
 
   it("opening a video puts the playhead at the start of its range", async () => {
     if ((await state()).playing) await page.keyboard.press("Space");

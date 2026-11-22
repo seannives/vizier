@@ -2,6 +2,7 @@
   import { GENERATORS, type LayerDef } from "../../../../../packages/core/src/index.ts";
   import { addLayer, removeLayer, moveLayer, duplicateLayer, renameLayer, generatorList, layerOrigin, removedLayers, restoreLayer } from "../lib/edits.ts";
   import type { Doc } from "../lib/session.ts";
+  import { displayKeys } from "../lib/shortcuts.ts";
 
   /** The video's layers, front first. Click to select; double-click a name to rename. */
   let { layers, video, doc, selected, defaultTrack, trackName, edit, onselect }: {
@@ -55,8 +56,8 @@
       <div class="btns">
         <button title="Move in front" disabled={i === 0} onclick={(e) => { e.stopPropagation(); edit("move layer", (d) => moveLayer(d, video, l.id, 1)); }}>↑</button>
         <button title="Move behind" disabled={i === layers.length - 1} onclick={(e) => { e.stopPropagation(); edit("move layer", (d) => moveLayer(d, video, l.id, -1)); }}>↓</button>
-        <button title="Duplicate" onclick={(e) => { e.stopPropagation(); let id = ""; edit("duplicate layer", (d) => { id = duplicateLayer(d, video, l.id); }); if (id) onselect(id); }}>⧉</button>
-        <button title="Remove" class="rm" onclick={(e) => { e.stopPropagation(); edit(`remove ${l.name ?? l.id}`, (d) => removeLayer(d, video, l.id)); if (selected === l.id) onselect(null); }}>✕</button>
+        <button title="Duplicate ({displayKeys("Mod+D")}; the copy goes behind)" onclick={(e) => { e.stopPropagation(); let id = ""; edit("duplicate layer", (d) => { id = duplicateLayer(d, video, l.id); }); if (id) onselect(id); }}>⧉</button>
+        <button title="Remove the layer" class="rm" onclick={(e) => { e.stopPropagation(); edit(`remove ${l.name ?? l.id}`, (d) => removeLayer(d, video, l.id)); if (selected === l.id) onselect(null); }}>✕</button>
       </div>
     </div>
   {/each}

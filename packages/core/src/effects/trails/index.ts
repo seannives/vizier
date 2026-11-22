@@ -10,9 +10,9 @@ export default defineEffect({
   description: "Leaves fading copies of the layer behind it; zoom and rotation turn them into tunnels and spirals.",
   feedback: true,
   params: [
-    { name: "persistence", label: "Persistence (s to fade)", min: 0.05, max: 3, default: 0.6 },
-    { name: "zoom", label: "Zoom per second", min: 0.5, max: 2, default: 1.0 },
-    { name: "rotate", label: "Rotate (degrees/s)", min: -90, max: 90, default: 0 },
+    { name: "persistence", label: "Persistence (s to fade)", min: 0.05, max: 3, default: 0.6, description: "How long a trail takes to fade (to a tenth)." },
+    { name: "zoom", label: "Zoom per second", min: 0.5, max: 2, default: 1.0, description: "Above 1, trails grow outward (a tunnel); below 1, they shrink inward." },
+    { name: "rotate", label: "Rotate (degrees/s)", min: -90, max: 90, default: 0, description: "Trails turn as they fade, making spirals; negative values turn the other way." },
   ],
   passes: [
     /* glsl */ `

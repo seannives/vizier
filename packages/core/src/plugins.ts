@@ -97,21 +97,21 @@ export const defineEffect = (e: EffectDef): EffectDef => e;
 
 /** Parameters every layer has, handled by the compositor. */
 export const LAYER_PARAMS: ParamSpec[] = [
-  { name: "opacity", label: "Opacity", min: 0, max: 1, default: 1 },
-  { name: "x", label: "X (centre)", min: 0, max: 1, default: 0.5 },
-  { name: "y", label: "Y (centre)", min: 0, max: 1, default: 0.5 },
-  { name: "w", label: "Width", min: 0, max: 2, default: 1 },
-  { name: "h", label: "Height", min: 0, max: 2, default: 1 },
-  { name: "rotation", label: "Rotation (degrees)", min: -180, max: 180, default: 0 },
-  { name: "hueShift", label: "Hue shift (degrees)", min: -180, max: 180, default: 0, description: "Rotates all of the layer's colours" },
-  { name: "lightness", label: "Lightness", min: -1, max: 1, default: 0, description: "−1 black … 0 as is … +1 white, for all of the layer's colours" },
-  { name: "softEdge", label: "Soft edge", min: 0, max: 0.5, default: 0, description: "Fades the layer out towards the edges of its box, so trails and glow that reach the box don't end in a straight line. The width of the fade, as a fraction of the box's shorter side" },
+  { name: "opacity", label: "Opacity", min: 0, max: 1, default: 1, description: "How visible the layer is." },
+  { name: "x", label: "X (centre)", min: 0, max: 1, default: 0.5, description: "Centre position. As parameters they override the layout, for automating movement." },
+  { name: "y", label: "Y (centre)", min: 0, max: 1, default: 0.5, description: "Centre position. As parameters they override the layout, for automating movement." },
+  { name: "w", label: "Width", min: 0, max: 2, default: 1, description: "Size, likewise for automation." },
+  { name: "h", label: "Height", min: 0, max: 2, default: 1, description: "Size, likewise for automation." },
+  { name: "rotation", label: "Rotation (degrees)", min: -180, max: 180, default: 0, description: "Rotation, likewise for automation." },
+  { name: "hueShift", label: "Hue shift (degrees)", min: -180, max: 180, default: 0, description: "Rotates all the layer's colours around the colour wheel (keeps brightness)." },
+  { name: "lightness", label: "Lightness", min: -1, max: 1, default: 0, description: "Pushes all the layer's colours towards black (−1) or white (+1)." },
+  { name: "softEdge", label: "Soft edge", min: 0, max: 0.5, default: 0, description: "Fades the layer out towards the edges of its box (a fraction of its shorter side), so trails or glow that reach the box don't end in a straight line. Try 0.15–0.25." },
 ];
 
 /** Global post-processing parameters, automatable as "post.<name>". */
 export const POST_PARAMS: ParamSpec[] = [
-  { name: "grain", label: "Film grain", min: 0, max: 0.3, default: 0.05 },
-  { name: "vignette", label: "Vignette", min: 0, max: 1, default: 0.55 },
+  { name: "grain", label: "Film grain", min: 0, max: 0.3, default: 0.05, description: "Fine moving noise over the picture, one speck per pixel, the same in every render. A smaller preview shows it fainter." },
+  { name: "vignette", label: "Vignette", min: 0, max: 1, default: 0.55, description: "Darkens the corners." },
 ];
 
 export const defaults = (specs: ParamSpec[]): Record<string, number> => Object.fromEntries(specs.map((s) => [s.name, s.default]));

@@ -13,11 +13,14 @@ Every generator has `id`, `label`, `description`, `params` and a `kind`:
 
 ```ts
 params: [
-  { name: "scale", label: "Scale", min: 0.5, max: 8, default: 2.5 },
-  { name: "rows", label: "Rows", type: "int", min: 4, max: 80, default: 36 },
-  { name: "fill", label: "Fill", type: "toggle", min: 0, max: 1, default: 1 },
+  { name: "scale", label: "Scale", min: 0.5, max: 8, default: 2.5, description: "Zoom of the pattern: larger values give more, smaller swirls." },
+  { name: "rows", label: "Rows", type: "int", min: 4, max: 80, default: 36, description: "How many ridges." },
+  { name: "fill", label: "Fill", type: "toggle", min: 0, max: 1, default: 1, description: "…" },
 ]
 ```
+
+Every parameter needs a `description`: it's the parameter's tooltip in the editor, and the same words go in its
+row of the tables in [visuals.md](visuals.md). Keep it under 170 characters. A test checks both.
 
 Colours are declared separately, each defaulting to a palette slot (`bg`, `ink`, `accent`, `extra1`, `extra2`):
 

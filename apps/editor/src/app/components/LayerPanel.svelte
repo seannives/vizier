@@ -10,6 +10,7 @@
     layerOrigin, isChanged, resetSetting, resetLayer, baseLayer, type Setting,
     modsOf, modOrigin, addMod, setMod, removeMod, resetMod,
   } from "../lib/edits.ts";
+  import { displayKeys } from "../lib/shortcuts.ts";
   import type { Doc } from "../lib/session.ts";
 
   /** The selected layer's settings: what draws it, its track, parameters, effects and when it's on. */
@@ -199,7 +200,7 @@
           <input type="text" value={fmt(s.from)} title="Bar it comes on" onkeydown={(e) => e.stopPropagation()} onchange={(e) => { const v = num(e); if (v !== undefined) setSpan(i, { from: v }); }} aria-label="On from bar" />
           <span>–</span>
           <input type="text" value={fmt(s.to)} placeholder="end" title="Bar it goes off (empty: the end)" onkeydown={(e) => e.stopPropagation()} onchange={(e) => setSpan(i, { to: num(e) })} aria-label="Off at bar" />
-          <button class="x" title="Remove" onclick={() => removeSpan(i)}>✕</button>
+          <button class="x" title="Remove this on-span (or select it in the timeline and press {displayKeys("Delete")})" onclick={() => removeSpan(i)}>✕</button>
         </div>
         <div class="sr">
           <span>fades</span>
@@ -212,7 +213,7 @@
     {/each}
   {/if}
   <div class="spanbtns">
-    <button onclick={splitAtPlayhead} disabled={playheadBar === null} title="Split at the playhead (⌘E)">Split at playhead</button>
+    <button onclick={splitAtPlayhead} disabled={playheadBar === null} title="Split at the playhead ({displayKeys("Mod+E")})">Split at playhead</button>
     <button onclick={onFromPlayhead} disabled={playheadBar === null}>On from playhead</button>
     {#if spans.length}<button onclick={() => edit("on for the whole song", (d) => setSpans(d, video, layerId, null))}>Whole song</button>{/if}
   </div>

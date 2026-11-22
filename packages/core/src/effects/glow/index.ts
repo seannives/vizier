@@ -6,8 +6,8 @@ export default defineEffect({
   label: "Glow",
   description: "Adds a soft blurred halo around bright parts of the layer.",
   params: [
-    { name: "amount", label: "Amount", min: 0, max: 3, default: 1 },
-    { name: "radius", label: "Radius (pixels)", min: 1, max: 40, default: 8, pixels: true },
+    { name: "amount", label: "Amount", min: 0, max: 3, default: 1, description: "Strength of the halo." },
+    { name: "radius", label: "Radius (pixels)", min: 1, max: 40, default: 8, pixels: true, description: "How far the halo spreads, in pixels of the full-size video (a smaller preview scales it to match)." },
   ],
   passes: [
     /* glsl */ `

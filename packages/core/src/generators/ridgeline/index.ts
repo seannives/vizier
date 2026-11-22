@@ -18,14 +18,14 @@ export default defineGenerator({
     { name: "fill", label: "Fill under ridges", default: "bg" },
   ],
   params: [
-    { name: "rows", label: "Rows", type: "int", min: 4, max: 80, default: 36 },
-    { name: "spacing", label: "Frames between rows", type: "int", min: 1, max: 8, default: 2 },
-    { name: "height", label: "Ridge height", min: 0, max: 2, default: 0.8 },
-    { name: "floor", label: "Ignore below (level)", min: 0, max: 0.9, default: 0.35 },
-    { name: "depth", label: "Perspective", min: 0, max: 0.9, default: 0.55 },
-    { name: "lineWidth", label: "Line width", min: 0.5, max: 6, default: 1.5 },
-    { name: "fill", label: "Hide lines behind", type: "toggle", min: 0, max: 1, default: 1 },
-    { name: "acid", label: "Highlight amount", min: 0, max: 2, default: 0 },
+    { name: "rows", label: "Rows", type: "int", min: 4, max: 80, default: 36, description: "How many ridges." },
+    { name: "spacing", label: "Frames between rows", type: "int", min: 1, max: 8, default: 2, description: "Time between ridges: larger shows a longer stretch of history." },
+    { name: "height", label: "Ridge height", min: 0, max: 2, default: 0.8, description: "How tall the peaks rise." },
+    { name: "floor", label: "Ignore below (level)", min: 0, max: 0.9, default: 0.35, description: "Spectrum levels below this stay flat, so only real peaks rise (raise it for noisy stems)." },
+    { name: "depth", label: "Perspective", min: 0, max: 0.9, default: 0.55, description: "How much the far ridges narrow: 0 is flat, higher is a deeper view." },
+    { name: "lineWidth", label: "Line width", min: 0.5, max: 6, default: 1.5, description: "Line thickness (pixels at 1080p); the front ridge is thicker." },
+    { name: "fill", label: "Hide lines behind", type: "toggle", min: 0, max: 1, default: 1, description: "Fill under each ridge with the fill colour, hiding the ridges behind it. Off gives see-through wireframes." },
+    { name: "acid", label: "Highlight amount", min: 0, max: 2, default: 0, description: "How strongly ridges take the highlight colour when that moment was bright." },
   ],
   draw(g) {
     const { ctx, w, h } = g;

@@ -64,7 +64,7 @@ describe("LayerList", () => {
     await r.rerender(props());
     await fireEvent.click(r.container.querySelector('[data-layer="ring"] button[title="Move in front"]')!);
     expect(layerOf(s.doc, "full", "ring")!.z).toBeGreaterThan(layerOf(s.doc, "full", "title")!.z);
-    await fireEvent.click(r.container.querySelector('[data-layer="title"] button[title="Remove"]')!);
+    await fireEvent.click(r.container.querySelector('[data-layer="title"] button.rm')!);
     expect(layersOf(s.doc, "full").map((l) => l.id).sort()).toEqual(["pulseGrid", "ring"]);
   });
 });
@@ -176,7 +176,7 @@ describe("LayerList: rename and duplicate", () => {
     const { s, edit } = setup();
     const onselect = vi.fn();
     const r = render(LayerList, { layers: [...layersOf(s.doc, "full")].sort((a, b) => b.z - a.z), video: "full", selected: "ring", trackName: () => "", edit, onselect });
-    await fireEvent.click(r.container.querySelector('[data-layer="ring"] button[title="Duplicate"]')!);
+    await fireEvent.click(r.container.querySelector('[data-layer="ring"] button[title^="Duplicate"]')!);
     expect(onselect).toHaveBeenLastCalledWith("acidRing");
     const copy = layerOf(s.doc, "full", "acidRing")!;
     expect(copy.name).toBe("Acid ring copy");
