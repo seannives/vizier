@@ -54,8 +54,9 @@ Editor milestones:
         its audio (a replacement overwrites the old file on save); add or replace from media/; rename, reorder,
         remove (its layers and modulations move to the mix); each stem checked against the mix for length and
         for starting early or late
-  - [ ] New project from the editor: a folder in projects/, a title, the mix and stems dropped in, a first video
-        (decided 2026-11-22: between 4a and 4b, since a new song goes straight on to setting its tempo)
+  - [x] New project from the editor: a dialog asks for the title; drop the mix and stems; makes projects/<title>/
+        with a first guess at the tempo and bar 1, and an empty YouTube video. `vizier editor` without a project
+        opens on it; the project name switches projects (decided 2026-11-22: between 4a and 4b)
   - [ ] 4b. Tempo panel (typed BPM with detected suggestion, downbeat, drag the grid, audible click)
 - [ ] 5. Colour pickers, palette panel and colour lanes; Render button with progress; list of renders
 - [ ] Modulation presets: one-click combinations such as "pulse with the kick" or "colour follows the filter"

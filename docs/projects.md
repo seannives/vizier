@@ -144,12 +144,22 @@ vizier version, so it can be reproduced later. Watch disk space: a full 1080p so
 
 ## Starting a new project
 
+In the editor: run `vizier editor` without a project and it opens on a start page (or click the project's name
+in the editor's top bar). Under **New project**, type the title, drop the mix and stems from Finder (or choose
+them), check which file is the mix (it's guessed from names like mix, main, master or full, else the biggest
+file) and press **Create**. vizier makes `projects/<folder named after the title>/` with the audio in `media/`,
+a `song.json` with a track per file and a first guess at the tempo and where bar 1 starts, and an empty YouTube
+video, then opens it. **Open a project** lists the projects in `projects/`. Switching waits until unsaved changes
+are saved.
+
+By hand:
+
 1. `mkdir -p projects/<id>/media` and copy in the mix and stems.
 2. `vizier analyze projects/<id>` suggests the tempo, where bar 1 starts, where each stem plays and likely
    section changes (suggestions to check, not answers).
 3. Write `song.json` and a first video, or ask Claude: "here are my stems and the vizier repo; take a first pass
    at the project". `vizier validate projects/<id>` checks the result.
-4. Refine by rendering stills (`--still-bar`) and short excerpts (`--bars`), and soon in the editor.
+4. Refine by rendering stills (`--still-bar`) and short excerpts (`--bars`), and in the editor.
 
 The JSON Schemas in `packages/core/schema/` describe both files; editors such as VS Code use them for
 completion and checking via the `$schema` line at the top of each file.

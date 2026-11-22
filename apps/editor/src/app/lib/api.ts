@@ -13,7 +13,8 @@ async function getJson(url: string, init?: RequestInit) {
 }
 
 export const api = {
-  async session(): Promise<SessionData> { return getJson("/api/session"); },
+  /** The open project, or `noProject` when the editor was started without one. */
+  async session(): Promise<SessionData | { noProject: true }> { return getJson("/api/session"); },
   async waveform(file: string): Promise<Waveform> {
     const w = await getJson(`/api/waveform?file=${encodeURIComponent(file)}`);
     const bin = atob(w.peaks);

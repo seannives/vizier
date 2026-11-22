@@ -13,6 +13,9 @@ server isn't running, the editor says so and keeps your changes: start it again 
 
 ## What it does
 
+- **Projects**: click the project's name (top left) to open another project in `projects/` or make a new one
+  (a title and its audio; see [projects.md](projects.md#starting-a-new-project)). Started without a project
+  (`vizier editor`), the editor opens on the same page.
 - **Video menu** (top left): every video in the project; videos built on another show `← base`. Switching keeps
   unsaved changes to all videos; Save writes every changed file. **+ New** makes a video that builds on the open
   one, an independent copy of it, or a blank one, in any format; **Duplicate** is a quick copy. A new video is

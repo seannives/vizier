@@ -42,10 +42,11 @@ Examples:
   },
   editor: {
     script: "apps/editor/src/server.ts",
-    summary: "open the editor for a project (in Chrome)",
-    usage: "vizier editor <project> [--video <name>] [--port 5174] [--no-open]",
+    summary: "open the editor for a project, or start a new one (in Chrome)",
+    usage: "vizier editor [<project>] [--video <name>] [--port 5174] [--no-open]",
     details: `
 Starts the editor and opens it in Chrome at http://localhost:5174. Stop it with Ctrl+C.
+Without a project, it opens on a start page: open one of the projects in projects/, or make a new one.
 Unsaved changes live in the browser tab: if the editor stops, start it again and save.
 
   --video <name>   the video to open first

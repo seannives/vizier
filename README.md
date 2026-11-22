@@ -29,6 +29,7 @@ vizier render projects/demo --video full --gpu         # → projects/demo/outpu
 vizier render projects/demo --video reel --gpu         # a vertical Reel that builds on the full video
 vizier live projects/demo --video full                 # then open http://localhost:5173 in Chrome
 vizier editor projects/demo                            # the editor, in a Chrome window of its own
+vizier editor                                          # …or start on its projects page (open one, or make a new one)
 ```
 
 The demo's music is synthesised by code (`scripts/demo-audio.ts`), so the repository needs no audio files: a

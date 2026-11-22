@@ -13,6 +13,7 @@
   import VideoPanel from "./components/VideoPanel.svelte";
   import NewVideo from "./components/NewVideo.svelte";
   import TracksPanel, { type TrackCheck } from "./components/TracksPanel.svelte";
+  import Projects from "./components/Projects.svelte";
   import type { LayerRow, SpanS, LaneRow, LanePoint } from "./components/Timeline.svelte";
   import { frontToBack, addTrack, setTrackFile, removeTrack, trackFiles } from "./lib/edits.ts";
   import { setSpans, splitLayerAt, duplicateLayer, layerOf, setLayout, newVideo, lanesOfLayer, laneInherited, laneChanged, setLane, addLane, removeLane, resetLane } from "./lib/edits.ts";
@@ -29,6 +30,9 @@
   let session = $state<Session | null>(null);
   let version = $state(0); // bumps on every session change
   let projectId = $state("");
+  /** No project open (the editor was started without one): the start page. */
+  let noProject = $state(false);
+  let showProjects = $state(false);
   let videoName = $state<string | null>(null);
   let status = $state("loading…");
   let loadError = $state<string | null>(null);
@@ -72,7 +76,9 @@
   onMount(async () => {
     try {
       const data = await api.session();
+      if ("noProject" in data) { noProject = true; return; }
       projectId = data.id;
+      document.title = `vizier · ${data.song.title}`;
       const s = new Session({ song: data.song, videos: data.videos });
       s.subscribe(() => version++);
       session = s;
@@ -596,13 +602,15 @@
   });
 </script>
 
-{#if loadError}
+{#if noProject}
+  <Projects start />
+{:else if loadError}
   <div class="fatal">Couldn't open the project: {loadError}</div>
 {:else}
 <div class="app" class:popped class:dragging {ondragover} {ondragleave} {ondrop} role="application" style:grid-template-rows="42px minmax(0, 1fr) {tlRows} 24px">
   <header class="top">
     <div class="brand">vizier</div>
-    <div class="proj" title="project folder">{doc?.song.title ?? projectId}</div>
+    <button class="proj" onclick={() => (showProjects = true)} title="projects/{projectId}: open another project, or start a new one">{doc?.song.title ?? projectId}</button>
     <select bind:value={videoName} disabled={!doc} aria-label="Video">
       {#each videoNames as v}<option value={v}>{doc?.videos[v]?.name ?? v}{doc?.videos[v]?.base ? `  ← ${doc.videos[v].base}` : ""}</option>{/each}
     </select>
@@ -698,6 +706,7 @@
 {/if}
 
 {#if help}<Help {shortcuts} onclose={() => (help = false)} />{/if}
+{#if showProjects}<Projects dirty={dirtyFiles} onclose={() => (showProjects = false)} />{/if}
 {#if newDialog && videoName && doc}
   <NewVideo currentName={doc.videos[videoName]?.name ?? videoName} currentFormat={profileId} how={newDialog} oncreate={createVideo} oncancel={() => (newDialog = null)} />
 {/if}
@@ -718,7 +727,8 @@
   .delay { display: flex; align-items: center; gap: 4px; }
   .delay button { padding: 0 6px; font-size: 11px; line-height: 16px; }
   .brand { font-weight: 600; letter-spacing: .04em; color: var(--accent); }
-  .proj { font-weight: 500; }
+  .proj { font-weight: 500; background: none; border: none; padding: 0 4px; color: inherit; font-size: inherit; cursor: pointer; }
+  .proj:hover { color: var(--accent); }
   .small { font-size: 11px; padding: 2px 7px; }
   .badge { font-size: 11px; color: var(--dim); border: 1px solid var(--line2); border-radius: 3px; padding: 1px 6px; }
   .transport { display: flex; gap: 4px; margin-left: 8px; }
