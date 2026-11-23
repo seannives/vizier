@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from "vitest";
-import { spawnSync } from "node:child_process";
+import { spawnSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -7,6 +7,19 @@ import { join } from "node:path";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const vizier = (...args: string[]) => spawnSync("bash", [root + "bin/vizier", ...args], { cwd: root, encoding: "utf8" });
+/** Run vizier without blocking the test runner, and stop it (and the Chrome it started) after `ms`. */
+function vizierAsync(args: string[], ms: number): Promise<{ status: number | null; stderr: string }> {
+  return new Promise((done) => {
+    const p = spawn("bash", [root + "bin/vizier", ...args], { cwd: root, detached: true, stdio: ["ignore", "ignore", "pipe"] });
+    let stderr = "";
+    p.stderr!.on("data", (d) => { stderr += d; });
+    const timer = setTimeout(() => {
+      stderr += `\n(stopped: still running after ${ms / 1000} s; the last thing it printed is above)`;
+      try { process.kill(-p.pid!, "SIGKILL"); } catch { p.kill("SIGKILL"); }
+    }, ms);
+    p.on("exit", (status) => { clearTimeout(timer); done({ status, stderr }); });
+  });
+}
 
 describe("the vizier command", () => {
   // the demo's audio isn't in git; generate it (on a fresh machine, e.g. CI) so validate finds every file
@@ -34,9 +47,11 @@ describe("the vizier command", () => {
 describe("render options the editor uses", () => {
   const chrome = [process.env.CHROME_PATH, "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome", "/usr/bin/google-chrome"].find((p) => p && existsSync(p));
   const it2 = chrome && !process.env.VIZIER_QUICK ? it : it.skip;
-  it2("--progress reports every frame batch; the file appears only when complete (no .partial left)", () => {
+  it2("--progress reports every frame batch; the file appears only when complete (no .partial left)", async () => {
     const out = mkdtempSync(join(tmpdir(), "vizier-out-")) + "/clip.mp4";
-    const r = vizier("render", "projects/demo", "--video", "full", "--profile", "draft", "--bars", "2-2.5", "--progress", "--out", out);
+    // (on a Mac with the GPU, as you'd render; elsewhere, e.g. CI, software GL. Run so that a hang fails the test with
+    // what the render printed, rather than blocking the test runner for ever)
+    const r = await vizierAsync(["render", "projects/demo", "--video", "full", "--profile", "draft", "--bars", "2-2.5", "--progress", "--out", out, ...(process.platform === "darwin" ? ["--gpu"] : [])], 150_000);
     expect(r.status, r.stderr).toBe(0);
     const progress = r.stderr.split("\n").filter((l) => l.startsWith("PROGRESS "));
     expect(progress.length).toBeGreaterThan(1);
