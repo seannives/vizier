@@ -24,7 +24,16 @@
   let playing = $state<string | null>(null);
   let error = $state("");
   const active = $derived(jobs.filter((j) => j.status === "queued" || j.status === "running"));
-  const recent = $derived(jobs.filter((j) => j.status === "failed" || j.status === "cancelled").slice(-3));
+  /** How each video's last render ended (done, failed or cancelled), newest first; only while nothing newer for it is
+   *  waiting or running, so an old "cancelled" never sits beside a render that's going (or done) since. */
+  const recent = $derived.by(() => {
+    const finished = jobs.filter((j) => j.status === "done" || j.status === "failed" || j.status === "cancelled");
+    const last = new Map<string, RenderJob>();
+    for (const j of finished) last.set(`${j.video}|${j.whole}`, j);              // (jobs are in the order they were added)
+    return [...last.values()].filter((j) => !active.some((a) => a.video === j.video && a.whole === j.whole && a.id > j.id))
+      .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0)).slice(0, 3);
+  });
+  const took = (j: RenderJob) => { const s = Math.round(((j.endedAt ?? 0) - (j.startedAt ?? 0)) / 1000); return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`; };
 
   async function start(videosToRender: string[], whole: boolean, options?: string[]) {
     error = "";
@@ -80,7 +89,10 @@
       </div>
     {/each}
     {#each recent as j (j.id)}
-      <div class="job {j.status}"><span>{videos[j.video] ?? j.video}: {j.status === "failed" ? "failed" : "cancelled"}</span>
+      <div class="job {j.status}" data-job={j.id}>
+        <div class="row"><span>{videos[j.video] ?? j.video}{j.whole ? ", whole song" : ""}:
+          {j.status === "done" ? `done in ${took(j)}` : j.status === "failed" ? "failed" : "cancelled"}</span>
+          {#if j.status === "done" && j.file}<span class="dim">{j.file.replace(/^output\//, "")}</span><button onclick={() => (playing = j.file!)}>Play</button>{/if}</div>
         {#if j.error}<pre>{j.error}</pre>{/if}</div>
     {/each}
 
@@ -117,6 +129,8 @@
   .warn { color: var(--danger); border: 1px solid var(--danger); border-radius: 4px; padding: 6px 8px; margin: 0; }
   .job { padding: 6px 8px; background: var(--bg1); border-radius: 4px; }
   .job.failed { color: var(--danger); }
+  .job.done { color: var(--text); border-left: 3px solid var(--accent); }
+  .job.cancelled { color: var(--dim); }
   .job pre { white-space: pre-wrap; font-size: 11px; margin: 4px 0 0; color: var(--dim); }
   .bar { height: 4px; background: var(--bg3); border-radius: 2px; margin-top: 5px; overflow: hidden; }
   .bar div { height: 100%; background: var(--accent); transition: width .3s; }
