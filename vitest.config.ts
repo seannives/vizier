@@ -6,6 +6,9 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 // (the editor's end-to-end tests and the renderer tests).
 export default defineConfig({
   test: {
+    // Longer than the default 5 s: decoding audio or working out a tempo takes a second or two alone, and several
+    // times that on a laptop that's also running the Chrome tests in parallel. A test that's stuck still fails.
+    testTimeout: 30_000,
     projects: [
       { extends: true, test: { name: "node", include: ["**/*.test.ts"], exclude: ["**/node_modules/**", "**/*.component.test.ts"] } },
       {

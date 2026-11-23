@@ -43,7 +43,7 @@ describe("projects", () => {
     const saved = JSON.parse(readFileSync(join(dir, "song.json"), "utf8")) as SongFile;
     expect(validateProject(buildProject(saved, resolveVideo("youtube-full", () => video), (x) => x.file))).toEqual([]);
     expect(listProjects(root)).toEqual([{ id: "second-song", title: "Second Song" }]);
-  });
+  }, 60_000); // (decoding the mix and working out its tempo: about 2 s alone, more alongside the browser tests)
   it("an unfinished project can be thrown away; a finished one can't", () => {
     const id = beginProject(root, "Oops");
     discardProject(root, id);
