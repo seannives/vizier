@@ -586,10 +586,14 @@ run("editor (headless Chrome)", () => {
       expect((await lane("ring.spike") as any[]).length).toBe(1);
       await page.click('[data-lane="ring.radius"] button[aria-label="Hide lane"]');
       expect(await page.locator('[data-lane="ring.radius"]').count()).toBe(0);
+      // ▸ with some of its lanes shown (its colour lane) hides them all; again shows them all
+      const ringLanes = '[data-lane^="ring."]';
+      if (await page.locator(ringLanes).count()) await page.click('[data-fold="ring"]');
+      expect(await page.locator(ringLanes).count()).toBe(0);
       await page.click('[data-fold="ring"]');
       expect(await page.locator('[data-lane="ring.radius"], [data-lane="ring.spike"]').count()).toBe(2);
       await page.click('[data-fold="ring"]');
-      expect(await page.locator("[data-lane]").count()).toBe(0);
+      expect(await page.locator(ringLanes).count()).toBe(0);
       // removing a lane un-lights its A; A then starts a new one (rather than "hiding" one that's gone)
       await a.click();
       await page.click('[data-lane="ring.spike"] button[title="Remove this lane"]');
@@ -732,5 +736,62 @@ run("editor (headless Chrome)", () => {
     const c = await page.evaluate(() => (window as any).vizierEditor.clicks());
     expect(c.downbeats).toBeGreaterThanOrEqual(1);
     expect(c.beats / Math.max(1, c.downbeats)).toBeGreaterThan(1.5);          // about 3 beats to each downbeat
+  }, 120_000);
+
+  it("colour: the palette (song or this video), a layer's colour (a slot or its own), colour lanes with the picker", async () => {
+    const d = () => page.evaluate(() => (window as any).vizierEditor.session().doc);
+    const typeHex = async (hex: string) => { await page.fill('[aria-label="Hex colour"]', hex); await page.press('[aria-label="Hex colour"]', "Enter"); };
+    await page.selectOption("header select", "full");
+    await page.waitForFunction(() => (window as any).vizierEditor.state.videoName === "full");
+    // the palette: a slot for the song, then for this video only, then back
+    if (!(await page.locator(".palette").count())) await page.click('button.fold-btn:has-text("Palette")');
+    await page.click('[data-slot="extra1"] button.sw');
+    await page.waitForSelector('[role="dialog"][aria-label="Palette: Extra 1"]');
+    await typeHex("#ff0000");
+    expect((await d()).song.palette.extra1).toBe("#ff0000");
+    await page.check('[role="dialog"] input[type="checkbox"]');                   // only in this video
+    await typeHex("#00ff00");
+    expect((await d()).song.palette.extra1).toBe("#ff0000");
+    expect((await d()).videos.full.palette.extra1).toBe("#00ff00");
+    await page.uncheck('[role="dialog"] input[type="checkbox"]');
+    expect((await d()).videos.full.palette?.extra1).toBeUndefined();
+    await page.keyboard.press("Escape");
+    expect(await page.locator('[role="dialog"]').count()).toBe(0);
+    // a layer's colour: follow another slot, then its own
+    await page.click('[data-layer="ring"]');
+    const sw = page.locator('[data-colour="highlight"] button.sw');
+    await sw.scrollIntoViewIfNeeded(); await sw.click();
+    await page.click('[role="dialog"] button[aria-label="Extra 2"]');
+    expect((await d()).videos.full.layers.find((l: any) => l.id === "ring").colors.highlight).toBe("extra2");
+    await typeHex("#123456");
+    expect((await d()).videos.full.layers.find((l: any) => l.id === "ring").colors.highlight).toBe("#123456");
+    await page.keyboard.press("Escape");
+    // a colour lane: A starts it at the playhead with the colour; a click adds a point (the same colour there);
+    // a double-click picks its colour; the long way round
+    await page.evaluate(() => (window as any).vizierEditor.seek(0));
+    await page.click('button[aria-label="Automate Highlight (open filter)"]');
+    const lane = async () => (await d()).videos.full.automation.find((a: any) => a.target === "ring.highlight").points;
+    expect(await lane()).toEqual([{ bar: expect.any(Number), c: "#123456" }]);
+    await page.waitForSelector('[data-lane="ring.highlight"]');
+    const at = async (bar: number) => page.evaluate((bar) => { const ed = (window as any).vizierEditor, g = ed.session().doc.song.grid; return ed.timeline().laneXY("ring.highlight", g.downbeat + ((bar - 1) * 4 * 60) / g.tempo[0].bpm, 0.5); }, bar);
+    let p = await at(9);
+    await page.mouse.click(p.x, p.y);
+    expect((await lane()).map((x: any) => [x.bar, x.c])).toEqual([[expect.any(Number), "#123456"], [9, "#123456"]]);
+    p = await at(9);
+    await page.mouse.dblclick(p.x, p.y);
+    await page.waitForSelector('[role="dialog"][aria-label^="Highlight (open filter) colour"]');
+    await typeHex("#ff00ff");
+    expect((await lane())[1].c).toBe("#ff00ff");
+    await page.keyboard.press("Escape");
+    // the long way: on the first point (the fade after it)
+    p = await at((await lane())[0].bar);                                         // (the lane starts at the playhead: time 0)
+    await page.mouse.dblclick(p.x, p.y);
+    await page.check('[role="dialog"] input[type="checkbox"]');
+    expect((await lane())[0].hue).toBe("long");
+    await page.keyboard.press("Escape");
+    expect(await page.evaluate(() => (window as any).vizierEditor.state.undoLabel)).toBe("colour automation");
+    // the video's own lanes (palette, post) sit under "Palette & picture"
+    await page.click('[data-fold="_video"]');
+    expect(await page.locator('[data-lane="palette.accent"]').count()).toBe(1);
   }, 120_000);
 });

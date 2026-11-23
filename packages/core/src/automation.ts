@@ -9,8 +9,9 @@ export type Curve = "linear" | "hold" | "smooth";
 
 export interface Breakpoint { t: number; v: number; curve?: Curve } // curve applies to the segment AFTER this point
 /** A breakpoint as written in a project file: a number `v`, or for colour lanes a colour `c` ("#rrggbb"). */
-export interface BreakpointInput { t?: number; bar?: number; v?: number; c?: string; curve?: Curve }
-export interface ColorBreakpoint { t: number; c: string; curve?: Curve }
+/** `hue: "long"` (colour lanes): the fade after this point goes the long way round the colour wheel. */
+export interface BreakpointInput { t?: number; bar?: number; v?: number; c?: string; curve?: Curve; hue?: "long" }
+export interface ColorBreakpoint { t: number; c: string; curve?: Curve; hue?: "long" }
 export interface ColorLane { target: string; points: ColorBreakpoint[] }
 export interface LaneInput { target: string; points: BreakpointInput[] }
 
@@ -31,7 +32,7 @@ export function laneToSeconds(lane: LaneInput, grid?: Grid): Lane {
 export const isColorLane = (lane: LaneInput) => lane.points.some((p) => p.c !== undefined);
 
 export function colorLaneToSeconds(lane: LaneInput, grid?: Grid): ColorLane {
-  const points = lane.points.map((p) => ({ t: positionToSeconds(p, grid), c: p.c ?? "#000000", ...(p.curve ? { curve: p.curve } : {}) }));
+  const points = lane.points.map((p) => ({ t: positionToSeconds(p, grid), c: p.c ?? "#000000", ...(p.curve ? { curve: p.curve } : {}), ...(p.hue === "long" ? { hue: "long" as const } : {}) }));
   return { target: lane.target, points: points.sort((a, b) => a.t - b.t) };
 }
 
@@ -49,7 +50,7 @@ export function evaluateColorLane(lane: ColorLane, t: number): string | undefine
   if (curve === "hold") return a.c;
   let u = (t - a.t) / (b.t - a.t);
   if (curve === "smooth") u = u * u * (3 - 2 * u);
-  return mixHex(a.c, b.c, u);
+  return mixHex(a.c, b.c, u, a.hue === "long");
 }
 export interface Lane { target: string; points: Breakpoint[] }
 

@@ -15,15 +15,18 @@
   import TracksPanel, { type TrackCheck } from "./components/TracksPanel.svelte";
   import Projects from "./components/Projects.svelte";
   import TempoPanel, { type TempoGuess } from "./components/TempoPanel.svelte";
+  import PalettePanel from "./components/PalettePanel.svelte";
+  import ColourPicker from "./components/ColourPicker.svelte";
   import type { LayerRow, SpanS, LaneRow, LanePoint } from "./components/Timeline.svelte";
   import { frontToBack, addTrack, setTrackFile, removeTrack, trackFiles, setDownbeat } from "./lib/edits.ts";
+  import { paletteOf, paletteOrigin, setPaletteSlot, resetPaletteSlot, layerColor, layerColorHex, setLayerColor, addColorLane, colorLanesOf } from "./lib/edits.ts";
   import { setSpans, splitLayerAt, duplicateLayer, layerOf, setLayout, newVideo, lanesOfLayer, laneInherited, laneChanged, setLane, addLane, removeLane, resetLane } from "./lib/edits.ts";
   import type { Doc } from "./lib/session.ts";
   import { stats } from "./lib/stats.ts";
   import { openLink, type Msg } from "./lib/link.ts";
   import { featureAt } from "./lib/features.ts";
   import {
-    barToSeconds, secondsToBar, barLabel, beatTimes, nextBeatLine, sectionTimes, videoFormat, getProfile, spansToSeconds, laneToSeconds, paramTargets, EFFECTS, type Project, type BreakpointInput, type Span, type Transform,
+    barToSeconds, secondsToBar, barLabel, beatTimes, PALETTE_SLOTS, GENERATORS, colorTargets, colorLaneToSeconds, type LaneInput, nextBeatLine, sectionTimes, videoFormat, getProfile, spansToSeconds, laneToSeconds, paramTargets, EFFECTS, type Project, type BreakpointInput, type Span, type Transform,
   } from "../../../../packages/core/src/index.ts";
   import type { FeatureTrack } from "../../../../packages/features/src/index.ts";
 
@@ -322,6 +325,65 @@
     flash(`click ${clicking ? "on" : "off"}`);
   }
 
+  // ---- colour: the palette panel, layers' colours and the picker (one at a time) ----
+  let showPalette = $state(load("vizier.paletteOpen", "0") === "1");
+  $effect(() => save_("vizier.paletteOpen", showPalette ? "1" : "0"));
+  type PickFor = { kind: "palette"; slot: string } | { kind: "layer"; layer: string; name: string } | { kind: "point"; target: string; index: number };
+  let picking = $state<(PickFor & { at: { x: number; y: number } }) | null>(null);
+  /** "Only in this video" for a palette slot being picked (it starts as the slot is). */
+  let pickVideoOnly = $state(false);
+  const palette = $derived(doc && videoName && doc.videos[videoName] ? paletteOf(doc, videoName) : {});
+  const paletteSwatches = $derived(PALETTE_SLOTS.map((s) => ({ id: s.id, label: s.label, hex: palette[s.id] ?? s.default })));
+  function openPicker(p: PickFor, at: { x: number; y: number }) {
+    if (p.kind === "palette" && doc && videoName) pickVideoOnly = paletteOrigin(doc, videoName, p.slot) === "video";
+    picking = { ...p, at };
+  }
+  /** What the picker shows: its colour, the slot it follows, its title. */
+  const pickInfo = $derived.by(() => {
+    const p = picking, v = videoName;
+    if (!p || !doc || !v) return null;
+    if (p.kind === "palette") return { value: palette[p.slot] ?? "#888888", slot: null, allowSlots: false, title: `Palette: ${PALETTE_SLOTS.find((s) => s.id === p.slot)?.label}` };
+    if (p.kind === "layer") {
+      const l = layerOf(doc, v, p.layer), set = layerColor(doc, v, p.layer, p.name);
+      const label = l ? GENERATORS[l.generator]?.colors?.find((c) => c.name === p.name)?.label : p.name;
+      return { value: layerColorHex(doc, v, p.layer, p.name), slot: set.startsWith("#") ? null : set, allowSlots: true, title: `${l?.name ?? p.layer}: ${label}` };
+    }
+    const ln = laneRows.find((l) => l.target === p.target), pt = ln?.points[p.index];
+    return pt ? { value: pt.c ?? "#888888", slot: null, allowSlots: false, title: `${ln!.label}, at ${barLabel(toBar(pt.t), grid!)}` } : null;
+  });
+  function pickerChange(c: string, live: boolean) {
+    const p = picking, v = videoName;
+    if (!p || !v) return;
+    if (p.kind === "palette") {
+      const scope = pickVideoOnly ? "video" : "song";
+      edit(`${p.slot} colour`, (d) => setPaletteSlot(d, v, p.slot, c, scope), live ? `palette.${p.slot}` : undefined);
+    } else if (p.kind === "layer") edit("colour", (d) => setLayerColor(d, v, p.layer, p.name, c), live ? `${p.layer}.${p.name}.colour` : undefined);
+    else setPointColour(p.target, p.index, c, live);
+    if (!live) seal();
+  }
+  function setVideoOnly(on: boolean) {
+    const p = picking, v = videoName;
+    if (!p || p.kind !== "palette" || !v) return;
+    pickVideoOnly = on;
+    const c = palette[p.slot]!;
+    if (on) edit(`${p.slot} colour in this video only`, (d) => setPaletteSlot(d, v, p.slot, c, "video"));
+    else edit(`${p.slot} colour as the ${doc?.videos[v]?.base ? "base" : "song"}`, (d) => resetPaletteSlot(d, v, p.slot));
+  }
+  /** A on a colour: start a colour lane at the playhead with the colour, and show it (or show / hide it). */
+  function automateColour(target: string, hex: string) {
+    const v = videoName;
+    if (!v) return;
+    if (visibleLanes.has(target)) return hideLane(target);
+    if (!laneRows.some((l) => l.target === target))
+      edit("automate colour", (d) => addColorLane(d, v, target, grid ? { bar: toBar(playing ? time : marker) } : { t: playing ? time : marker }, hex));
+    shownLanes = new Set([...shownLanes, target]);
+  }
+  function setPointColour(target: string, index: number, c: string, live: boolean) {
+    const ln = laneRows.find((l) => l.target === target);
+    if (!ln) return;
+    lanePoints(target, ln.points.map((p, j) => (j === index ? { ...p, c } : p)), live ? `${target}.${index}.c` : undefined);
+  }
+
   const shortcuts: Shortcut[] = [
     { keys: "Space", label: "Play / stop (stop returns to the start marker)", group: "Transport", run: togglePlay },
     { keys: "Shift+Space", label: "Continue from where playback stopped", group: "Transport", run: continuePlay },
@@ -396,7 +458,7 @@
     try { session.apply(label, fn, { merge }); } catch (e) { flash(`couldn't ${label}: ${(e as Error).message}`); }
   }
   const seal = () => session?.seal();
-  const selectLayer = (id: string | null, span: number | null = null) => { selectedLayer = id; selectedSpan = span; selectedPoint = null; };
+  const selectLayer = (id: string | null, span: number | null = null) => { if (id === "_video") return; selectedLayer = id; selectedSpan = span; selectedPoint = null; };
   const trackName = (id: string | undefined) => {
     const t = doc?.song.tracks.find((t) => (id ? t.id === id : t.mix));
     return t?.name ?? id ?? "mix";
@@ -414,9 +476,27 @@
   }
   const hideLane = (target: string) => { const n = new Set(shownLanes); n.delete(target); shownLanes = n; if (selectedPoint?.target === target) selectedPoint = null; };
   const targets = $derived(project ? paramTargets(project) : new Map());
+  const ctargets = $derived(project ? colorTargets(project) : new Map<string, { label: string }>());
+  /** The video's own lanes (palette colours, film grain, vignette) sit under a row of their own. */
+  const VIDEO_ROW = "_video";
   const laneRows = $derived.by<LaneRow[]>(() => {
     if (!doc || !videoName || !doc.videos[videoName]) return [];
     const out: LaneRow[] = [];
+    const d0 = doc, v0 = videoName;
+    const origin = (target: string) => laneInherited(d0, v0, target) ? "base" as const : laneChanged(d0, v0, target) ? "changed" as const : "own" as const;
+    const colourRow = (lane: LaneInput, layer: string, label: string) => {
+      try {
+        const pts = colorLaneToSeconds(lane, grid).points.map((p) => ({ t: p.t, v: 0, c: p.c, ...(p.curve ? { curve: p.curve } : {}), ...(p.hue ? { hue: p.hue } : {}) }));
+        out.push({ target: lane.target, layer, label, min: 0, max: 1, int: false, points: pts, origin: origin(lane.target), color: true });
+      } catch { /* a lane in bars without a grid */ }
+    };
+    // the video's own: palette colours and post (number lanes)
+    for (const lane of colorLanesOf(doc, videoName, "palette.")) colourRow(lane, VIDEO_ROW, ctargets.get(lane.target)?.label ?? lane.target);
+    for (const lane of (project?.automation ?? []).filter((a) => a.target.startsWith("post.") && a.points.length && a.points[0]!.c === undefined)) {
+      const spec = targets.get(lane.target);
+      if (!spec) continue;
+      try { out.push({ target: lane.target, layer: VIDEO_ROW, label: spec.label, min: spec.min, max: spec.max, int: false, points: laneToSeconds(lane, grid).points.sort((a, b) => a.t - b.t), origin: origin(lane.target) }); } catch { /* no grid */ }
+    }
     for (const l of layers) for (const lane of lanesOfLayer(doc, videoName, l.id)) {
       const spec = targets.get(lane.target);
       if (!spec) continue;
@@ -430,14 +510,26 @@
         origin: laneInherited(doc, videoName, lane.target) ? "base" : laneChanged(doc, videoName, lane.target) ? "changed" : "own",
       });
     }
+    // layers' colour lanes
+    for (const l of layers) for (const lane of colorLanesOf(doc, videoName, `${l.id}.`)) {
+      const spec = ctargets.get(lane.target);
+      if (spec) colourRow(lane, l.id, `${spec.label} colour`);
+    }
     return out;
   });
   /** Breakpoints from the timeline (seconds) back to the file (bars when there's a tempo). */
-  function lanePoints(target: string, pts: LanePoint[]) {
+  function lanePoints(target: string, pts: LanePoint[], merge?: string) {
     const v = videoName;
     if (!v) return;
-    const file: BreakpointInput[] = pts.map((p) => ({ ...(grid ? { bar: toBar(p.t) } : { t: Math.round(p.t * 1000) / 1000 }), v: p.v, ...(p.curve && p.curve !== "linear" ? { curve: p.curve } : {}) }));
-    edit("automation", (d) => setLane(d, v, target, file));
+    const colour = laneRows.find((l) => l.target === target)?.color;
+    const file: BreakpointInput[] = pts.map((p) => ({ ...(grid ? { bar: toBar(p.t) } : { t: Math.round(p.t * 1000) / 1000 }),
+      ...(colour ? { c: p.c ?? "#000000" } : { v: p.v }), ...(p.curve && p.curve !== "linear" ? { curve: p.curve } : {}), ...(colour && p.hue === "long" ? { hue: "long" as const } : {}) }));
+    edit(colour ? "colour automation" : "automation", (d) => setLane(d, v, target, file), merge);
+  }
+  function pointLongWay(target: string, i: number, on: boolean) {
+    const ln = laneRows.find((l) => l.target === target);
+    if (!ln) return;
+    lanePoints(target, ln.points.map((p, j) => (j === i ? (on ? { ...p, hue: "long" as const } : (({ hue: _h, ...rest }) => rest)(p)) : p)));
   }
   function laneCurve(target: string, i: number, curve: "linear" | "hold" | "smooth") {
     const ln = laneRows.find((l) => l.target === target);
@@ -466,11 +558,14 @@
     shownLanes = new Set([...shownLanes, target]);
   }
   const lanesPerLayer = $derived(laneRows.reduce((m, l) => m.set(l.layer, (m.get(l.layer) ?? 0) + 1), new Map<string, number>()));
-  const layerRows = $derived<LayerRow[]>(layers.map((l) => ({
-    id: l.id, name: l.name ?? l.id, track: l.track ?? mixId,
-    spans: l.spans?.length && grid ? spansToSeconds(l.spans, grid) : null,
-    lanes: lanesPerLayer.get(l.id) ?? 0,
-  })));
+  const layerRows = $derived<LayerRow[]>([
+    ...(lanesPerLayer.get(VIDEO_ROW) ? [{ id: VIDEO_ROW, name: "Palette & picture", track: mixId, spans: null, lanes: lanesPerLayer.get(VIDEO_ROW), fixed: true }] : []),
+    ...layers.map((l) => ({
+      id: l.id, name: l.name ?? l.id, track: l.track ?? mixId,
+      spans: l.spans?.length && grid ? spansToSeconds(l.spans, grid) : null,
+      lanes: lanesPerLayer.get(l.id) ?? 0,
+    })),
+  ]);
   const automated = $derived(new Set((project?.automation ?? []).map((a) => a.target)));
   const playheadBar = $derived(grid ? secondsToBar(playing ? time : marker, grid) : null);
   const startBar = $derived(grid ? secondsToBar(0, grid) : 1);
@@ -682,6 +777,12 @@
       {#if showTempo && doc}
         <TempoPanel {doc} {time} {detected} {clicking} {edit} seal={() => session?.seal()} onclick={toggleClick} />
       {/if}
+      <h3 class="fold-h"><button class="fold-btn" onclick={() => (showPalette = !showPalette)} aria-expanded={showPalette}
+        title="{showPalette ? "Hide" : "Show"} the palette: the colours layers follow"><svg class="tri" class:open={showPalette} viewBox="0 0 10 10" width="12" height="12" aria-hidden="true"><path d="M2 0.5 L9 5 L2 9.5 Z" /></svg>Palette</button>
+        <span class="chips">{#each paletteSwatches as p (p.id)}<span class="chip" style:background={p.hex} title="{p.label}: {p.hex.toUpperCase()}"></span>{/each}</span></h3>
+      {#if showPalette && doc && videoName}
+        <PalettePanel {doc} video={videoName} {automated} shownLanes={visibleLanes} {edit} onpick={(slot, at) => openPicker({ kind: "palette", slot }, at)} onautomate={automateColour} />
+      {/if}
       <h3>Layers <span class="hint-inline">front to back</span></h3>
       {#if videoName}
         <LayerList {layers} video={videoName} doc={doc ?? undefined} selected={selectedLayer} defaultTrack={undefined} {trackName} {edit} onselect={(id) => selectLayer(id)} />
@@ -698,6 +799,7 @@
   {#snippet layerPanel()}
     {#if videoName && selectedLayer && doc}
       <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} shownLanes={visibleLanes} {edit} {seal} {family} onautomate={automate} {time} {features}
+        onpickcolor={(name, at) => openPicker({ kind: "layer", layer: selectedLayer!, name }, at)} onautomatecolor={automateColour}
         onselect={(id) => selectLayer(id)} />
     {:else if videoName}
       <p class="hint">Select a layer to edit it. Each layer also has a row under its track in the timeline: drag there to set when it's on.</p>
@@ -710,6 +812,7 @@
     <Timeline bind:this={timeline} bind:contentHeight={tlContent} {grid} {sections} {tracks} layers={layerRows} {selectedLayer} {selectedSpan} {duration} {time} range={rangeSec} {rangeInherited}
       follow={playing} {marker} {snap} onseek={seek} onrange={setRange} onselectlayer={selectLayer} onspans={spansFromTimeline}
       ongrid={(d) => edit("move the grid", (doc) => setDownbeat(doc, d), "grid-drag")} ongriddone={() => session?.seal()}
+      onpickpoint={(target, index, at) => { selectedPoint = { target, index }; openPicker({ kind: "point", target, index }, at); }}
       lanes={laneRows} {shownLanes} {selectedPoint} ontogglelanes={toggleLanes} onhidelane={hideLane}
       onselectpoint={(t, i) => { if (t) selectLayer(t.split(".")[0]!); selectedPoint = t && i !== null ? { target: t, index: i } : null; }}
       onlanepoints={lanePoints} onlanecurve={laneCurve}
@@ -736,6 +839,22 @@
 {/if}
 
 {#if help}<Help {shortcuts} onclose={() => (help = false)} />{/if}
+{#if picking && pickInfo}
+  <ColourPicker value={pickInfo.value} slot={pickInfo.slot} palette={paletteSwatches} allowSlots={pickInfo.allowSlots} at={picking.at} title={pickInfo.title}
+    onchange={pickerChange} onclose={() => (picking = null)}>
+    {#if picking.kind === "palette"}
+      <label title="Set this colour for this video only; the song's palette (and other videos) keep theirs">
+        <input type="checkbox" checked={pickVideoOnly} onchange={(e) => setVideoOnly((e.currentTarget as HTMLInputElement).checked)} /> Only in this video</label>
+    {:else if picking.kind === "point"}
+      {@const ln = laneRows.find((l) => l.target === (picking as { target: string }).target)}
+      {@const i = (picking as { index: number }).index}
+      {#if ln && i < ln.points.length - 1}
+        <label title="Fade to the next colour the other way round the colour wheel (green to red through blue and purple instead of yellow)">
+          <input type="checkbox" checked={ln.points[i]!.hue === "long"} onchange={(e) => pointLongWay(ln.target, i, (e.currentTarget as HTMLInputElement).checked)} /> Fade the long way round</label>
+      {/if}
+    {/if}
+  </ColourPicker>
+{/if}
 {#if showProjects}<Projects dirty={dirtyFiles} onclose={() => (showProjects = false)} />{/if}
 {#if newDialog && videoName && doc}
   <NewVideo currentName={doc.videos[videoName]?.name ?? videoName} currentFormat={profileId} how={newDialog} oncreate={createVideo} oncancel={() => (newDialog = null)} />
@@ -776,6 +895,8 @@
   h3 { margin: 6px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); font-weight: 500; }
   .fold-btn { background: none; border: none; padding: 0; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer;
     display: inline-flex; align-items: center; gap: 6px; }
+  .chips { display: inline-flex; gap: 3px; margin-left: 8px; }
+  .chip { width: 10px; height: 10px; border-radius: 2px; border: 1px solid #fff2; }
   .tri { fill: var(--text); transition: transform .1s; }
   .tri.open { transform: rotate(90deg); }
   .fold-btn:hover .tri, .tri.open { fill: var(--accent); }

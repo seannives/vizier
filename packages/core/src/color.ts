@@ -65,8 +65,9 @@ export function oklchToRgb(c: Oklch): [number, number, number] {
 export const hexToOklch = (hex: string) => rgbToOklch(parseHex(hex));
 export const oklchToHex = (c: Oklch) => toHex(oklchToRgb(c));
 
-/** Blend two colours in OKLCH, the short way round the hue circle; greys take the other colour's hue. */
-export function mixOklch(a: Oklch, b: Oklch, u: number): Oklch {
+/** Blend two colours in OKLCH, the short way round the hue circle (or the long way: green to red through cyan, blue
+ *  and purple instead of yellow); greys take the other colour's hue. */
+export function mixOklch(a: Oklch, b: Oklch, u: number, long = false): Oklch {
   const t = clamp01(u);
   let ha = a[2], hb = b[2];
   if (a[1] < 1e-3) ha = hb;
@@ -74,10 +75,11 @@ export function mixOklch(a: Oklch, b: Oklch, u: number): Oklch {
   let dh = hb - ha;
   if (dh > 180) dh -= 360;
   if (dh < -180) dh += 360;
+  if (long && a[1] >= 1e-3 && b[1] >= 1e-3) dh = dh > 0 ? dh - 360 : dh + 360;
   return [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, (ha + dh * t + 360) % 360];
 }
 
-export const mixHex = (a: string, b: string, u: number) => oklchToHex(mixOklch(hexToOklch(a), hexToOklch(b), u));
+export const mixHex = (a: string, b: string, u: number, long = false) => oklchToHex(mixOklch(hexToOklch(a), hexToOklch(b), u, long));
 
 /** Hue shift (degrees) and lightness offset (−1…1: −1 = black, +1 = white), applied in OKLCH. */
 export function shiftColor(hex: string, hueShift: number, lightness: number): string {

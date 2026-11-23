@@ -69,6 +69,7 @@ export function mergeVideos(base: VideoFile, child: VideoFile): VideoFile {
     const merged: VideoLayer = { ...prev, ...l };
     if (isObj(prev.params) || isObj(l.params)) merged.params = { ...prev.params, ...l.params };
     if (isObj(prev.layout) || isObj(l.layout)) merged.layout = { ...prev.layout, ...l.layout };
+    if (isObj(prev.colors) || isObj(l.colors)) merged.colors = { ...prev.colors, ...l.colors }; // one colour at a time
     layers.set(l.id, merged);
   }
   out.layers = [...layers.values()];

@@ -249,6 +249,12 @@
                   "type": "string",
                   "pattern": "^#[0-9A-Fa-f]{6}$",
                   "description": "Colour lanes: a colour instead of v"
+                },
+                "hue": {
+                  "enum": [
+                    "long"
+                  ],
+                  "description": "Colour lanes: the fade after this point goes the long way round the colour wheel"
                 }
               },
               "oneOf": [

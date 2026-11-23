@@ -96,6 +96,8 @@ Each generator declares the colours it draws with, and each defaults to a palett
   fades keep their brightness and vividness instead of going muddy:
   `{ "target": "palette.accent", "points": [{ "bar": 24, "c": "#B6FF3B", "curve": "smooth" }, { "bar": 25, "c": "#FF3B8A" }] }`.
   Targets: `palette.<slot>` (changes every layer that follows that slot) or `<layer>.<colour>` (one layer).
+  `"hue": "long"` on a point makes the fade after it go the long way round the colour wheel (green to red through
+  blue and purple instead of yellow).
 - **Hue shift and lightness**: every layer has `hueShift` (degrees) and `lightness` (−1 black … +1 white), applied to
   all its colours. Automate them, or let audio drive them:
   `{ "target": "ring.hueShift", "source": "bass.centroid", "amount": 60 }` swings the ring's colours as the

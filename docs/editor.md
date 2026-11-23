@@ -43,6 +43,22 @@ server isn't running, the editor says so and keeps your changes: start it again 
   tempos are common mix-ups) and where bar 1 starts; click one to use it. **⌥-drag in the bar ruler** slides the
   whole grid. **Click** (C, also in the top bar) ticks on every beat while playing, higher on the first beat of each
   bar, to check the grid by ear. Layers, lanes and ranges are in bars, so they move with the grid.
+- **Palette** (side panel, fold open with ▸): the five colour slots layers follow (background, ink, accent,
+  extra 1 and 2). Click a swatch to change it: the song's palette changes for every video, unless **Only in this
+  video** is ticked in the picker (marked "this video", ↺ to go back; "base" when a base video sets it). **A**
+  starts a colour lane for the slot at the playhead.
+- **Colours** (layer panel): each of the layer's colours follows a palette slot (shown by name) or is its own
+  (shown as #RRGGBB). In the picker, the palette swatches make it follow that slot; the hex field, sliders or
+  eyedropper give it its own colour. **A** starts a colour lane for it.
+- **The colour picker**: the palette's swatches, a hex field (Return to apply), an eyedropper (anywhere on the
+  screen), and sliders for lightness, vividness and hue: they change the colour the way it looks (in OKLCH), and
+  each slider's track shows what it would do. Esc or a click outside closes it; a slider drag is one undo step.
+- **Colour lanes** (in the timeline, under their layer; the palette's, film grain and vignette under **Palette &
+  picture** at the top): a strip of the colour over time, with each breakpoint as a swatch. Click to add a
+  breakpoint (it takes the colour already there), drag to move it, double-click it (or click the swatch in the
+  lane's header) to pick its colour, Delete to remove it, and the curve buttons as for other lanes. Fades blend in
+  OKLCH, so they stay bright and vivid; **Fade the long way round** (in the picker, for the fade after that point)
+  goes the other way round the colour wheel: green to red through blue and purple instead of yellow. ↻ marks it.
 - **Transport, Ableton-style**: Play starts from the start marker (the hollow triangle in the ruler). Stop leaves the
   playhead where it stopped; the next Play jumps back to the marker, and ⇧Space continues from the stop point instead.
   Clicking the timeline or the arrow keys move the marker. With loop on (L), playback wraps at the range's end

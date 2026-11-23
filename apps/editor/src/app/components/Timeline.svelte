@@ -1,20 +1,24 @@
 <script lang="ts">
-  import { barToSeconds, secondsToBar, barLabel, beatsPerBarAt, type Grid } from "../../../../../packages/core/src/index.ts";
+  import { barToSeconds, secondsToBar, barLabel, beatsPerBarAt, evaluateColorLane, type Grid } from "../../../../../packages/core/src/index.ts";
   import { xOf, tOf, snapTime, type View } from "../lib/timeline.ts";
   import type { Waveform } from "../lib/api.ts";
 
   export interface TrackRow { id: string; name: string; mix?: boolean; wave: Waveform | null }
   /** A layer under its track: when it's on, in seconds (`null`: the whole song). */
   export interface SpanS { from: number; to: number; fadeIn: number; fadeOut: number }
-  export interface LayerRow { id: string; name: string; track: string; spans: SpanS[] | null; lanes?: number }
+  /** `fixed`: not a layer (the video's own lanes: palette and post): no on-spans, not selectable. */
+  export interface LayerRow { id: string; name: string; track: string; spans: SpanS[] | null; lanes?: number; fixed?: boolean }
   /** An automation lane under its layer: breakpoints in seconds; the value range is the parameter's. */
-  export interface LanePoint { t: number; v: number; curve?: "linear" | "hold" | "smooth" }
-  export interface LaneRow { target: string; layer: string; label: string; effect?: string; min: number; max: number; int: boolean; points: LanePoint[]; origin: "own" | "base" | "changed" }
+  /** A breakpoint: a number `v`, or for a colour lane a colour `c` (and `hue: "long"` to fade the long way round). */
+  export interface LanePoint { t: number; v: number; c?: string; hue?: "long"; curve?: "linear" | "hold" | "smooth" }
+  export interface LaneRow { target: string; layer: string; label: string; effect?: string; min: number; max: number; int: boolean; points: LanePoint[]; origin: "own" | "base" | "changed"; color?: boolean }
 
   let { grid, sections, tracks, layers = [], selectedLayer = null, selectedSpan = null, duration, time, range, rangeInherited, follow,
     marker = 0, snap = true, onseek, onrange, onselectlayer = () => {}, onspans = () => {}, contentHeight = $bindable(0),
     lanes = [], shownLanes = new Set<string>(), selectedPoint = null, ontogglelanes = () => {}, onselectpoint = () => {}, onlanepoints = () => {},
-    onlanecurve = () => {}, onlaneremove = () => {}, onlanereset = () => {}, onhidelane = () => {}, ongrid = () => {}, ongriddone = () => {} }: {
+    onlanecurve = () => {}, onlaneremove = () => {}, onlanereset = () => {}, onhidelane = () => {}, ongrid = () => {}, ongriddone = () => {}, onpickpoint = () => {} }: {
+    /** A colour lane's breakpoint was double-clicked, or its swatch in the lane's header clicked: pick its colour. */
+    onpickpoint?: (target: string, index: number, at: { x: number; y: number }) => void;
     /** ⌥-drag in the ruler slides the grid: where bar 1 starts (seconds), live while dragging; then done. */
     ongrid?: (downbeat: number) => void; ongriddone?: () => void;
     /** Every automation lane, and which are shown (by target); hidden lanes keep working. */
@@ -260,6 +264,20 @@
       ctx.fillStyle = "#0000004d"; ctx.fillRect(0, row.y, W, row.h);
       ctx.fillStyle = C.line; ctx.fillRect(0, row.y, W, 1);
       if (!pts.length) continue;
+      if (ln.color) { // a strip of the colour over time; breakpoints as swatches on it
+        const top = row.y + 8, bh = row.h - 16;
+        for (let x = 0; x < W; x += 2) { ctx.fillStyle = colourAt(pts, tOf(x + 1, v)); ctx.fillRect(x, top, 2, bh); }
+        pts.forEach((p, j) => {
+          const x = xOf(p.t, v);
+          if (x < -8 || x > W + 8) return;
+          const on = selectedPoint?.target === ln.target && selectedPoint.index === j;
+          ctx.fillStyle = p.c ?? "#000"; ctx.fillRect(x - 5, top + bh / 2 - 7, 10, 14);
+          ctx.strokeStyle = on ? C.accent : "#000"; ctx.lineWidth = on ? 2 : 1; ctx.strokeRect(x - 5, top + bh / 2 - 7, 10, 14);
+          if (!on) { ctx.strokeStyle = "#fff8"; ctx.strokeRect(x - 6, top + bh / 2 - 8, 12, 16); }
+          if (p.hue === "long" && j < pts.length - 1) { ctx.fillStyle = "#fff"; ctx.fillText("↻", x + 8, top + bh / 2); }
+        });
+        continue;
+      }
       ctx.strokeStyle = ln.origin === "base" ? "#f5a52488" : C.accent; ctx.lineWidth = 1.5;
       ctx.beginPath();
       ctx.moveTo(0, yOf(pts[0]!.v)); ctx.lineTo(xOf(pts[0]!.t, v), yOf(pts[0]!.v));
@@ -332,6 +350,7 @@
   /** y in the rows' coordinates, whichever canvas the pointer is over. */
   const vy = (e: PointerEvent) => e.offsetY + (e.currentTarget === canvas ? HEAD : 0);
   function layerDown(e: PointerEvent, l: LayerRow) {
+    if (l.fixed) return; // (the video's own lanes: nothing to switch on or off)
     const x = e.offsetX, t = tOf(x, view);
     const hit = spanHit(l, x);
     spanDrag = { id: l.id, index: hit?.index ?? -1, kind: hit?.part ?? "new", x0: x, t0: t, orig: l.spans ?? [], moved: false };
@@ -370,6 +389,8 @@
   }
 
   // ---- automation lanes: click to add a breakpoint, drag one to move it (snap applies to time), click to select ----
+  /** A colour lane's colour at time t (OKLCH, with curves and the long way round). */
+  const colourAt = (pts: LanePoint[], t: number) => evaluateColorLane({ target: "", points: pts.map((p) => ({ t: p.t, c: p.c ?? "#000000", ...(p.curve ? { curve: p.curve } : {}), ...(p.hue ? { hue: p.hue } : {}) })) }, t) ?? "#000000";
   type LaneDrag = { target: string; index: number; x0: number; y0: number; moved: boolean; orig: LanePoint[]; added: boolean };
   let laneDrag: LaneDrag | null = null;
   let dragLane = $state<{ target: string; points: LanePoint[] } | null>(null);
@@ -381,13 +402,15 @@
   function laneDown(e: PointerEvent, row: { y: number; h: number; lane: LaneRow }) {
     const ln = row.lane, x = e.offsetX, y = vy(e);
     const yOf = (v: number) => row.y + 5 + (1 - Math.min(1, Math.max(0, (v - ln.min) / (ln.max - ln.min || 1)))) * (row.h - 10);
-    let index = ln.points.findIndex((p) => Math.abs(xOf(p.t, view) - x) < 6 && Math.abs(yOf(p.v) - y) < 7);
+    let index = ln.points.findIndex((p) => Math.abs(xOf(p.t, view) - x) < 6 && (ln.color || Math.abs(yOf(p.v) - y) < 7));
     let pts = ln.points.map((p) => ({ ...p }));
     let added = false;
     if (index < 0) { // a new breakpoint where you clicked
       const t = snapT(tOf(x, view), e);
       const prev = [...pts].reverse().find((p) => p.t <= t);
-      const np: LanePoint = { t, v: laneValue(ln, row, y), ...(prev?.curve ? { curve: prev.curve } : {}) };
+      // (a new colour breakpoint takes the colour the lane has there, so adding one changes nothing until it's moved or recoloured)
+      const np: LanePoint = ln.color ? { t, v: 0, c: colourAt(pts, t), ...(prev?.curve ? { curve: prev.curve } : {}), ...(prev?.hue ? { hue: prev.hue } : {}) }
+        : { t, v: laneValue(ln, row, y), ...(prev?.curve ? { curve: prev.curve } : {}) };
       pts.push(np);
       pts.sort((a, b) => a.t - b.t);
       index = pts.indexOf(np); // (not by time: a point may already sit at the same time)
@@ -409,7 +432,7 @@
     const lo = d.index > 0 ? pts[d.index - 1]!.t : -Infinity, hi = d.index < pts.length - 1 ? pts[d.index + 1]!.t : Infinity;
     // keep the order: a point can't pass its neighbours (it can sit on them, for a jump)
     pts[d.index]!.t = Math.min(hi, Math.max(lo, snapT(tOf(x, view), e)));
-    pts[d.index]!.v = laneValue(ln, lrow, y);
+    if (!ln.color) pts[d.index]!.v = laneValue(ln, lrow, y);
     dragLane = { target: d.target, points: pts };
   }
   function laneUp() {
@@ -457,6 +480,13 @@
     else if (drag.kind === "edgeR") { const a = snapT(t, e); dragRange = { from: Math.min(o.from, a), to: Math.max(o.from, a) }; }
     else if (drag.kind === "move") { const len = o.to - o.from; const from = snapT(o.from + (t - drag.t0), e); dragRange = { from, to: Math.min(duration, from + len) }; }
   }
+  /** A double-click on a colour breakpoint: pick its colour. */
+  function ondblclick(e: MouseEvent) {
+    const row = rowAt(vy(e as PointerEvent));
+    if (row?.kind !== "lane" || !row.lane.color) return;
+    const i = row.lane.points.findIndex((p) => Math.abs(xOf(p.t, view) - e.offsetX) < 6);
+    if (i >= 0) onpickpoint(row.lane.target, i, { x: e.clientX, y: e.clientY });
+  }
   function onpointerup(e: PointerEvent) {
     (e.currentTarget as HTMLCanvasElement).releasePointerCapture(e.pointerId);
     if (spanDrag) return layerUp(e);
@@ -501,6 +531,10 @@
               <div class="lb">
                 {#if ln.effect}<em class="fx" title="a parameter of its {ln.effect} effect">{ln.effect}</em>{/if}
                 {#if ln.origin === "base"}<em class="tag">base</em>{:else if ln.origin === "changed"}<em class="tag ch">changed</em>{/if}
+                {#if ln.color && sp !== null && ln.points[sp]}
+                  <button class="psw" style:background={ln.points[sp]!.c} title="The selected point's colour (or double-click a point)" aria-label="Point colour"
+                    onclick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); onpickpoint(ln.target, sp!, { x: r.left, y: r.bottom }); }}></button>
+                {/if}
                 {#if cur}
                   {#each [["linear", "⟋", "Straight to the next point"], ["hold", "⌐", "Hold, then jump at the next point"], ["smooth", "∿", "Ease in and out"]] as [c, icon, tip]}
                     <button class:on={cur === c} title="{tip} (after the selected point)" onclick={() => onlanecurve(ln.target, sp!, c as "linear")}>{icon}</button>
@@ -516,7 +550,7 @@
         {/each}
       </div>
       <div class="wrap2">
-        <canvas bind:this={canvas} style:height="{Math.max(1, height - HEAD)}px" style:width="{width}px" {onwheel} {onpointerdown} {onpointermove} {onpointerup}></canvas>
+        <canvas bind:this={canvas} style:height="{Math.max(1, height - HEAD)}px" style:width="{width}px" {onwheel} {onpointerdown} {onpointermove} {onpointerup} {ondblclick}></canvas>
       </div>
     </div>
   </div>
@@ -546,6 +580,7 @@
   .h.layer { height: 18px; padding-left: 18px; font-size: 11px; text-transform: none; letter-spacing: 0; color: var(--dim); cursor: default;
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; line-height: 17px; }
   .h.layer.sel { color: var(--accent); background: var(--bg3); font-weight: 600; }
+  .psw { width: 16px; height: 14px; padding: 0; border: 1px solid #fff6; border-radius: 2px; }
   .fold { background: none; border: none; padding: 0; width: 18px; height: 17px; margin: 0 0 0 -18px; vertical-align: top; cursor: pointer;
     display: inline-flex; align-items: center; justify-content: center; }
   .fold svg { fill: var(--text); transition: transform .1s; }

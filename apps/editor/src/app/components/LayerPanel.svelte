@@ -8,14 +8,18 @@
     layerOf, isInherited, splitLayerAt, patchLayer, setParam, setGenerator, setSpans, addEffect, removeEffect, moveEffect, setEffectParam,
     PANEL_LAYER_PARAMS, effectList, generatorList, placement, setLayout, hasOwnLayout,
     layerOrigin, isChanged, resetSetting, resetLayer, baseLayer, type Setting,
-    modsOf, modOrigin, addMod, setMod, removeMod, resetMod,
+    modsOf, modOrigin, addMod, setMod, removeMod, resetMod, layerColor, layerColorHex,
   } from "../lib/edits.ts";
   import { displayKeys } from "../lib/shortcuts.ts";
   import type { Doc } from "../lib/session.ts";
 
   /** The selected layer's settings: what draws it, its track, parameters, effects and when it's on. */
   let { doc, video, layerId, tracks, playheadBar, startBar = 1, automated, shownLanes = new Set<string>(), edit, seal, onselect, family = "landscape", onautomate,
-    time = 0, features = null }: {
+    time = 0, features = null, onpickcolor, onautomatecolor }: {
+    /** Open the colour picker for one of the layer's colours, next to its swatch. */
+    onpickcolor?: (name: string, at: { x: number; y: number }) => void;
+    /** A on a colour: start a colour lane ("<layer>.<colour>") with this colour, or show / hide it. */
+    onautomatecolor?: (target: string, hex: string) => void;
     /** The playhead (seconds) and the tracks' features, for the modulation meters. */
     time?: number; features?: Record<string, FeatureTrack> | null;
     doc: Doc; video: string; layerId: string; tracks: { id: string; name: string; mix?: boolean }[];
@@ -228,6 +232,25 @@
     {@render modRows(`${layerId}.${s.name}`, s)}
   {/each}
 
+  {#if gen.colors?.length}
+    <h4>Colours</h4>
+    {#each gen.colors as c (c.name)}
+      {@const setting = layerColor(doc, video, layerId, c.name)}
+      {@const hex = layerColorHex(doc, video, layerId, c.name)}
+      {@const target = `${layerId}.${c.name}`}
+      <div class="colour" data-colour={c.name}>
+        <button class="sw" style:background={hex} aria-label="{c.label} colour" title="{c.label}: {hex.toUpperCase()}. Click to change it"
+          onclick={(e) => { const r = (e.currentTarget as HTMLElement).getBoundingClientRect(); onpickcolor?.(c.name, { x: r.left, y: r.bottom }); }}></button>
+        <span class="cl">{c.label}{#if automated.has(target)}<em class="auto" title="A colour lane sets it while playing">- automated</em>{/if}</span>
+        <span class="follows" title={setting.startsWith("#") ? "Its own colour" : "Follows the palette: changes with it"}>{setting.startsWith("#") ? setting.toUpperCase() : `${setting === "bg" ? "background" : setting}`}</span>
+        {#if ch({ color: c.name })}<button class="rs" title="Back to the base video's colour" onclick={() => reset({ color: c.name }, `${c.label.toLowerCase()} colour`)}>↺</button>{/if}
+        {#if onautomatecolor}<button class="auto-btn" class:on={shownLanes.has(target)} aria-label="Automate {c.label}"
+          title={shownLanes.has(target) ? "Hide its colour lane" : automated.has(target) ? "Show its colour lane" : "Automate: start a colour lane at the playhead, with this colour"}
+          onclick={() => onautomatecolor(target, hex)}>A</button>{/if}
+      </div>
+    {/each}
+  {/if}
+
   <h4>Effects{#if ch({ field: "effects" })}<button class="rs" title="Back to the base's effect chain" onclick={() => reset({ field: "effects" }, "effects")}>↺</button>{/if}</h4>
   {#each layer.effects ?? [] as e, i (e.id ?? e.type)}
     {@const def = EFFECTS[e.type]}
@@ -268,6 +291,12 @@
   .field select { flex: 0 1 170px; min-width: 0; }
   .field.col { flex-direction: column; align-items: stretch; }
   textarea { resize: vertical; font-family: 'Special Elite', var(--ui); }
+  .colour { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+  .colour .sw { width: 26px; height: 18px; padding: 0; border: 1px solid #fff3; border-radius: 3px; }
+  .colour .cl { flex: 1; }
+  .colour .follows { color: var(--dim); font-size: 11px; }
+  .colour .auto { font-style: normal; color: var(--accent); font-size: 11px; margin-left: 4px; font-weight: 600; }
+  .colour .auto-btn { padding: 0 5px; font-size: 11px; font-weight: 600; }
   h4 { margin: 12px 0 6px; font-size: 10px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); font-weight: 500; border-top: 1px solid var(--line); padding-top: 8px; }
   .rs { padding: 0 4px; font-size: 11px; line-height: 14px; margin-left: 5px; text-transform: none; letter-spacing: 0; }
   .field > span { display: flex; align-items: center; }

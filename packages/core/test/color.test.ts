@@ -75,3 +75,24 @@ describe("colour lanes", () => {
     expect(e).toMatch(/"ring.line" is a colour: give its points c/);
   });
 });
+
+describe("the long way round", () => {
+  it("fades green to red through blue instead of yellow, keeping brightness and vividness", () => {
+    const g = hexToOklch("#33CC33"), r = hexToOklch("#CC3333");
+    const short = mixOklch(g, r, 0.5), long = mixOklch(g, r, 0.5, true);
+    const between = (h: number, a: number, b: number) => h > Math.min(a, b) && h < Math.max(a, b);
+    expect(between(short[2], r[2], g[2])).toBe(true);                     // via yellow/orange: between them
+    expect(between(long[2], r[2], g[2])).toBe(false);                     // the other way: blue and purple
+    expect(long[2]).toBeGreaterThan(200);
+    expect(long[2]).toBeLessThan(330);
+    expect(long[0]).toBeCloseTo(short[0], 5);
+    expect(mixOklch(g, r, 0, true)).toEqual(g);
+    expect(mixOklch(g, r, 1, true)[2]).toBeCloseTo(r[2], 5);
+  });
+  it("a colour lane point with hue: long fades that way to the next point", () => {
+    const lane = colorLaneToSeconds({ target: "palette.accent", points: [{ t: 0, c: "#33CC33", hue: "long" }, { t: 1, c: "#CC3333" }] });
+    const mid = hexToOklch(evaluateColorLane(lane, 0.5)!);
+    expect(mid[2]).toBeGreaterThan(200);
+    expect(mid[2]).toBeLessThan(330);
+  });
+});

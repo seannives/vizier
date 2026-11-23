@@ -4,7 +4,7 @@ import {
   addLayer, removeLayer, moveLayer, duplicateLayer, setParam, setLayout, placement, hasOwnLayout, patchLayer,
   layerOrigin, isChanged, baseLayer, resetSetting, resetLayer, removedLayers, restoreLayer, newVideo, detachVideo, setVideo,
   laneOf, laneChanged, laneInherited, setLane, addLane, removeLane, resetLane, lanesOfLayer,
-  modsOf, modOrigin, addMod, setMod, removeMod, resetMod, frontToBack, addTrack, renameTrack, moveTrack, removeTrack, setTrackFile, trackIdFor, mixTrackId, setTempo, addTempoChange, moveTempoChange, removeTempoChange, setDownbeat, tempoSegments, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
+  modsOf, modOrigin, addMod, setMod, removeMod, resetMod, frontToBack, addTrack, renameTrack, moveTrack, removeTrack, setTrackFile, trackIdFor, mixTrackId, setTempo, addTempoChange, moveTempoChange, removeTempoChange, setDownbeat, tempoSegments, paletteOf, paletteOrigin, setPaletteSlot, resetPaletteSlot, layerColor, layerColorHex, setLayerColor, addColorLane, colorLanesOf, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
 } from "../src/app/lib/edits.ts";
 import { validateProject, buildProject, resolveVideo } from "../../../packages/core/src/index.ts";
 
@@ -406,5 +406,52 @@ describe("tempo", () => {
     expect(d.song.grid!.downbeat).toBe(0.123);
     setDownbeat(d, -0.5);
     expect(d.song.grid!.downbeat).toBe(0);
+  });
+});
+
+describe("colour", () => {
+  it("the palette: the song's, overridden per video; a base's override is inherited", () => {
+    const d = doc();
+    setPaletteSlot(d, "full", "accent", "#ff0000", "song");
+    expect(paletteOf(d, "reel").accent).toBe("#ff0000");
+    expect(paletteOrigin(d, "reel", "accent")).toBe("song");
+    setPaletteSlot(d, "full", "accent", "#00ff00", "video");
+    expect(paletteOf(d, "full").accent).toBe("#00ff00");
+    expect(paletteOrigin(d, "reel", "accent")).toBe("base");
+    setPaletteSlot(d, "reel", "accent", "#0000ff", "video");
+    expect(paletteOrigin(d, "reel", "accent")).toBe("video");
+    expect(paletteOf(d, "full").accent).toBe("#00ff00");
+    resetPaletteSlot(d, "reel", "accent");
+    expect(paletteOf(d, "reel").accent).toBe("#00ff00");
+    expect(d.videos.reel!.palette).toBeUndefined();
+    expect(valid(d, "reel")).toEqual([]);
+  });
+  it("a layer's colour follows its slot, can follow another or be its own; a reel changes one colour, keeping the rest", () => {
+    const d = doc();
+    expect(layerColor(d, "full", "ring", "highlight")).toBe("accent");
+    setLayerColor(d, "full", "ring", "line", "#123456");
+    setLayerColor(d, "full", "ring", "highlight", "extra2");
+    expect(layerColorHex(d, "full", "ring", "line")).toBe("#123456");
+    expect(layerColorHex(d, "full", "ring", "highlight")).toBe(paletteOf(d, "full").extra2);
+    setLayerColor(d, "reel", "ring", "highlight", "#abcdef");
+    expect(layerColor(d, "reel", "ring", "line")).toBe("#123456");          // kept from the base
+    expect(layerColor(d, "reel", "ring", "highlight")).toBe("#abcdef");
+    expect(isChanged(d, "reel", "ring", { color: "highlight" })).toBe(true);
+    expect(isChanged(d, "reel", "ring", { color: "line" })).toBe(false);
+    resetSetting(d, "reel", "ring", { color: "highlight" });
+    expect(layerColor(d, "reel", "ring", "highlight")).toBe("extra2");
+    setLayerColor(d, "full", "ring", "highlight", "accent");                // back to its default: nothing stored
+    expect(layerOf(d, "full", "ring")!.colors).toEqual({ line: "#123456" });
+    expect(valid(d, "full")).toEqual([]);
+  });
+  it("colour lanes start with one colour and are listed apart from number lanes", () => {
+    const d = doc();
+    addColorLane(d, "full", "palette.accent", { bar: 9 }, "#ff0000");
+    addColorLane(d, "full", "ring.line", { bar: 1 }, "#00ff00");
+    addColorLane(d, "full", "ring.line", { bar: 5 }, "#0000ff");             // already there: no change
+    expect(colorLanesOf(d, "full", "palette.").map((l) => l.target)).toEqual(["palette.accent"]);
+    expect(colorLanesOf(d, "full", "ring.")[0]!.points).toEqual([{ bar: 1, c: "#00ff00" }]);
+    expect(lanesOfLayer(d, "full", "ring").map((l) => l.target)).toEqual(["ring.radius"]);
+    expect(valid(d, "full")).toEqual([]);
   });
 });

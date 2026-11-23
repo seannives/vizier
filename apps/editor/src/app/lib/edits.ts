@@ -4,7 +4,7 @@
  * (only what changed) to this video, and the base is never touched.
  */
 import {
-  resolveVideo, GENERATORS, EFFECTS, LAYER_PARAMS, type VideoFile, type VideoLayer, type LayerDef, type EffectRef, type Span, splitSpans, type LaneInput, type BreakpointInput, type Modulation, layoutFor, type LayoutFamily, type Transform,
+  resolveVideo, normalizePalette, PALETTE_ALIASES, GENERATORS, EFFECTS, LAYER_PARAMS, type VideoFile, type VideoLayer, type LayerDef, type EffectRef, type Span, splitSpans, type LaneInput, type BreakpointInput, type Modulation, layoutFor, type LayoutFamily, type Transform,
 } from "../../../../../packages/core/src/index.ts";
 import type { Doc } from "./session.ts";
 
@@ -278,7 +278,7 @@ export function baseLayer(doc: Doc, video: string, id: string): LayerDef | undef
 
 /** A setting of an inherited layer that can be changed here and reset: a field, a parameter, or one shape's layout. */
 export type Setting = { field: "generator" | "track" | "blend" | "text" | "effects" | "spans" | "name" | "z" | "opacity" | "colors" }
-  | { param: string } | { layout: LayoutFamily };
+  | { param: string } | { layout: LayoutFamily } | { color: string };
 
 /** Whether this video changes the setting of an inherited layer (false for layers added here: nothing to go back to). */
 export function isChanged(doc: Doc, video: string, id: string, s: Setting): boolean {
@@ -287,6 +287,7 @@ export function isChanged(doc: Doc, video: string, id: string, s: Setting): bool
   if (!e) return false;
   if ("param" in s) return e.params?.[s.param] !== undefined;
   if ("layout" in s) return e.layout?.[s.layout] !== undefined;
+  if ("color" in s) return e.colors?.[s.color] !== undefined;
   return (e as unknown as Record<string, unknown>)[s.field] !== undefined;
 }
 
@@ -297,6 +298,7 @@ export function resetSetting(doc: Doc, video: string, id: string, s: Setting): v
   if (!e) return;
   if ("param" in s) { if (e.params) { delete e.params[s.param]; if (!Object.keys(e.params).length) delete e.params; } }
   else if ("layout" in s) { if (e.layout) { delete e.layout[s.layout]; if (!Object.keys(e.layout).length) delete e.layout; } }
+  else if ("color" in s) { if (e.colors) { delete e.colors[s.color]; if (!Object.keys(e.colors).length) delete e.colors; } }
   else delete (e as unknown as Record<string, unknown>)[s.field];
   if (Object.keys(e).length === 1) { v.layers = v.layers!.filter((l) => l !== e); if (!v.layers.length) delete v.layers; }
 }
@@ -578,4 +580,61 @@ export function removeTempoChange(doc: Doc, bar: number): void {
 export function setDownbeat(doc: Doc, seconds: number): void {
   if (!Number.isFinite(seconds)) return;
   gridOf(doc).downbeat = Math.max(0, Math.round(seconds * 1000) / 1000);
+}
+
+// ---- colour: the palette (song, with per-video overrides) and layers' colours ----
+
+/** The palette the video uses: the song's, with the video's (and its bases') overrides. */
+export function paletteOf(doc: Doc, video: string): Record<string, string> {
+  return normalizePalette({ ...doc.song.palette, ...resolved(doc, video).palette });
+}
+/** Where a slot's colour comes from: the song, this video's file, or a base video. */
+export function paletteOrigin(doc: Doc, video: string, slot: string): "song" | "video" | "base" {
+  if (doc.videos[video]?.palette?.[slot] !== undefined) return "video";
+  const base = doc.videos[video]?.base;
+  return base && resolved(doc, base).palette?.[slot] !== undefined ? "base" : "song";
+}
+/** Set a palette slot: in the song (every video that doesn't override it), or in this video only. */
+export function setPaletteSlot(doc: Doc, video: string, slot: string, hex: string, scope: "song" | "video"): void {
+  if (scope === "song") (doc.song.palette ??= {})[slot] = hex;
+  else (doc.videos[video]!.palette ??= {})[slot] = hex;
+}
+/** Drop this video's override of a slot: it's the song's (or its base's) again. */
+export function resetPaletteSlot(doc: Doc, video: string, slot: string): void {
+  const v = doc.videos[video]!;
+  if (!v.palette) return;
+  delete v.palette[slot];
+  if (!Object.keys(v.palette).length) delete v.palette;
+}
+/** A layer's colour setting: a palette slot it follows, or its own "#rrggbb". */
+export function layerColor(doc: Doc, video: string, id: string, name: string): string {
+  const l = layerOf(doc, video, id);
+  const spec = l ? GENERATORS[l.generator]?.colors?.find((c) => c.name === name) : undefined;
+  const v = l?.colors?.[name] ?? spec?.default ?? "ink";
+  return PALETTE_ALIASES[v] ?? v;
+}
+/** The colour itself (#rrggbb), following the slot through the video's palette. */
+export function layerColorHex(doc: Doc, video: string, id: string, name: string): string {
+  const v = layerColor(doc, video, id, name);
+  return v.startsWith("#") ? v : paletteOf(doc, video)[v] ?? "#888888";
+}
+/** Point a layer's colour at a palette slot, or give it its own colour. Back to its generator's slot (on a layer
+ *  of this video's own) drops the setting. */
+export function setLayerColor(doc: Doc, video: string, id: string, name: string, value: string): void {
+  const l = layerOf(doc, video, id);
+  if (!l) return;
+  const def = GENERATORS[l.generator]?.colors?.find((c) => c.name === name)?.default;
+  const e = ownEntry(doc, video, id);
+  const colors = { ...e.colors, [name]: value };
+  if (value === def && !isInherited(doc, video, id)) delete colors[name];
+  if (Object.keys(colors).length) e.colors = colors; else delete e.colors;
+}
+/** Start a colour lane with one breakpoint (it holds that colour until more points are added). */
+export function addColorLane(doc: Doc, video: string, target: string, at: { bar?: number; t?: number }, c: string): void {
+  if (resolved(doc, video).automation?.some((a) => a.target === target && a.points.length)) return;
+  setLane(doc, video, target, [{ ...at, c }]);
+}
+/** Colour lanes for a layer's colours ("<layer>.<colour>") or for the palette ("palette.<slot>"). */
+export function colorLanesOf(doc: Doc, video: string, prefix: string): LaneInput[] {
+  return (resolved(doc, video).automation ?? []).filter((a) => a.points.length > 0 && a.target.startsWith(prefix) && a.points.some((p) => p.c !== undefined));
 }

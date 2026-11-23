@@ -6,6 +6,7 @@ export * from "./spans.ts";
 export * from "./formats.ts";
 export * from "./resolve.ts";
 export * from "./rng.ts";
+export * from "./color.ts";
 export * from "./plugins.ts";
 export { GENERATORS } from "./generators/index.ts";
 export { EFFECTS } from "./effects/index.ts";
