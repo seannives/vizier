@@ -30,6 +30,8 @@ snapshot of exactly what was rendered. A new render replaces the old one of the 
   --still-bar <bar>    one frame as a PNG, at a bar position (e.g. 105 or 105.5)
   --still <frame>      one frame as a PNG, by frame number
   --keep               add a timestamp to the file name instead of replacing the last render
+  --whole              the whole song, even when the video has a range (adds -song to the name)
+  --progress           machine-readable progress lines ("PROGRESS done total"; the editor uses them)
   --bitrate <Mbps>     video bitrate (default: 1.5 × the format's)
   --encoder ffmpeg     encode with ffmpeg's libx264 instead of in Chrome (slower)
   --bench <frames>     measure drawing speed only (live headroom); no file is written

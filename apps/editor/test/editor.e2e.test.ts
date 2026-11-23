@@ -2,7 +2,7 @@
 // Shortcuts use ControlOrMeta: ⌘ on a Mac, Ctrl elsewhere, matching the editor.
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { spawn, type ChildProcess } from "node:child_process";
-import { mkdtempSync, mkdirSync, cpSync, writeFileSync, readFileSync, existsSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, cpSync, writeFileSync, readFileSync, existsSync, rmSync, readdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -35,7 +35,7 @@ run("editor (headless Chrome)", () => {
     cpSync(join(root, "projects/demo/videos"), join(dir, "videos"), { recursive: true });
     mkdirSync(join(dir, "media"));
     for (const [n, s] of Object.entries(makeDemoTracks())) writeFileSync(join(dir, "media", `${n}.wav`), wav(s, DEMO.sampleRate));
-    server = spawn(process.execPath, ["--experimental-strip-types", join(root, "apps/editor/src/server.ts"), dir, "--video", "full", "--port", String(PORT), "--no-open"], { stdio: ["ignore", "ignore", "pipe"] });
+    server = spawn(process.execPath, ["--experimental-strip-types", join(root, "apps/editor/src/server.ts"), dir, "--video", "full", "--port", String(PORT), "--no-open"], { stdio: ["ignore", "ignore", "pipe"], env: { ...process.env, VIZIER_RENDER_GPU: "0", VIZIER_NO_REVEAL: "1" } });
     await new Promise<void>((ok, fail) => {
       server.stderr!.on("data", (d) => { serverLog += d; if (serverLog.includes("ready:")) ok(); });
       server.on("exit", () => fail(new Error(serverLog)));
@@ -797,4 +797,41 @@ run("editor (headless Chrome)", () => {
     await page.click('[data-fold="_video"]');
     expect(await page.locator('[data-lane="palette.accent"]').count()).toBe(1);
   }, 120_000);
+
+  it("render: asks to save first; renders with progress and can cancel; lists, plays and shows past renders", async () => {
+    // a past render, with the snapshot the command writes beside it
+    mkdirSync(join(dir, "output"), { recursive: true });
+    writeFileSync(join(dir, "output/full-youtube.mp4"), readFileSync(join(root, "apps/editor/test/fixtures/tiny.mp4")));
+    writeFileSync(join(dir, "output/full-youtube.json"), JSON.stringify({ renderedAt: new Date().toISOString(), video: "full", profile: "youtube", range: { fromSeconds: 0, toSeconds: 1, frames: 30 }, vizier: { commit: "abc1234", localChanges: false } }));
+    await page.selectOption("header select", "full");
+    await page.waitForFunction(() => (window as any).vizierEditor.state.videoName === "full");
+    await page.selectOption('select[aria-label="Add a layer"]', "pulseGrid");        // an unsaved change
+    await page.click("header button.render");
+    await page.waitForSelector('[role="dialog"][aria-label="Render"]');
+    expect(await page.textContent('[aria-label="Render"] .warn')).toMatch(/save first/);
+    expect(await page.isDisabled('[aria-label="Render"] button.primary')).toBe(true);
+    await page.click('[aria-label="Render"] .warn button');                             // Save
+    await page.waitForFunction(() => !document.querySelector('[aria-label="Render"] .warn'));
+    // the past render: listed with its format, length and version; Play shows it; Show in Finder asks the server
+    const row = '[aria-label="Render"] li[data-file="output/full-youtube.mp4"]';
+    await page.waitForSelector(row);
+    expect(await page.textContent(row)).toMatch(/YouTube.*0:01.*abc1234/);
+    await page.click(`${row} button:has-text("Play")`);
+    expect(await page.getAttribute('[aria-label="Render"] video', "src")).toBe("/api/output?file=output%2Ffull-youtube.mp4");
+    const r = await page.evaluate(async () => { const x = await fetch("/api/output?file=output%2Ffull-youtube.mp4", { headers: { range: "bytes=0-99" } }); return { status: x.status, len: (await x.arrayBuffer()).byteLength }; });
+    expect(r).toEqual({ status: 206, len: 100 });                                       // ranges, so the player can seek
+    await page.click('[aria-label="Render"] button:has-text("Close the player")');
+    await page.click(`${row} button:has-text("Show in Finder")`);
+    // a render: progress shows (here, without a GPU, slowly), then Cancel stops it and leaves no file behind
+    await page.click('[aria-label="Render"] input[value="video"]');
+    await page.click('[aria-label="Render"] button.primary');
+    await page.waitForFunction(() => /\d+% · \d+\/\d+ frames/.test(document.querySelector('[aria-label="Render"] .job')?.textContent ?? ""), null, { timeout: 90_000 });
+    expect(await page.textContent("header button.render")).toMatch(/Rendering \d+%/);
+    await page.click('[aria-label="Render"] .job button:has-text("Cancel")');
+    await page.waitForFunction(() => /cancelled/.test(document.querySelector('[aria-label="Render"]')?.textContent ?? ""), null, { timeout: 30_000 });
+    await new Promise((res) => setTimeout(res, 500));
+    expect(readdirSync(join(dir, "output")).filter((f) => f.includes(".partial."))).toEqual([]);
+    expect(await page.textContent("header button.render")).toBe("Render");
+    await page.keyboard.press("Escape");
+  }, 180_000);
 });

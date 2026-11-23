@@ -9,7 +9,7 @@
  * timestamp) plus a .json snapshot of exactly what was rendered.
  */
 import { parseArgs } from "node:util";
-import { mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync, renameSync } from "node:fs";
 import { join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -36,6 +36,8 @@ const { values, positionals } = parseArgs({
     gpu: { type: "boolean", default: false },
     encoder: { type: "string", default: "webcodecs" },
     bitrate: { type: "string" },
+    whole: { type: "boolean", default: false },     // the whole song, whatever the video's range
+    progress: { type: "boolean", default: false },  // machine-readable progress for the editor: "PROGRESS done total"
   },
 });
 
@@ -62,6 +64,9 @@ if (values.bars) {
   fromSec = positionToSeconds({ bar: Number(m[1]) }, project.grid);
   toSec = positionToSeconds({ bar: Number(m[2]) }, project.grid);
   rangeTag = `-b${m[1]}-${m[2]}`;
+} else if (values.whole) {
+  fromSec = 0; toSec = duration;
+  rangeTag = project.range ? "-song" : "";
 } else if (values.start !== undefined || values.duration !== undefined) {
   fromSec = Number(values.start ?? 0);
   toSec = values.duration ? fromSec + Number(values.duration) : duration;
@@ -109,7 +114,10 @@ try {
     log(`wrote ${relative(process.cwd(), out)}`);
   } else {
     const out = outPath(`${lp.videoName}-${profile.id}${rangeTag}`, ".mp4");
-    const media = { out, fps: profile.fps, audio: project.tracks[project.mix], audioStart: start / profile.fps, duration: (end - start) / profile.fps };
+    // written under a temporary name and renamed when complete: a stopped or failed render never leaves a broken
+    // video under the real name (or replaces a good one)
+    const partial = out.replace(/\.mp4$/, "") + ".partial.mp4";
+    const media = { out: partial, fps: profile.fps, audio: project.tracks[project.mix], audioStart: start / profile.fps, duration: (end - start) / profile.fps };
     const bitrateMbps = Number(values.bitrate ?? profile.videoBitrateMbps * 1.5);
     let mode = values.encoder === "ffmpeg" ? "ffmpeg" : "webcodecs";
     let info = null as Awaited<ReturnType<typeof r.encodeStart>> | null;
@@ -131,6 +139,7 @@ try {
       await enc.write(data);
       renderMs += b - a; encodeMs += performance.now() - b;
       const now = Date.now(), last = f + n - 1;
+      if (values.progress) process.stderr.write(`PROGRESS ${last + 1 - start} ${end - start}\n`);
       if (now - lastLog >= 5000 || last === end - 1) {
         const done = last - lastFrame + 1, rate = done / ((now - lastLog) / 1000);
         log(`frame ${last + 1 - start}/${end - start} · ${rate.toFixed(1)} fps · in Chrome ${(renderMs / done).toFixed(0)} ms/frame · ffmpeg wait ${(encodeMs / done).toFixed(0)} ms/frame · eta ${((end - last - 1) / rate / 60).toFixed(1)} min`);
@@ -139,7 +148,8 @@ try {
     }
     if (mode === "webcodecs") await enc.write(await r.encodeFinish());
     await enc.finish();
-    const probe = probeVideo(out);
+    const probe = probeVideo(partial);
+    renameSync(partial, out);
     const expectSec = (end - start) / profile.fps;
     if (probe.frames !== end - start || Math.abs(probe.duration - expectSec) > 1.5 / profile.fps || Math.abs(probe.fps - profile.fps) > 0.01)
       log(`WARNING: expected ${end - start} frames, ${expectSec.toFixed(2)} s at ${profile.fps} fps; file has ${probe.frames} frames, ${probe.duration.toFixed(2)} s at ${probe.fps.toFixed(2)} fps`);

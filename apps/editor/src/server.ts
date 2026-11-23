@@ -22,6 +22,7 @@ import { listVideos, loadSong, loadVideoFile, projectDir } from "../../offline/s
 import { storeUpload, listMedia, settleMedia, clearIncoming, stemOffset } from "./media.ts";
 import { listProjects, beginProject, addProjectMedia, finishProject, discardProject } from "./projects.ts";
 import { analyze } from "../../offline/src/analyze.ts";
+import { RenderQueue, listRenders, againOptions } from "./renders.ts";
 
 const root = fileURLToPath(new URL("../../../", import.meta.url));
 const { values, positionals } = parseArgs({
@@ -84,6 +85,8 @@ const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>
 // ---- caches ----
 const waveCache = new Map<string, unknown>();
 const checkCache = new Map<string, unknown>();
+// renders run the same command as the terminal (on the GPU, unless VIZIER_RENDER_GPU=0: tests on machines without one)
+const renders = new RenderQueue(join(root, "apps/offline/src/cli.ts"), process.env.VIZIER_RENDER_GPU !== "0", (s) => log(s));
 if (positionals[0]) { try { openProject(projectDir(positionals[0])); } catch (e) { die((e as Error).message); } }
 /** Min/max peaks at 100 per second, as signed bytes, base64: small enough to send every track. */
 function waveform(file: string) {
@@ -185,6 +188,44 @@ const server = createServer(async (req, res) => {
       return json(res, { file });
     }
     if (p === "/api/media") return json(res, listMedia(need()));
+    // ---- renders: start (one or more videos), progress, cancel; the files in output/; play one; show it in Finder ----
+    if (p === "/api/render" && req.method === "POST") {
+      const b = JSON.parse(await readBody(req)) as { videos: string[]; whole?: boolean; options?: string[] };
+      const dir = need();
+      for (const v of b.videos) if (!listVideos(dir).includes(v)) return json(res, { error: `no saved video ${v} (save first)` }, 400);
+      // (options only as the list of a past render gives them: againOptions keeps to the command's own)
+      return json(res, { jobs: renders.add(dir, b.videos, !!b.whole, againOptions(["x", ...(b.options ?? [])])) });
+    }
+    if (p === "/api/render") {
+      const dir = need();
+      return json(res, { jobs: renders.jobs.filter((j) => j.dir === dir), files: listRenders(dir) });
+    }
+    if (p === "/api/render/cancel" && req.method === "POST") {
+      renders.cancel((JSON.parse(await readBody(req)) as { id: number }).id);
+      return json(res, { ok: true });
+    }
+    if (p === "/api/output") {
+      const path = projectFile(url.searchParams.get("file")!);
+      if (!path.startsWith(join(need(), "output") + "/") || !existsSync(path)) return json(res, { error: "not found" }, 404);
+      // ranges, so the player can seek
+      const size = statSync(path).size, range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? "");
+      if (range) {
+        const from = range[1] ? Number(range[1]) : size - Number(range[2]), to = range[1] && range[2] ? Number(range[2]) : size - 1;
+        res.writeHead(206, { "content-type": "video/mp4", "content-range": `bytes ${from}-${to}/${size}`, "accept-ranges": "bytes", "content-length": to - from + 1 });
+        return void createReadStream(path, { start: from, end: to }).pipe(res);
+      }
+      res.writeHead(200, { "content-type": "video/mp4", "content-length": size, "accept-ranges": "bytes" });
+      return void createReadStream(path).pipe(res);
+    }
+    if (p === "/api/reveal" && req.method === "POST") {
+      const path = projectFile((JSON.parse(await readBody(req)) as { file: string }).file);
+      if (!existsSync(path)) return json(res, { error: "not found" }, 404);
+      if (process.env.VIZIER_NO_REVEAL !== "1") {
+        if (process.platform === "darwin") spawn("open", ["-R", path], { stdio: "ignore", detached: true }).unref();
+        else spawn("xdg-open", [resolve(path, "..")], { stdio: "ignore", detached: true }).on("error", () => {}).unref();
+      }
+      return json(res, { ok: true });
+    }
     // the tempo and where bar 1 starts, worked out from a file (the mix): suggestions for the tempo panel
     if (p === "/api/tempo") {
       const f = projectFile(url.searchParams.get("file")!);

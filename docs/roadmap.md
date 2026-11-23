@@ -61,12 +61,13 @@ Editor milestones:
         per bar with changes at later bars (marked in the ruler), the tempo worked out from the mix as suggestions,
         and a click on every beat (C)
 - [ ] Later: tap tempo; tempo ramps (see below); detect tempo changes in the mix
-- [ ] 5. In two parts:
+- [x] 5. In two parts:
   - [x] 5a. Colour: vizier's picker (palette swatches, hex, OKLCH sliders, eyedropper); Palette panel (song palette,
         per-video overrides, A for palette lanes); layers' colours (follow a slot or their own, A, base/changed/↺);
         colour lanes in the timeline (swatch breakpoints, curves, the long way round the colour wheel); the
         video's own lanes (palette, film grain, vignette) under "Palette & picture"
-  - [ ] 5b. Render from the editor: Render button with progress and cancel; list of renders (play, show in Finder)
+  - [x] 5b. Render from the editor: the open video (its range or the whole song) or all videos, with progress, time
+        left and Cancel; the renders in output/ to play, show in Finder or make again the same way
 - [ ] Modulation presets: one-click combinations such as "pulse with the kick" or "colour follows the filter"
 - [ ] Later: pencil drawing of automation; finer snapping; record control moves (mouse or MIDI) as automation
 

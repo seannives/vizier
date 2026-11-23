@@ -91,6 +91,13 @@ server isn't running, the editor says so and keeps your changes: start it again 
   opposite of the current setting.
 - **Sync** (status bar): lines the playhead and picture up with what you hear. If the sound comes after the playhead,
   press +; if it comes before, press −. It's remembered per browser (so set it once per speakers or headphones).
+- **Render** (top bar): renders the open video at its range, the whole song, or every video, on the GPU into the
+  project's `output/` folder, the same as `vizier render --gpu` (so the same video). It renders the saved files, so
+  it asks you to save first. The dialog shows progress with time left and Cancel (a cancelled render leaves no
+  file); close it and the top bar shows "Rendering 42%" until it's done. Below: the renders in `output/`, with
+  format, length, size, date and the vizier version, to **Play** here, **Show in Finder**, or make **Again** the
+  same way (a draft or a few bars stay so). A render with the same name is replaced; a finished file only appears
+  when it's complete.
 - **Save, undo, redo**: ⌘S, ⌘Z, ⇧⌘Z. Changes aren't written until you save; the Save button and the status bar
   show unsaved files, and Chrome warns before closing with unsaved changes.
 

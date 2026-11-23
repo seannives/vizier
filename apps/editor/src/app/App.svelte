@@ -2,7 +2,7 @@
   import { onMount, untrack } from "svelte";
   import { Session } from "./lib/session.ts";
   import { Transport } from "./lib/transport.ts";
-  import { api, type Waveform } from "./lib/api.ts";
+  import { api, type Waveform, type RenderJob, type RenderFile } from "./lib/api.ts";
   import { handleKey, displayKeys, type Shortcut } from "./lib/shortcuts.ts";
   import { snapTime, beatSeconds } from "./lib/timeline.ts";
   import Timeline from "./components/Timeline.svelte";
@@ -17,6 +17,7 @@
   import TempoPanel, { type TempoGuess } from "./components/TempoPanel.svelte";
   import PalettePanel from "./components/PalettePanel.svelte";
   import PicturePanel from "./components/PicturePanel.svelte";
+  import RenderDialog from "./components/RenderDialog.svelte";
   import ColourPicker from "./components/ColourPicker.svelte";
   import type { LayerRow, SpanS, LaneRow, LanePoint } from "./components/Timeline.svelte";
   import { frontToBack, addTrack, setTrackFile, removeTrack, trackFiles, setDownbeat } from "./lib/edits.ts";
@@ -385,6 +386,29 @@
     lanePoints(target, ln.points.map((p, j) => (j === index ? { ...p, c } : p)), live ? `${target}.${index}.c` : undefined);
   }
 
+  // ---- rendering: the dialog, the queue's progress (checked twice a second while there's something to watch) ----
+  let showRender = $state(false);
+  let renderJobs = $state<RenderJob[]>([]), renderFiles = $state<RenderFile[]>([]);
+  const rendering = $derived(renderJobs.filter((j) => j.status === "queued" || j.status === "running"));
+  const renderPct = $derived.by(() => { const j = rendering.find((x) => x.status === "running"); return j?.total ? Math.floor((j.done / j.total) * 100) : 0; });
+  let seenDone = new Set<number>();
+  async function refreshRenders() {
+    try {
+      const r = await api.renders();
+      for (const j of r.jobs) if (j.status === "done" && !seenDone.has(j.id)) { seenDone.add(j.id); if (renderJobs.some((x) => x.id === j.id && x.status !== "done")) flash(`rendered ${j.file ?? j.video}`); }
+      renderJobs = r.jobs; renderFiles = r.files;
+    } catch { /* the server is away: the status bar says so */ }
+  }
+  // (a yes/no, so each answer from the server doesn't restart the polling)
+  const watchRenders = $derived(status === "ready" && (showRender || rendering.length > 0));
+  $effect(() => { if (status === "ready") void untrack(refreshRenders); }); // once: a render may be running from before a reload
+  $effect(() => {
+    if (!watchRenders) return;
+    void untrack(refreshRenders);
+    const t = setInterval(refreshRenders, 500);
+    return () => clearInterval(t);
+  });
+
   const shortcuts: Shortcut[] = [
     { keys: "Space", label: "Play / stop (stop returns to the start marker)", group: "Transport", run: togglePlay },
     { keys: "Shift+Space", label: "Continue from where playback stopped", group: "Transport", run: continuePlay },
@@ -748,6 +772,8 @@
     <button onclick={undo} disabled={!undoLabel} title="Undo {undoLabel ?? ""} ({displayKeys("Mod+Z")})">↶</button>
     <button onclick={redo} disabled={!redoLabel} title="Redo {redoLabel ?? ""} ({displayKeys("Shift+Mod+Z")})">↷</button>
     <button class:on={dirtyFiles.length > 0} onclick={save} title="Save ({displayKeys("Mod+S")})">Save{dirtyFiles.length ? " •" : ""}</button>
+    <button class="render" class:busy={rendering.length > 0} onclick={() => (showRender = true)} disabled={!doc}
+      title={rendering.length ? `Rendering (${rendering.length} to go): open to see or cancel` : "Render videos to MP4 (and see past renders)"}>{rendering.length ? `Rendering ${renderPct}%` : "Render"}</button>
     <button onclick={() => (help = true)} title="Keyboard shortcuts ({displayKeys("?")})">?</button>
   </header>
 
@@ -861,6 +887,12 @@
     {/if}
   </ColourPicker>
 {/if}
+{#if showRender && doc && videoName}
+  <RenderDialog video={videoName} videoName={doc.videos[videoName]?.name ?? videoName}
+    videos={Object.fromEntries(Object.entries(doc.videos).map(([k, v]) => [k, v.name ?? k]))}
+    {rangeLabel} hasRange={!!rangeBars} dirty={dirtyFiles} jobs={renderJobs} files={renderFiles}
+    onsave={save} onclose={() => (showRender = false)} onrefresh={refreshRenders} />
+{/if}
 {#if showProjects}<Projects dirty={dirtyFiles} onclose={() => (showProjects = false)} />{/if}
 {#if newDialog && videoName && doc}
   <NewVideo currentName={doc.videos[videoName]?.name ?? videoName} currentFormat={profileId} how={newDialog} oncreate={createVideo} oncancel={() => (newDialog = null)} />
@@ -901,6 +933,7 @@
   h3 { margin: 6px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); font-weight: 500; }
   .fold-btn { background: none; border: none; padding: 0; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer;
     display: inline-flex; align-items: center; gap: 6px; }
+  .render.busy { border-color: var(--accent); color: var(--accent); }
   .chips { display: inline-flex; gap: 3px; margin-left: 8px; }
   .chip { width: 10px; height: 10px; border-radius: 2px; border: 1px solid #fff2; }
   .tri { fill: var(--text); transition: transform .1s; }
