@@ -212,6 +212,9 @@ run("editor (headless Chrome)", () => {
       await p2.keyboard.press("Space");
       const t0 = Date.now();
       await p2.waitForTimeout(2500);
+      // (on a busy machine, such as CI running the render tests alongside, software GL can take seconds per frame:
+      // wait for frames to arrive rather than assume they do in 2.5 s; the limit below uses the real time taken)
+      await p2.waitForFunction((n) => (window as any).vizierEditor.stats().previewFrames > n + 1, before.previewFrames, { timeout: 60_000 });
       const after = await p2.evaluate(() => ({ ...(window as any).vizierEditor.stats(), time: (window as any).vizierEditor.state.time }));
       const secs = (Date.now() - t0) / 1000;
       await p2.keyboard.press("Space");
