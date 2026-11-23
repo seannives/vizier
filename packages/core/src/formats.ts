@@ -45,6 +45,8 @@ export interface VideoFile {
   range?: { from?: number; to?: number }; // bars; `to` is where it ends (exclusive): 17–49 = bars 17..48
   seed?: number;
   palette?: Record<string, string>; // overrides the song's
+  /** Film grain and vignette when no lane sets them (POST_PARAMS: "grain", "vignette"). */
+  post?: Record<string, number>;
   layers?: VideoLayer[];
   automation?: LaneInput[];       // a lane replaces the base's lane for the same target
   modulations?: (Modulation & { remove?: boolean })[]; // replaces the base's entry with the same target + source
@@ -82,6 +84,7 @@ export function mergeVideos(base: VideoFile, child: VideoFile): VideoFile {
   for (const m of child.modulations ?? []) { if (m.remove) mods.delete(key(m)); else mods.set(key(m), m); }
   out.modulations = [...mods.values()].filter((m) => !ofGone(m.target));
   if (base.palette || child.palette) out.palette = { ...base.palette, ...child.palette };
+  if (base.post || child.post) out.post = { ...base.post, ...child.post };
   return pruneStale(out);
 }
 
@@ -144,6 +147,7 @@ export function buildProject(song: SongFile, video: VideoFile, trackPath: (t: Tr
     grid: song.grid,
     sections: song.sections,
     palette: { ...song.palette, ...video.palette },
+    ...(video.post ? { post: video.post } : {}),
     range: video.range,
     layers: (video.layers ?? []).filter((l) => !l.remove).map((l) => l as LayerDef),
     automation: video.automation ?? [],

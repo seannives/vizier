@@ -80,4 +80,21 @@ run("new project (headless Chrome)", () => {
     expect(await page.isDisabled('.projects li:has-text("Second Song") button')).toBe(true);
     await page.keyboard.press("Escape");
   }, 60_000);
+
+  it("a new project has the Palette & picture row: the palette, film grain and vignette, with A for lanes", async () => {
+    await page.waitForFunction(() => (window as any).vizierEditor?.state?.status === "ready", null, { timeout: 60_000 });
+    if ((await page.evaluate(() => (window as any).vizierEditor.state.dirtyFiles.length))) await page.keyboard.press("ControlOrMeta+s");
+    const y = await page.evaluate(() => (window as any).vizierEditor.timeline().layerY("_video"));
+    const x = await page.evaluate(() => (window as any).vizierEditor.timeline().pageX(5));
+    await page.mouse.click(x, y);
+    await page.waitForSelector(".picture");
+    expect(await page.locator(".picture [data-slot]").count()).toBe(5);
+    const vig = page.locator('.picture input[type="text"][aria-label="Vignette"]');
+    await vig.fill("0.2"); await vig.press("Enter");
+    const video = () => page.evaluate(() => { const ed = (window as any).vizierEditor; return ed.session().doc.videos[ed.state.videoName]; });
+    expect((await video()).post).toEqual({ vignette: 0.2 });
+    await page.click('.picture button[aria-label="Automate Film grain"]');
+    expect((await video()).automation.map((a: any) => a.target)).toContain("post.grain");
+    expect(await page.locator('[data-lane="post.grain"]').count()).toBe(1);
+  }, 60_000);
 });

@@ -307,6 +307,7 @@
       ctx.fillStyle = sel ? "#ffffff0a" : "#00000033"; ctx.fillRect(0, row.y, W, row.h);
       ctx.fillStyle = C.line; ctx.fillRect(0, row.y, W, 1);
       const y0 = row.y + 3, h = row.h - 6;
+      if (l.fixed) continue;              // (the video's own settings: no on-spans)
       if (!spans) { // on for the whole song
         ctx.fillStyle = sel ? "#f5a52430" : "#ffffff14";
         ctx.fillRect(xOf(0, v), y0, xOf(duration, v) - xOf(0, v), h);
@@ -350,7 +351,7 @@
   /** y in the rows' coordinates, whichever canvas the pointer is over. */
   const vy = (e: PointerEvent) => e.offsetY + (e.currentTarget === canvas ? HEAD : 0);
   function layerDown(e: PointerEvent, l: LayerRow) {
-    if (l.fixed) return; // (the video's own lanes: nothing to switch on or off)
+    if (l.fixed) { onselectlayer(l.id, null); return; } // (the video's own settings: nothing to switch on or off)
     const x = e.offsetX, t = tOf(x, view);
     const hit = spanHit(l, x);
     spanDrag = { id: l.id, index: hit?.index ?? -1, kind: hit?.part ?? "new", x0: x, t0: t, orig: l.spans ?? [], moved: false };

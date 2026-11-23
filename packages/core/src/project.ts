@@ -64,6 +64,8 @@ export interface Project {
   mix: string;
   grid?: Grid;
   palette: Record<string, string>;
+  /** Whole-picture settings (film grain, vignette) when no lane sets them: POST_PARAMS names → values. */
+  post?: Record<string, number>;
   sections?: Section[];
   /** The video's bar range: `to` is exclusive. */
   range?: { from?: number; to?: number };
@@ -136,6 +138,11 @@ export function validateProject(p: Project): string[] {
       effIds.add(id);
       for (const k of Object.keys(e.params ?? {})) if (!def.params.some((s) => s.name === k)) errs.push(`layer ${l.id}: "${k}" is not a parameter of effect ${e.type}`);
     }
+  }
+  for (const [k, v] of Object.entries(p.post ?? {})) {
+    const spec = POST_PARAMS.find((x) => x.name === k);
+    if (!spec) errs.push(`post: "${k}" isn't a whole-picture setting (${POST_PARAMS.map((x) => x.name).join(", ")})`);
+    else if (typeof v !== "number" || !(v >= spec.min && v <= spec.max)) errs.push(`post.${k} must be a number from ${spec.min} to ${spec.max}`);
   }
   for (const [k, v] of Object.entries(p.palette ?? {})) {
     if (!isPaletteSlot(PALETTE_ALIASES[k] ?? k)) errs.push(`palette: "${k}" is not a slot (${PALETTE_SLOTS.map((s) => s.id).join(", ")})`);

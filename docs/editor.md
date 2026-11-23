@@ -53,8 +53,10 @@ server isn't running, the editor says so and keeps your changes: start it again 
 - **The colour picker**: the palette's swatches, a hex field (Return to apply), an eyedropper (anywhere on the
   screen), and sliders for lightness, vividness and hue: they change the colour the way it looks (in OKLCH), and
   each slider's track shows what it would do. Esc or a click outside closes it; a slider drag is one undo step.
-- **Colour lanes** (in the timeline, under their layer; the palette's, film grain and vignette under **Palette &
-  picture** at the top): a strip of the colour over time, with each breakpoint as a swatch. Click to add a
+- **Palette & picture** (the first row under the mix in the timeline, in every video): click it for what belongs to
+  the whole video rather than a layer: the palette, **film grain** and **vignette** (with A for their lanes, and ↺
+  in a video built on another). Their lanes unfold under that row.
+- **Colour lanes** (in the timeline, under their layer; the palette's under **Palette & picture**): a strip of the colour over time, with each breakpoint as a swatch. Click to add a
   breakpoint (it takes the colour already there), drag to move it, double-click it (or click the swatch in the
   lane's header) to pick its colour, Delete to remove it, and the curve buttons as for other lanes. Fades blend in
   OKLCH, so they stay bright and vivid; **Fade the long way round** (in the picker, for the fade after that point)

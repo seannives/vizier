@@ -545,8 +545,8 @@ export class Renderer {
     const up = (n: string) => gl.getUniformLocation(this.progPost, n);
     gl.uniform3f(up("bg"), ...bg);
     // grain is one speck per pixel: a smaller preview has bigger specks, so it's made fainter to look about the same
-    gl.uniform1f(up("grain"), this.resolver.value("post.grain", 0.05, t, lookup) * this.scale);
-    gl.uniform1f(up("vignette"), this.resolver.value("post.vignette", 0.55, t, lookup));
+    gl.uniform1f(up("grain"), this.resolver.value("post.grain", this.project.post?.grain ?? 0.05, t, lookup) * this.scale);
+    gl.uniform1f(up("vignette"), this.resolver.value("post.vignette", this.project.post?.vignette ?? 0.55, t, lookup));
     gl.uniform1f(up("seed"), (Math.floor(frame) % 997) * 0.731);
     gl.uniform2f(up("res"), width, height);
     gl.uniform2f(up("centre"), 0, 0);

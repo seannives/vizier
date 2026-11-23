@@ -4,7 +4,7 @@ import {
   addLayer, removeLayer, moveLayer, duplicateLayer, setParam, setLayout, placement, hasOwnLayout, patchLayer,
   layerOrigin, isChanged, baseLayer, resetSetting, resetLayer, removedLayers, restoreLayer, newVideo, detachVideo, setVideo,
   laneOf, laneChanged, laneInherited, setLane, addLane, removeLane, resetLane, lanesOfLayer,
-  modsOf, modOrigin, addMod, setMod, removeMod, resetMod, frontToBack, addTrack, renameTrack, moveTrack, removeTrack, setTrackFile, trackIdFor, mixTrackId, setTempo, addTempoChange, moveTempoChange, removeTempoChange, setDownbeat, tempoSegments, paletteOf, paletteOrigin, setPaletteSlot, resetPaletteSlot, layerColor, layerColorHex, setLayerColor, addColorLane, colorLanesOf, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
+  modsOf, modOrigin, addMod, setMod, removeMod, resetMod, frontToBack, addTrack, renameTrack, moveTrack, removeTrack, setTrackFile, trackIdFor, mixTrackId, setTempo, addTempoChange, moveTempoChange, removeTempoChange, setDownbeat, tempoSegments, paletteOf, paletteOrigin, setPaletteSlot, resetPaletteSlot, layerColor, layerColorHex, setLayerColor, addColorLane, colorLanesOf, postValue, setPost, postChanged, resetPost, setGenerator, setSpans, addEffect, removeEffect, setEffectParam, moveEffect, layerOf, layersOf, isInherited,
 } from "../src/app/lib/edits.ts";
 import { validateProject, buildProject, resolveVideo } from "../../../packages/core/src/index.ts";
 
@@ -453,5 +453,25 @@ describe("colour", () => {
     expect(colorLanesOf(d, "full", "ring.")[0]!.points).toEqual([{ bar: 1, c: "#00ff00" }]);
     expect(lanesOfLayer(d, "full", "ring").map((l) => l.target)).toEqual(["ring.radius"]);
     expect(valid(d, "full")).toEqual([]);
+  });
+});
+
+describe("the whole picture (film grain, vignette)", () => {
+  it("has the defaults until set; a reel inherits it, sets its own, and goes back", () => {
+    const d = doc();
+    expect(postValue(d, "full", "vignette")).toBe(0.55);
+    setPost(d, "full", "vignette", 0.2);
+    expect(postValue(d, "reel", "vignette")).toBe(0.2);
+    expect(postChanged(d, "full", "vignette")).toBe(false);              // nothing to go back to
+    setPost(d, "reel", "vignette", 0.9);
+    expect(postChanged(d, "reel", "vignette")).toBe(true);
+    expect(postValue(d, "full", "vignette")).toBe(0.2);
+    resetPost(d, "reel", "vignette");
+    expect(postValue(d, "reel", "vignette")).toBe(0.2);
+    expect(d.videos.reel!.post).toBeUndefined();
+    expect(valid(d, "reel")).toEqual([]);
+    const p = buildProject(d.song, resolveVideo("full", (n) => d.videos[n]!), (t) => t.file);
+    expect(p.post).toEqual({ vignette: 0.2 });
+    expect(validateProject({ ...p, post: { vignette: 3, sparkle: 1 } })).toEqual(expect.arrayContaining([expect.stringMatching(/post.vignette must be a number from 0 to 1/), expect.stringMatching(/"sparkle" isn't a whole-picture setting/)]));
   });
 });

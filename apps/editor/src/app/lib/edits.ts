@@ -4,7 +4,7 @@
  * (only what changed) to this video, and the base is never touched.
  */
 import {
-  resolveVideo, normalizePalette, PALETTE_ALIASES, GENERATORS, EFFECTS, LAYER_PARAMS, type VideoFile, type VideoLayer, type LayerDef, type EffectRef, type Span, splitSpans, type LaneInput, type BreakpointInput, type Modulation, layoutFor, type LayoutFamily, type Transform,
+  resolveVideo, normalizePalette, PALETTE_ALIASES, POST_PARAMS, GENERATORS, EFFECTS, LAYER_PARAMS, type VideoFile, type VideoLayer, type LayerDef, type EffectRef, type Span, splitSpans, type LaneInput, type BreakpointInput, type Modulation, layoutFor, type LayoutFamily, type Transform,
 } from "../../../../../packages/core/src/index.ts";
 import type { Doc } from "./session.ts";
 
@@ -637,4 +637,22 @@ export function addColorLane(doc: Doc, video: string, target: string, at: { bar?
 /** Colour lanes for a layer's colours ("<layer>.<colour>") or for the palette ("palette.<slot>"). */
 export function colorLanesOf(doc: Doc, video: string, prefix: string): LaneInput[] {
   return (resolved(doc, video).automation ?? []).filter((a) => a.points.length > 0 && a.target.startsWith(prefix) && a.points.some((p) => p.c !== undefined));
+}
+
+// ---- the whole picture: film grain and vignette, when no lane sets them ----
+
+/** A whole-picture setting as the video has it (its own, its base's, or the default). */
+export function postValue(doc: Doc, video: string, name: string): number {
+  return resolved(doc, video).post?.[name] ?? POST_PARAMS.find((p) => p.name === name)?.default ?? 0;
+}
+export function setPost(doc: Doc, video: string, name: string, v: number): void {
+  (doc.videos[video]!.post ??= {})[name] = Math.round(v * 1000) / 1000;
+}
+/** Whether this video sets it over its base's (false for a video on its own: nothing to go back to). */
+export const postChanged = (doc: Doc, video: string, name: string) => !!doc.videos[video]?.base && doc.videos[video]!.post?.[name] !== undefined;
+export function resetPost(doc: Doc, video: string, name: string): void {
+  const v = doc.videos[video]!;
+  if (!v.post) return;
+  delete v.post[name];
+  if (!Object.keys(v.post).length) delete v.post;
 }

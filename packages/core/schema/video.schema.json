@@ -330,6 +330,23 @@
     "format": {
       "type": "string",
       "description": "Output format: youtube, youtube60, youtube4k, shorts, reels, igfeed, draft"
+    },
+    "post": {
+      "type": "object",
+      "description": "Film grain and vignette when no lane sets them",
+      "properties": {
+        "grain": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 0.3
+        },
+        "vignette": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
     }
   },
   "definitions": {

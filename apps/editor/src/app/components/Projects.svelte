@@ -83,7 +83,8 @@
   const mb = (n: number) => `${(n / 1e6).toFixed(1)} MB`;
 </script>
 
-<div class="backdrop" class:start role="presentation" onkeydown={(e) => { e.stopPropagation(); if (e.key === "Escape" && !start && !busy) onclose(); }}>
+<svelte:window onkeydown={(e) => { if (e.key === "Escape" && !start && !busy) { e.stopPropagation(); onclose(); } }} />
+<div class="backdrop" class:start role="presentation" onkeydown={(e) => e.stopPropagation()}>
   <div class="dialog" role="dialog" aria-label="Projects">
     {#if start}<h2>vizier</h2>{/if}
     {#if blocked}<p class="warn blocking" role="alert">Save (⌘S) or undo your changes first: switching projects would lose them. Unsaved: {dirty.join(", ")}.</p>{/if}

@@ -16,6 +16,7 @@
   import Projects from "./components/Projects.svelte";
   import TempoPanel, { type TempoGuess } from "./components/TempoPanel.svelte";
   import PalettePanel from "./components/PalettePanel.svelte";
+  import PicturePanel from "./components/PicturePanel.svelte";
   import ColourPicker from "./components/ColourPicker.svelte";
   import type { LayerRow, SpanS, LaneRow, LanePoint } from "./components/Timeline.svelte";
   import { frontToBack, addTrack, setTrackFile, removeTrack, trackFiles, setDownbeat } from "./lib/edits.ts";
@@ -452,13 +453,13 @@
   let selectedLayer = $state<string | null>(null);
   let selectedSpan = $state<number | null>(null);
   $effect(() => { void videoName; selectedLayer = null; selectedSpan = null; });
-  $effect(() => { if (selectedLayer && !layers.some((l) => l.id === selectedLayer)) { selectedLayer = null; selectedSpan = null; } });
+  $effect(() => { if (selectedLayer && selectedLayer !== "_video" && !layers.some((l) => l.id === selectedLayer)) { selectedLayer = null; selectedSpan = null; } });
   function edit(label: string, fn: (d: Doc) => void, merge?: string) {
     if (!session || !videoName) return;
     try { session.apply(label, fn, { merge }); } catch (e) { flash(`couldn't ${label}: ${(e as Error).message}`); }
   }
   const seal = () => session?.seal();
-  const selectLayer = (id: string | null, span: number | null = null) => { if (id === "_video") return; selectedLayer = id; selectedSpan = span; selectedPoint = null; };
+  const selectLayer = (id: string | null, span: number | null = null) => { selectedLayer = id; selectedSpan = id === "_video" ? null : span; selectedPoint = null; };
   const trackName = (id: string | undefined) => {
     const t = doc?.song.tracks.find((t) => (id ? t.id === id : t.mix));
     return t?.name ?? id ?? "mix";
@@ -559,7 +560,8 @@
   }
   const lanesPerLayer = $derived(laneRows.reduce((m, l) => m.set(l.layer, (m.get(l.layer) ?? 0) + 1), new Map<string, number>()));
   const layerRows = $derived<LayerRow[]>([
-    ...(lanesPerLayer.get(VIDEO_ROW) ? [{ id: VIDEO_ROW, name: "Palette & picture", track: mixId, spans: null, lanes: lanesPerLayer.get(VIDEO_ROW), fixed: true }] : []),
+    // always there: click it for the palette, film grain and vignette (and their lanes)
+    { id: VIDEO_ROW, name: "Palette & picture", track: mixId, spans: null, lanes: lanesPerLayer.get(VIDEO_ROW) ?? 0, fixed: true },
     ...layers.map((l) => ({
       id: l.id, name: l.name ?? l.id, track: l.track ?? mixId,
       spans: l.spans?.length && grid ? spansToSeconds(l.spans, grid) : null,
@@ -677,7 +679,7 @@
     if (final) seal();
   }
   function splitSelected() {
-    if (!selectedLayer || playheadBar === null || !videoName) { flash("select a layer to split it at the playhead"); return; }
+    if (!selectedLayer || selectedLayer === VIDEO_ROW || playheadBar === null || !videoName) { flash("select a layer to split it at the playhead"); return; }
     const id = selectedLayer, at = playheadBar, sb = startBar, v = videoName;
     let ok = false;
     edit("split at playhead", (d) => { ok = splitLayerAt(d, v, id, at, sb); });
@@ -691,7 +693,7 @@
     selectedSpan = null;
   }
   function duplicateSelected() {
-    if (!selectedLayer || !videoName) return;
+    if (!selectedLayer || selectedLayer === VIDEO_ROW || !videoName) return;
     const id = selectedLayer, v = videoName;
     let nid = "";
     edit("duplicate layer", (d) => { nid = duplicateLayer(d, v, id); });
@@ -797,7 +799,11 @@
   </main>
 
   {#snippet layerPanel()}
-    {#if videoName && selectedLayer && doc}
+    {#if videoName && selectedLayer === VIDEO_ROW && doc}
+      <h3 class="pic-h">Palette &amp; picture</h3>
+      <PicturePanel {doc} video={videoName} {automated} shownLanes={visibleLanes} {edit} {seal}
+        onpick={(slot, at) => openPicker({ kind: "palette", slot }, at)} onautomate={automate} onautomatecolour={automateColour} />
+    {:else if videoName && selectedLayer && doc}
       <LayerPanel {doc} video={videoName} layerId={selectedLayer} tracks={doc.song.tracks} {playheadBar} {startBar} {automated} shownLanes={visibleLanes} {edit} {seal} {family} onautomate={automate} {time} {features}
         onpickcolor={(name, at) => openPicker({ kind: "layer", layer: selectedLayer!, name }, at)} onautomatecolor={automateColour}
         onselect={(id) => selectLayer(id)} />

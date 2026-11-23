@@ -98,6 +98,8 @@ Each generator declares the colours it draws with, and each defaults to a palett
   Targets: `palette.<slot>` (changes every layer that follows that slot) or `<layer>.<colour>` (one layer).
   `"hue": "long"` on a point makes the fade after it go the long way round the colour wheel (green to red through
   blue and purple instead of yellow).
+- **Film grain and vignette** apply to the whole picture: `"post": { "grain": 0.03, "vignette": 0.4 }` in a video
+  (defaults 0.05 and 0.55), automatable as `post.grain` and `post.vignette`.
 - **Hue shift and lightness**: every layer has `hueShift` (degrees) and `lightness` (−1 black … +1 white), applied to
   all its colours. Automate them, or let audio drive them:
   `{ "target": "ring.hueShift", "source": "bass.centroid", "amount": 60 }` swings the ring's colours as the
