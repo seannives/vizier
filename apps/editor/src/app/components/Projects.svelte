@@ -16,6 +16,7 @@
 
   let projects = $state<{ id: string; title: string }[]>([]);
   let open = $state<string | null>(null);
+  let loaded = $state(false);
   let title = $state("");
   let files = $state<File[]>([]);
   let mixIndex = $state(0);
@@ -28,7 +29,7 @@
 
   onMount(async () => {
     const r = await (await fetch("/api/projects")).json();
-    projects = r.projects; open = r.open;
+    projects = r.projects; open = r.open; loaded = true;
   });
   const post = async (url: string, body: BodyInit, json = true) => {
     const r = await fetch(url, { method: "POST", body, headers: json ? { "content-type": "application/json" } : {} });
@@ -85,15 +86,16 @@
 <div class="backdrop" class:start role="presentation" onkeydown={(e) => { e.stopPropagation(); if (e.key === "Escape" && !start && !busy) onclose(); }}>
   <div class="dialog" role="dialog" aria-label="Projects">
     {#if start}<h2>vizier</h2>{/if}
-    {#if blocked}<p class="warn">Save (or undo) your changes first: unsaved {dirty.join(", ")}.</p>{/if}
+    {#if blocked}<p class="warn blocking" role="alert">Save (⌘S) or undo your changes first: switching projects would lose them. Unsaved: {dirty.join(", ")}.</p>{/if}
 
+    {#if !loaded}<p class="dim small">Loading the projects…</p>{/if}
     {#if projects.length}
       <h3>Open a project</h3>
       <ul class="projects">
         {#each projects as p (p.id)}
           <li>
             <span>{p.title} <span class="dim">projects/{p.id}</span></span>
-            {#if p.id === open}<em class="dim">open</em>{:else}<button onclick={() => openProject(p.id)} disabled={!!busy || blocked}>Open</button>{/if}
+            {#if p.id === open}<em class="dim">open</em>{:else}<button onclick={() => openProject(p.id)} disabled={!!busy || blocked} title={blocked ? "Save or undo your changes first (see above)" : `Open ${p.title}`}>Open</button>{/if}
           </li>
         {/each}
       </ul>
@@ -113,13 +115,15 @@
       <ul class="files">
         {#each files as f, i (f.name + f.size + i)}
           <li>
-            <label title="The full song: what's played, and what the tempo is worked out from"><input type="radio" name="mix" checked={mixIndex === i} onchange={() => (mixIndex = i)} disabled={!!busy} /> mix</label>
+            <label title="The main mix: the finished song, the video's soundtrack"><input type="radio" name="mix" checked={mixIndex === i} onchange={() => (mixIndex = i)} disabled={!!busy} /> mix</label>
             <span class="fname">{f.name}</span><span class="dim">{mb(f.size)}</span>
             <button title="Leave it out" onclick={() => removeFile(i)} disabled={!!busy}>✕</button>
           </li>
         {/each}
       </ul>
-      <p class="dim small">The others become stem tracks, named after their files (rename them later in Tracks).</p>
+      <p class="dim small">Select the <b>main mix</b>: the finished song. Its audio is the video's soundtrack, and the tempo is
+        worked out from it. The other files become <b>stem tracks</b> (drums, bass, vocals…), named after their files:
+        layers can react to any one of them, so a ring can pulse with the bass alone. Rename them later in Tracks.</p>
     {/if}
     <p class="dim small">Made in projects/{folderName || "…"} with an empty YouTube video. The tempo and where bar 1 starts are a first guess from the mix.</p>
     <div class="actions">
@@ -153,5 +157,6 @@
   .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
   .primary { border-color: var(--accent); }
   .warn { color: var(--warn, #e0a040); }
+  .warn.blocking { color: var(--danger); font-weight: 500; border: 1px solid var(--danger); border-radius: 4px; padding: 6px 8px; margin: 0 0 8px; }
   .busy { color: var(--accent); }
 </style>

@@ -29,8 +29,9 @@ server isn't running, the editor says so and keeps your changes: start it again 
   files already in the project's `media/` folder. Rename a track by typing its name (layers and modulations refer
   to its id, which doesn't change); ↑ ↓ reorder; ✕ removes it, and layers that listened to it listen to the mix
   (the mix itself can't be removed, only replaced). Each stem is checked against the mix: a warning says if it's
-  shorter or longer, or starts early or late (bounce stems from the same start as the mix); "lines up?" means it
-  couldn't tell (a stem with little in common with the mix, or a whole bar out), so listen to check. A dropped
+  shorter or longer, or starts early or late (bounce stems from the same start as the mix), or that it couldn't
+  tell (a stem with little in common with the mix, or a whole bar out), so listen to check. **OK** hides a warning
+  you've checked; it comes back if the track gets a new file. A dropped
   file is kept aside until you save: saving moves it into `media/` under its own name, overwriting the file the
   track used if it had the same name, or deleting the old file if nothing else uses it. Undo before saving
   leaves `media/` as it was. A removed track's file stays in `media/`.

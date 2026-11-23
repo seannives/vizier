@@ -671,13 +671,13 @@
         <VideoPanel {doc} video={videoName} {rangeLabel} {rangeTime} {rangeInherited} {edit} onopen={(v) => (videoName = v)} />
       {/if}
       <h3 class="fold-h"><button class="fold-btn" onclick={() => { showTracks = !showTracks; if (showTracks) refreshMedia(); }} aria-expanded={showTracks}
-        title="{showTracks ? "Hide" : "Show"} the song's tracks (shared by every video)">{showTracks ? "▾" : "▸"} Tracks</button>
+        title="{showTracks ? "Hide" : "Show"} the song's tracks (shared by every video)"><svg class="tri" class:open={showTracks} viewBox="0 0 10 10" width="12" height="12" aria-hidden="true"><path d="M2 0.5 L9 5 L2 9.5 Z" /></svg>Tracks</button>
         <span class="hint-inline">{doc?.song.tracks.length ?? 0} · shared by every video</span></h3>
       {#if showTracks && doc}
-        <TracksPanel {doc} checks={checksByFile} {media} {edit} onadd={addTrackFrom} onreplace={replaceTrackWith} onremove={removeTrackNow} onrefreshmedia={refreshMedia} />
+        <TracksPanel {doc} project={projectId} checks={checksByFile} {media} {edit} onadd={addTrackFrom} onreplace={replaceTrackWith} onremove={removeTrackNow} onrefreshmedia={refreshMedia} />
       {/if}
       <h3 class="fold-h"><button class="fold-btn" onclick={() => (showTempo = !showTempo)} aria-expanded={showTempo}
-        title="{showTempo ? "Hide" : "Show"} the song's tempo and grid (shared by every video)">{showTempo ? "▾" : "▸"} Tempo</button>
+        title="{showTempo ? "Hide" : "Show"} the song's tempo and grid (shared by every video)"><svg class="tri" class:open={showTempo} viewBox="0 0 10 10" width="12" height="12" aria-hidden="true"><path d="M2 0.5 L9 5 L2 9.5 Z" /></svg>Tempo</button>
         <span class="hint-inline">{doc?.song.grid ? `${doc.song.grid.tempo[0]?.bpm} BPM${doc.song.grid.tempo.length > 1 ? ` + ${doc.song.grid.tempo.length - 1} change${doc.song.grid.tempo.length > 2 ? "s" : ""}` : ""}` : ""}</span></h3>
       {#if showTempo && doc}
         <TempoPanel {doc} {time} {detected} {clicking} {edit} seal={() => session?.seal()} onclick={toggleClick} />
@@ -774,7 +774,11 @@
   .err { position: absolute; bottom: 30px; left: 12px; right: 12px; color: var(--danger); font: 12px var(--mono); }
   .inspector { background: var(--bg1); border-left: 1px solid var(--line2); padding: 10px 12px; overflow: auto; }
   h3 { margin: 6px 0 8px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); font-weight: 500; }
-  .fold-btn { background: none; border: none; padding: 0; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer; }
+  .fold-btn { background: none; border: none; padding: 0; color: inherit; font: inherit; text-transform: inherit; letter-spacing: inherit; cursor: pointer;
+    display: inline-flex; align-items: center; gap: 6px; }
+  .tri { fill: var(--text); transition: transform .1s; }
+  .tri.open { transform: rotate(90deg); }
+  .fold-btn:hover .tri, .tri.open { fill: var(--accent); }
   .app.dragging { outline: 2px dashed var(--accent); outline-offset: -4px; }
   .hint-inline { text-transform: none; letter-spacing: 0; color: var(--faint); font-weight: 400; margin-left: 4px; }
   .hint { color: var(--faint); font-size: 11px; margin: 8px 0 14px; }

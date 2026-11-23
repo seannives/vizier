@@ -102,5 +102,4 @@
   .dim { color: var(--dim); }
   .hint { color: var(--faint); font-size: 11px; margin: 6px 0 4px; }
   .warn { color: var(--warn, #e0a040); font-size: 11px; margin: 2px 0; }
-  .on { border-color: var(--accent); color: var(--accent); }
 </style>

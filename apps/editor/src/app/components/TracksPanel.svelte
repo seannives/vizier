@@ -8,8 +8,10 @@
    * The song's tracks (shared by every video): rename, reorder, replace, remove; add from a dropped file or from
    * media/. Dropping an audio file on a track's row replaces its audio; anywhere else in the editor adds a track.
    */
-  let { doc, checks, media, edit, onadd, onreplace, onremove, onrefreshmedia }: {
+  let { doc, project = "", checks, media, edit, onadd, onreplace, onremove, onrefreshmedia }: {
     doc: Doc;
+    /** The project's folder name (dismissed warnings are remembered per project, in this browser). */
+    project?: string;
     /** Per track file: its length, the mix's, and its shift against the mix ("checking" while it's worked out). */
     checks: Record<string, TrackCheck | "checking" | undefined>;
     /** Audio files in media/ (for adding or replacing without dragging). */
@@ -28,11 +30,26 @@
   function warning(c: TrackCheck | "checking" | undefined, mix: boolean): string {
     if (!c || c === "checking" || mix) return "";
     const out: string[] = [];
+    if (c.offset === null) out.push("couldn't tell whether it lines up with the mix (too little in common, or it's a whole bar out): listen to check");
     if (c.offset !== null && Math.abs(c.offset) >= 0.02)
       out.push(`starts ${Math.abs(c.offset).toFixed(2)} s ${c.offset > 0 ? "late" : "early"} against the mix: bounce it from the same start as the mix`);
     const d = c.seconds - c.mixSeconds;
     if (Math.abs(d) >= 0.1) out.push(`${Math.abs(d).toFixed(1)} s ${d < 0 ? "shorter" : "longer"} than the mix`);
     return out.join("; ");
+  }
+  // Warnings you've checked and dismissed (OK), by project, file and what was found: a new bounce is checked again
+  const okKey = (file: string, c: TrackCheck) => `vizier.trackOk|${project}|${file}|${c.seconds.toFixed(2)}|${c.offset}`;
+  let oks = $state<Record<string, boolean>>({});
+  const isOk = (file: string, c: TrackCheck | "checking" | undefined) => {
+    if (!c || c === "checking") return false;
+    const k = okKey(file, c);
+    if (k in oks) return oks[k]!;
+    try { return localStorage.getItem(k) === "1"; } catch { return false; }
+  };
+  function dismiss(file: string, c: TrackCheck) {
+    const k = okKey(file, c);
+    oks[k] = true;
+    try { localStorage.setItem(k, "1"); } catch { /* not available */ }
   }
   let dropOn = $state<string | null>(null);
   const hasFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes("Files");
@@ -67,14 +84,17 @@
       </div>
       <div class="meta">
         <span class="file" title={t.file}>{t.file.startsWith("media/.incoming/") ? `${trackNameFor(t.file)} (new, saved with the project)` : t.file.replace(/^media\//, "")}</span>
-        {#if c === "checking"}<span class="dim">· checking…</span>{:else if c}<span class="dim">· {fmtTime(c.seconds)}</span>{#if c.offset === null}<span class="dim" title="Too little in common with the mix to tell whether it starts at the same time (or it's a whole bar out). Listen to check">· lines up?</span>{/if}{/if}
+        {#if c === "checking"}<span class="dim">· checking…</span>{:else if c}<span class="dim">· {fmtTime(c.seconds)}</span>{/if}
         <select class="replace" onchange={(e) => pick(e, (f) => onreplace(t.id, f))} onfocus={onrefreshmedia} aria-label="Replace the audio of {t.name}"
           title="Replace its audio with a file from media/ (or drop a new bounce on this row)">
           <option value="">Replace…</option>
           {#each media.filter((m) => m !== t.file) as m}<option value={m}>{m.replace(/^media\//, "")}</option>{/each}
         </select>
       </div>
-      {#if warn}<div class="warn" role="alert">⚠ {warn}</div>{/if}
+      {#if warn && c && c !== "checking" && !isOk(t.file, c)}
+        <div class="warn" role="alert"><span>⚠ {warn}</span>
+          <button title="It's fine: hide this warning (it comes back if the track gets a new file)" onclick={() => dismiss(t.file, c)}>OK</button></div>
+      {/if}
     </div>
   {/each}
   <div class="add">
@@ -95,7 +115,9 @@
   .meta { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--dim); margin-top: 2px; }
   .file { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
   .replace { margin-left: auto; font-size: 11px; max-width: 110px; }
-  .warn { font-size: 11px; color: var(--warn, #e0a040); margin-top: 2px; }
+  .warn { display: flex; align-items: flex-start; gap: 6px; font-size: 11px; color: var(--danger); margin-top: 3px; }
+  .warn span { flex: 1; }
+  .warn button { font-size: 11px; padding: 0 6px; }
   .add { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
   .hint { font-size: 11px; color: var(--dim); }
 </style>

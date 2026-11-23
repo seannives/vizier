@@ -76,7 +76,7 @@ run("new project (headless Chrome)", () => {
     await page.waitForFunction(() => (window as any).vizierEditor?.state?.status === "ready", null, { timeout: 60_000 });
     await page.selectOption('select[aria-label="Add a layer"]', "pulseGrid");
     await page.click("header button.proj");
-    expect(await page.textContent('[aria-label="Projects"] .warn')).toMatch(/Save \(or undo\) your changes first/);
+    expect(await page.textContent('[aria-label="Projects"] .warn')).toMatch(/or undo your changes first/);
     expect(await page.isDisabled('.projects li:has-text("Second Song") button')).toBe(true);
     await page.keyboard.press("Escape");
   }, 60_000);
