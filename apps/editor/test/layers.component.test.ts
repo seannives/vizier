@@ -71,6 +71,19 @@ describe("LayerList", () => {
 
 describe("LayerPanel", () => {
   const base = { video: "full", tracks: doc().song.tracks, startBar: 1, automated: new Set<string>(), onselect: () => {} };
+  it("modulation presets: only those that fit the layer are offered; one adds its modulations and opens them", async () => {
+    const { s, edit, seal } = setup();
+    const r = render(LayerPanel, { ...base, doc: s.doc, layerId: "ring", playheadBar: 9, edit, seal });
+    const menu = r.getByLabelText("Modulation preset") as HTMLSelectElement;
+    const offered = [...menu.options].map((o) => o.value).filter(Boolean);
+    expect(offered).toContain("squelch");
+    menu.value = "flash"; await fireEvent.change(menu);
+    expect(s.undoLabel).toBe("preset: Flash on hits");
+    const mods = (s.doc.videos.full!.modulations ?? []).filter((m) => m.target === "ring.lightness");
+    expect(mods).toEqual([{ target: "ring.lightness", source: "bass.hit", amount: 0.45 }]);
+    await r.rerender({ ...base, doc: s.doc, layerId: "ring", playheadBar: 9, edit, seal });
+    expect(r.container.querySelector('[data-mod="bass.hit"]')).not.toBeNull();                      // its row is open
+  });
   it("changes the track and generator", async () => {
     const { s, edit, seal } = setup();
     const r = render(LayerPanel, { ...base, doc: s.doc, layerId: "ring", playheadBar: 9, edit, seal });

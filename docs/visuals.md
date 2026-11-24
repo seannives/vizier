@@ -135,6 +135,75 @@ Colour: **Text** (`text`, default: ink).
 | Stutter (`stutter`) | 0–2 (0) | Glitch: horizontal strips of the text slide sideways on hits, and sometimes in between. |
 | Blur (`blur`) | 0–20 (0) | Softens the letters; automate it down to bring text into focus. |
 
+### Laser fan (`lasers`)
+
+![Laser fan on the demo's drums, with glow](images/visuals/lasers.jpg)
+
+A fan of laser beams from one point, like a rig over a dance floor, drawn on the GPU. The fan sweeps from side to
+side in time with the beat (set by the song's tempo, so it stays locked to the music); loudness lights the beams
+and hits strobe them. Add Glow for the haze of a smoky room, and set the blend to add.
+
+Listens to: `env` (brightness), `hit` (strobe), and the beat (the sweep).
+Colours: **Beams** (`beam`, default: accent), **Core (hot centre)** (`core`, default: ink).
+
+| Parameter | Range (default) | What it does |
+|---|---|---|
+| Beams (`beams`) | 1–32 (9) | How many beams in the fan. |
+| Spread (degrees) (`spread`) | 0–180 (100) | The angle the fan covers, from the first beam to the last. |
+| Sweep (degrees) (`sweep`) | 0–90 (25) | How far the whole fan swings either way, in time with the beat. |
+| Beats per sweep (`beatsPerSweep`) | 1–32 (4) | How many beats one swing (one way) takes: 4 is a bar in 4/4. Change it with a hold step: a gradual change makes the fan jump. |
+| Scissor (`scissor`) | on/off (off) | Every other beam swings the opposite way, so the beams cross like scissors. |
+| Origin height (`origin`) | −0.5–1.5 (0) | Where the beams start: 0 the bottom of the layer, 1 the top (and beyond, off the edge). |
+| Beam width (`width`) | 0.001–0.03 (0.004) | Thickness of a beam, as a share of the layer's height. |
+| Haze (`haze`) | 0–2 (0.6) | A soft glow around each beam, as if through smoke. |
+| Falloff (`falloff`) | 0–4 (0.8) | How quickly beams fade with distance from where they start. |
+| Brightness (`brightness`) | 0–3 (1) | Overall brightness. Quiet passages are dim; loudness lights the beams. |
+| Hit strobe (`strobe`) | 0–3 (1) | How much hits flash the beams. 0 ignores hits. |
+
+### Tunnel (`tunnel`)
+
+![Tunnel on the demo's drums](images/visuals/tunnel.jpg)
+
+An endless tunnel of rings rushing towards you, a ring per beat (or as many as you set), drawn on the GPU. The
+rings can be round or have corners; twist turns them into a spiral. The low end (kick and sub) widens the rings;
+hits flash them in the highlight colour. The far end fades into the dark.
+
+Listens to: `env` (brightness), `low` (ring width), `hit` (flash), and the beat (movement and spin).
+Colours: **Rings** (`line`, default: ink), **Highlight (hits)** (`highlight`, default: accent).
+
+| Parameter | Range (default) | What it does |
+|---|---|---|
+| Sides (`sides`) | 0–8 (4) | The rings' shape: 0 round, 3 triangles, 4 squares, 6 hexagons… |
+| Rings per beat (`ringsPerBeat`) | 0–4 (1) | Rings passing you per beat (0 stands still). Change it at a bar with a hold step: a gradual change makes the tunnel jump. |
+| Depth spacing (`density`) | 0.5–8 (2.5) | How close together the rings are: more rings fit in the view. |
+| Twist (`twist`) | −3–3 (0.4) | How much the rings turn with depth, making a spiral. |
+| Spin (turns/bar) (`spin`) | −2–2 (0.05) | How fast the tunnel turns, in turns per 4 beats. Change it with a hold step: a gradual change makes it jump. |
+| Line width (`width`) | 0.01–0.5 (0.08) | Thickness of the rings, as a share of the space between them. |
+| Low-end pump (`pump`) | 0–2 (0.6) | How much the kick and sub widen the rings. 0 ignores the low end. |
+| Brightness (`brightness`) | 0–3 (1) | Overall brightness. The far end fades into the dark. |
+| Hit flash (`flash`) | 0–3 (1) | How much hits light the rings in the highlight colour. 0 ignores hits. |
+
+### Truchet maze (`truchet`)
+
+![Truchet maze on the demo's drums](images/visuals/truchet.jpg)
+
+A maze of curved tiles (Truchet tiles: each holds two quarter circles, so the curves join into endless paths).
+Every few beats some tiles turn, rewiring the paths, and light up in the highlight colour as they do. Drawn on
+the GPU.
+
+Listens to: `env` (brightness), `hit` (flash), and the beat (when tiles turn).
+Colours: **Paths** (`line`, default: ink), **Highlight (just turned)** (`highlight`, default: accent).
+
+| Parameter | Range (default) | What it does |
+|---|---|---|
+| Tiles (`tiles`) | 2–60 (12) | How many tiles fit across the layer's shorter side. |
+| Beats per change (`beatsPerChange`) | 0.25–16 (1) | How often tiles turn: every this many beats. |
+| Tiles changing (`change`) | 0–1 (0.15) | The share of tiles that turn at each change. |
+| Line width (`width`) | 0.02–0.5 (0.12) | Thickness of the paths, as a share of a tile. |
+| Turn glow (beats) (`glow`) | 0–8 (1.5) | How long a tile stays lit after it turns, in beats. 0: no highlight. |
+| Brightness (`brightness`) | 0–3 (1) | Overall brightness. Quiet passages are dim; loudness and hits brighten. |
+| Hit flash (`flash`) | 0–3 (0.6) | How much hits brighten the whole maze. 0 ignores hits. |
+
 ## Effects
 
 A layer's effects run in order on its picture, before it's composited with the others.
@@ -164,6 +233,35 @@ resized.
 | Persistence (`persistence`) | 0.05–3 s (0.6) | How long a trail takes to fade (to a tenth). |
 | Zoom per second (`zoom`) | 0.5–2 (1) | Above 1, trails grow outward (a tunnel); below 1, they shrink inward. |
 | Rotate (`rotate`) | −90–90 °/s (0) | Trails turn as they fade, making spirals; negative values turn the other way. |
+
+### RGB split (`rgbSplit`)
+
+![Acid ring with an RGB split, on a hit](images/visuals/rgbSplit.jpg)
+
+Chromatic aberration and glitch: the red and blue of the layer pulled apart sideways (always a little, more on a
+hit), and on hits, horizontal strips of the picture jump sideways for a few frames. It listens to the layer's own
+track.
+
+| Parameter | Range (default) | What it does |
+|---|---|---|
+| Split (pixels) (`offset`) | 0–40 (4) | How far red and blue sit from green, in pixels of the full-size video, all the time. |
+| Hit split (pixels) (`kick`) | 0–80 (16) | How much further they move apart on a hit (fading with it). |
+| Glitch (`glitch`) | 0–1 (0.3) | On hits, how many horizontal strips jump sideways. 0: none. |
+| Strips (`strips`) | 2–64 (18) | How many strips the picture is cut into for the glitch. |
+
+### Kaleidoscope (`kaleidoscope`)
+
+![Flow field through a kaleidoscope](images/visuals/kaleidoscope.jpg)
+
+Mirrors the layer into wedges around its centre, like a kaleidoscope; it can turn in time with the beat. Put it
+on a layer with movement (a flow field, trails) for mandalas that keep changing.
+
+| Parameter | Range (default) | What it does |
+|---|---|---|
+| Segments (`segments`) | 2–16 (6) | How many mirrored wedges make the circle. |
+| Angle (degrees) (`angle`) | −180–180 (0) | Turns the pattern: which part of the layer the wedges show. |
+| Spin (turns/bar) (`spin`) | −2–2 (0) | How fast it turns, in turns per 4 beats (0 stands still). Change it with a hold step: a gradual change makes it jump. |
+| Zoom (`zoom`) | 0.25–4 (1) | Above 1, the wedges show a smaller, closer part of the layer. |
 
 ## Layer settings
 

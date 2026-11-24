@@ -57,13 +57,17 @@ const maxed = (specs: { name: string; max: number }[]) => Object.fromEntries(spe
 const SETUP: Record<string, { track: string; bar: number; params?: Record<string, number> }> = {
   acidRing: { track: "bass", bar: 20 }, pulseGrid: { track: "mix", bar: 12.5 }, flowField: { track: "drums", bar: 12.5 },
   ridgeline: { track: "pad", bar: 27.5 }, typeText: { track: "mix", bar: 12.5, params: { size: 0.5, stutter: 0.6, shake: 1, blur: 4 } },
+  lasers: { track: "drums", bar: 12.5 }, tunnel: { track: "drums", bar: 12.5 }, truchet: { track: "drums", bar: 12.5 },
 };
 // Fine detail drawn in the generator's own units (not pixels) aliases more at a smaller size. That's sampling, not
 // a units mismatch, and Full preview quality shows the real thing; these limits are looser accordingly.
 // The pulse grid at its maximum density draws dots under a pixel across at these test sizes, which browsers
 // antialias a little differently (0.02 here, 0.09 on GitHub's machines); its units bug showed even at the
 // default density (0.13), which keeps the default limit.
-const LIMIT: Record<string, number> = { default: 0.08, flowField: 0.2, "flowField max": 0.6, "pulseGrid max": 0.15 };
+// The tunnel's and the Truchet maze's lines are a share of a ring or tile, a pixel or so wide at the quarter size
+// tested here (a maze tile is 11 px; in the editor's preview, 45): the same pattern at the same size, just
+// pixelated (measured 0.084 and 0.19; at their maximum settings, 0.005 and 0.04).
+const LIMIT: Record<string, number> = { default: 0.08, flowField: 0.2, "flowField max": 0.6, "pulseGrid max": 0.15, tunnel: 0.12, truchet: 0.25 };
 
 run("bug sweep: the smaller preview looks like the export", () => {
   afterAll(closeSharedBrowsers);

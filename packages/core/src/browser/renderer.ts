@@ -8,6 +8,7 @@ import { EFFECTS } from "../effects/index.ts";
 import { defaults, PALETTE_SLOTS, PALETTE_ALIASES, type DrawContext, type EffectDef, type Generator, type ParamSpec } from "../plugins.ts";
 import { parseHex, shiftColor } from "../color.ts";
 import { spansToSeconds, spanGain, type SpanSec } from "../spans.ts";
+import { beatsAt } from "../grid.ts";
 
 // Composite: draws a layer texture as a transformed quad on the output.
 const VS_QUAD = `#version 300 es
@@ -61,7 +62,7 @@ const uniformDecl = (specs: ParamSpec[]) => specs.map((s) => `uniform float u_${
 function generatorFS(g: Generator & { kind: "shader" }): string {
   return `#version 300 es
 precision highp float; in vec2 uv; out vec4 o;
-uniform vec2 u_res; uniform float u_aspect, u_time, u_frame, u_seed;
+uniform vec2 u_res; uniform float u_aspect, u_time, u_frame, u_seed, u_beat;
 ${FEATURE_UNIFORMS.map((f) => `uniform float u_${f};`).join(" ")}
 uniform sampler2D u_specHist;
 ${PALETTE_SLOTS.map((s) => `uniform vec3 u_pal_${s.id};`).join(" ")}
@@ -76,7 +77,8 @@ void main(){ o = generate(vec2(uv.x, 1.0 - uv.y)); }`;
 function effectFS(e: EffectDef, pass: string): string {
   return `#version 300 es
 precision highp float; in vec2 uv; out vec4 o;
-uniform sampler2D u_in, u_orig, u_fb; uniform vec2 u_texel, u_res; uniform float u_time, u_fps;
+uniform sampler2D u_in, u_orig, u_fb; uniform vec2 u_texel, u_res; uniform float u_time, u_fps, u_beat;
+${FEATURE_UNIFORMS.map((f) => `uniform float u_${f};`).join(" ")}
 ${uniformDecl(e.params)}
 ${GLSL_LIB}
 vec4 pass(vec2 uv){ ${pass} }
@@ -398,6 +400,7 @@ export class Renderer {
     const gl = this.gl;
     const { width, height, fps } = this.profile;
     const t = frame / fps;
+    const beat = beatsAt(t, this.project.grid);
     const lookup = (stem: string, feat: string) => this.feature(stem, feat, frame);
     const palette = this.paletteAt(t);
     const bg = parseHex(palette.bg!);
@@ -431,7 +434,7 @@ export class Renderer {
         const ctx = L.ctx as unknown as CanvasRenderingContext2D;
         ctx.clearRect(0, 0, L.w, L.h);
         const g: DrawContext = {
-          ctx, w: L.w, h: L.h, t, frame, fps,
+          ctx, w: L.w, h: L.h, t, frame, fps, beat,
           p: (name) => pv(name),
           color: colorOf,
           f: (name, ago = 0, s = stem) => this.feature(s, name, frame - ago),
@@ -463,6 +466,7 @@ export class Renderer {
         gl.uniform1f(u("u_time"), t);
         gl.uniform1f(u("u_frame"), frame);
         gl.uniform1f(u("u_seed"), this.project.seed);
+        gl.uniform1f(u("u_beat"), beat);
         for (const f of FEATURE_UNIFORMS) gl.uniform1f(u(`u_${f}`), this.feature(stem, f, frame));
         gl.uniform1i(u("u_specHist"), 1);
         for (const s of PALETTE_SLOTS) gl.uniform3f(u(`u_pal_${s.id}`), ...parseHex(palette[s.id]!));
@@ -494,6 +498,8 @@ export class Renderer {
           gl.uniform2f(u("u_res"), L.w, L.h);
           gl.uniform1f(u("u_time"), t);
           gl.uniform1f(u("u_fps"), fps);
+          gl.uniform1f(u("u_beat"), beat);
+          for (const f of FEATURE_UNIFORMS) gl.uniform1f(u(`u_${f}`), this.feature(stem, f, frame));
           for (const s of e.def.params) gl.uniform1f(u(`u_${s.name}`), this.resolver.value(`${id}.${e.id}.${s.name}`, e.params[s.name]!, t, lookup) * (s.pixels ? pxScale : 1));
           gl.bindFramebuffer(gl.FRAMEBUFFER, dst.fbo);
           gl.viewport(0, 0, L.w, L.h);

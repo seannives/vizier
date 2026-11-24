@@ -11,6 +11,7 @@
     modsOf, modOrigin, addMod, setMod, removeMod, resetMod, layerColor, layerColorHex,
   } from "../lib/edits.ts";
   import { displayKeys } from "../lib/shortcuts.ts";
+  import { PRESETS, presetFits, applyPreset } from "../lib/presets.ts";
   import type { Doc } from "../lib/session.ts";
 
   /** The selected layer's settings: what draws it, its track, parameters, effects and when it's on. */
@@ -103,6 +104,16 @@
   const fromPct = (e: Event) => { const v = Number((e.currentTarget as HTMLInputElement).value); return Number.isFinite(v) ? v / 100 : undefined; };
   // ---- audio modulation: rows under a parameter, opened with M ----
   let openMods = $state(new Set<string>());
+  /** A modulation preset: its modulations are added (and their rows opened, to adjust). */
+  function preset(e: Event) {
+    const sel = e.currentTarget as HTMLSelectElement;
+    const p = PRESETS.find((x) => x.id === sel.value);
+    sel.value = ""; sel.blur();
+    if (!p) return;
+    let done: string[] = [];
+    edit(`preset: ${p.label}`, (d) => { done = applyPreset(d, video, layerId, p); });
+    openMods = new Set([...openMods, ...done]);
+  }
   const mixId = $derived(tracks.find((t) => t.mix)?.id ?? tracks[0]?.id ?? "mix");
   const modsFor = (target: string) => modsOf(doc, video, target);
   /** M: open rows close; closed ones open (adding a modulation first if there's none). */
@@ -223,6 +234,10 @@
   </div>
 
   <h4>Parameters</h4>
+  <select class="presets" onchange={preset} aria-label="Modulation preset" title="One-click combinations of audio modulation (they show under M, to adjust or remove)">
+    <option value="">+ Modulation preset…</option>
+    {#each PRESETS.filter((p) => presetFits(doc, video, layerId, p)) as p (p.id)}<option value={p.id} title={p.description}>{p.label}</option>{/each}
+  </select>
   {#each [...PANEL_LAYER_PARAMS, ...gen.params] as s (s.name)}
     <ParamControl spec={s} value={valueOf(s)} automated={automated.has(`${layerId}.${s.name}`)} laneShown={shownLanes.has(`${layerId}.${s.name}`)} onchange={(v, f) => param(s, v, f)}
       changed={ch({ param: s.name }) || (s.name === "opacity" && ch({ field: "opacity" }))} baseValue={base?.params?.[s.name] ?? (s.name === "opacity" ? base?.opacity : undefined)}
@@ -291,6 +306,7 @@
   .field select { flex: 0 1 170px; min-width: 0; }
   .field.col { flex-direction: column; align-items: stretch; }
   textarea { resize: vertical; font-family: 'Special Elite', var(--ui); }
+  .presets { width: 100%; margin-bottom: 6px; color: var(--dim); }
   .colour { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
   .colour .sw { width: 26px; height: 18px; padding: 0; border: 1px solid #fff3; border-radius: 3px; }
   .colour .cl { flex: 1; }

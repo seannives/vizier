@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { spansToSeconds, spanGain, splitSpans, validateSpans } from "../src/spans.ts";
-import { addBeats, beatsPerBarAt, nextBeatLine, beatTimes } from "../src/grid.ts";
+import { addBeats, beatsPerBarAt, nextBeatLine, beatTimes, beatsAt } from "../src/grid.ts";
 import { mergeVideos, validateProject, type Project } from "../src/index.ts";
 
 // 120 BPM, 4/4, bar 1 at 0 s: a bar is 2 s, a beat 0.5 s
@@ -115,5 +115,17 @@ describe("beat times (the click)", () => {
   });
   it("includes a beat exactly at the start, not at the end", () => {
     expect(beatTimes(1, 2, g).map((x) => x.t)).toEqual([1, 1.5]);
+  });
+});
+
+describe("beats since bar 1 (for visuals that move on the beat)", () => {
+  it("counts beats in each bar's own metre, fractional, negative in the lead-in", () => {
+    const g = { tempo: [{ bar: 1, bpm: 120, beatsPerBar: 4 }, { bar: 3, bpm: 60, beatsPerBar: 3 }], downbeat: 0.5 };
+    expect(beatsAt(0.5, g)).toBeCloseTo(0, 6);
+    expect(beatsAt(0, g)).toBeCloseTo(-1, 6);                 // the lead-in: a beat before bar 1
+    expect(beatsAt(1.75, g)).toBeCloseTo(2.5, 6);
+    expect(beatsAt(4.5, g)).toBeCloseTo(8, 6);                // bar 3 starts after 8 beats of 4/4
+    expect(beatsAt(6, g)).toBeCloseTo(9.5, 6);                // then 3/4 at 60 BPM: a beat a second
+    expect(beatsAt(3, undefined)).toBe(6);                    // no grid: 120 BPM
   });
 });

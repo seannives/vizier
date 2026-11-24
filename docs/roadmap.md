@@ -68,7 +68,10 @@ Editor milestones:
         video's own lanes (palette, film grain, vignette) under "Palette & picture"
   - [x] 5b. Render from the editor: the open video (its range or the whole song) or all videos, with progress, time
         left and Cancel; the renders in output/ to play, show in Finder or make again the same way
-- [ ] Modulation presets: one-click combinations such as "pulse with the kick" or "colour follows the filter"
+- [x] Modulation presets: one-click combinations such as "pulse with the kick" or "colour follows the filter"
+      (eight, for dark acid techno, in the layer panel)
+- [x] Three more generators (laser fan, tunnel, Truchet maze) and two more effects (RGB split, kaleidoscope); the
+      beat position for generators and effects, and the stem's features for effects
 - [ ] Later: pencil drawing of automation; finer snapping; record control moves (mouse or MIDI) as automation
 
 ## Phase 4: Platform polish (then: Reels/Shorts and the YouTube video for the maleficus)
@@ -105,7 +108,8 @@ Editor milestones:
 - [ ] Importing arrangement data from Live (`.als` file or MIDI export). Not the Extensions SDK: it may be
       missing or limited in Live 13
 
-- [ ] More generators and effects over time (candidates: radial/Truchet rhythm grid, kaleidoscope, RGB-split glitch)
+- [ ] More generators and effects over time (candidates: radial rhythm grid, scope/waveform line, strobe, mirror,
+      pixelate, feedback zoom)
 - [ ] Imported video clips and still images as layers (alongside live camera layers), with the same effects
 - [ ] Live typing from the keyboard (recorded as events for replay)
 - [ ] SVG layers (D3/SVG rendered to a texture)

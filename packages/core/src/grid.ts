@@ -122,3 +122,20 @@ export function beatTimes(from: number, to: number, grid: Grid): { t: number; ba
   }
   return out;
 }
+
+/**
+ * Beats since bar 1 at a time in seconds (fractional; negative in a lead-in), counting each bar in its own metre:
+ * what visuals move in step with ("one ring per beat"). Without a grid, 120 BPM from 0 s.
+ */
+export function beatsAt(sec: number, grid?: Grid): number {
+  if (!grid?.tempo.length) return sec * 2;
+  const bar = secondsToBar(sec, grid);
+  const s = segs(grid);
+  if (bar < 1) return (bar - 1) * (s[0]!.beatsPerBar ?? 4);
+  let beats = 0;
+  for (let i = 0; i < s.length; i++) {
+    const from = Math.max(1, s[i]!.bar), to = Math.min(bar, s[i + 1]?.bar ?? Infinity);
+    if (to > from) beats += (to - from) * (s[i]!.beatsPerBar ?? 4);
+  }
+  return beats;
+}

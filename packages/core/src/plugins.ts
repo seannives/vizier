@@ -39,6 +39,8 @@ export interface DrawContext {
   ctx: CanvasRenderingContext2D;
   w: number; h: number;              // layer size in pixels
   t: number; frame: number; fps: number;
+  /** Beats since bar 1 (fractional; each bar in its own metre): for moving in step with the music. */
+  beat: number;
   /** Resolved parameter value (base → automation → modulation → override). */
   p(name: string): number;
   /** One of the generator's declared colours, as "#rrggbb" (palette or layer colour, automated, hue/lightness applied). */
@@ -69,7 +71,7 @@ export interface Canvas2DGenerator extends PluginBase {
 
 /**
  * A GLSL generator. `fragment` is the body of a function `vec4 generate(vec2 uv)` returning premultiplied RGBA.
- * Available: uv (0..1, y up), u_res (layer pixels), u_aspect, u_time, u_frame, u_seed;
+ * Available: uv (0..1, y up), u_res (layer pixels), u_aspect, u_time, u_frame, u_seed, u_beat (beats since bar 1);
  * features of the layer's stem: u_rms u_env u_low u_lowMid u_mid u_high u_centroid u_flux u_onset,
  * u_hit (onset envelope that decays over ~0.3 s), spec(bin01, framesAgo01) (spectrum history, 64 frames);
  * each declared colour as vec3 u_<name>; the palette as u_pal_<slot>; each parameter as u_<name>;
@@ -85,7 +87,8 @@ export type Generator = Canvas2DGenerator | ShaderGenerator;
 /**
  * An effect: one or more GLSL passes over a layer's image. Each pass's `fragment` is the body of
  * `vec4 pass(vec2 uv)` (uv in texture space). Available: u_in (previous pass), u_orig (effect input),
- * u_fb (this effect's previous output, if `feedback`), u_texel, u_res, u_time, u_fps, parameters as u_<name>.
+ * u_fb (this effect's previous output, if `feedback`), u_texel, u_res, u_time, u_fps, u_beat (beats since bar 1),
+ * the layer's stem features (u_env, u_hit, u_onset, u_low, u_centroid… as for generators), parameters as u_<name>.
  */
 export interface EffectDef extends PluginBase {
   passes: string[];

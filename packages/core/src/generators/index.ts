@@ -8,7 +8,10 @@ import pulseGrid from "./pulseGrid/index.ts";
 import typeText from "./typeText/index.ts";
 import ridgeline from "./ridgeline/index.ts";
 import flowField from "./flowField/index.ts";
+import lasers from "./lasers/index.ts";
+import tunnel from "./tunnel/index.ts";
+import truchet from "./truchet/index.ts";
 
 export const GENERATORS: Record<string, Generator> = Object.fromEntries(
-  [acidRing, pulseGrid, typeText, ridgeline, flowField].map((g) => [g.id, g]),
+  [acidRing, pulseGrid, typeText, ridgeline, flowField, lasers, tunnel, truchet].map((g) => [g.id, g]),
 );

@@ -154,6 +154,11 @@ what they're good for in [visuals.md](visuals.md#what-the-visuals-listen-to)).
 - The **meter** shows the feature's level at the playhead and what it adds to the parameter right now, so you can
   set the amount while the song plays.
 - **+ another** adds a second track or feature (they add up); ✕ removes one.
+- **+ Modulation preset…** (top of Parameters) adds a ready-made set of modulations for dark, acid techno: Pump with
+  the kick, Flash on hits, Colour follows the filter, Acid squelch, Breathe with the track, Kick shake, Glitch on
+  hits (adds an RGB split), Rush on the build. Each uses the layer's own track (Pump uses the mix's low end, where
+  the kick is) and only parameters the layer has; only presets that fit the layer are offered. They're ordinary
+  modulations, opened under M to adjust or remove; one ⌘Z undoes a preset. Hover a preset for what it does.
 - Modulation stacks with automation: the lane sets where the value sits over the song, the music moves it around
   that. In a video built on another, modulations are inherited (base), changed here (↺ back) or removed here only.
 

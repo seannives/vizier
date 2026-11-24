@@ -55,6 +55,11 @@ await shot("typeText", [{ id: "title", track: "mix", generator: "typeText", z: 0
 await shot("glow", [ring({ effects: [{ type: "glow", params: { amount: 3, radius: 30 } }] })], 20);
 await shot("trails", [ring({ effects: [{ type: "trails", params: { persistence: 1, zoom: 1.3, rotate: 20 } }] })], 20);
 await shot("hueShift", [ring({ params: { hueShift: 120 }, effects: [{ type: "glow" }] })], 20);
+await shot("lasers", [{ id: "lasers", track: "drums", generator: "lasers", z: 0, blend: "add", layout: FULL, effects: [{ type: "glow", params: { amount: 1.2, radius: 10 } }] }], 12.5);
+await shot("tunnel", [{ id: "tunnel", track: "drums", generator: "tunnel", z: 0, layout: FULL }], 12.5);
+await shot("truchet", [{ id: "maze", track: "drums", generator: "truchet", z: 0, layout: FULL }], 12.5);
+await shot("rgbSplit", [ring({ effects: [{ type: "rgbSplit", params: { offset: 10, kick: 30, glitch: 0.8 } }] })], 12);
+await shot("kaleidoscope", [{ id: "flow", track: "drums", generator: "flowField", z: 0, layout: FULL, effects: [{ type: "kaleidoscope", params: { segments: 8 } }] }], 12.5);
 const demo = loadProject(join(root, "projects/demo"), "full");
 await shot("demo-full", [], 20, demo.project);
 rmSync(tmp, { recursive: true, force: true });
