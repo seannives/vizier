@@ -36,7 +36,8 @@
   }
 </script>
 
-<div class="list">
+<!-- a click on the list's empty space (not on a layer) deselects -->
+<div class="list" onclick={(e) => { if (e.target === e.currentTarget) onselect(null); }} role="presentation">
   {#each layers as l, i (l.id)}
     <div class="layer" class:sel={selected === l.id} onclick={() => onselect(l.id)} onkeydown={(e) => { if (e.key === "Enter") onselect(l.id); }} role="button" tabindex="-1" data-layer={l.id}>
       <div class="main">
@@ -74,6 +75,7 @@
 </div>
 
 <style>
+  .list { padding-bottom: 24px; } /* (room to click below the layers) */
   .layer { display: flex; align-items: center; gap: 4px; padding: 4px 6px; margin-bottom: 3px; background: var(--bg2);
     border: 1px solid var(--line); border-radius: 3px; cursor: default; }
   .layer.sel { border-color: var(--accent); background: var(--bg3); }

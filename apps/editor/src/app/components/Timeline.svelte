@@ -267,6 +267,22 @@
       if (ln.color) { // a strip of the colour over time; breakpoints as swatches on it
         const top = row.y + 8, bh = row.h - 16;
         for (let x = 0; x < W; x += 2) { ctx.fillStyle = colourAt(pts, tOf(x + 1, v)); ctx.fillRect(x, top, 2, bh); }
+        // the fade's shape from each breakpoint to the next (bottom: this colour, top: the next), so straight, ease
+        // and hold can be told apart: a dark line under a light one, readable on any colour
+        const lo = top + bh - 3, hi = top + 3;
+        const path = () => {
+          ctx.beginPath();
+          for (let j = 0; j < pts.length - 1; j++) {
+            const a = pts[j]!, b = pts[j + 1]!, xa = xOf(a.t, v), xb = xOf(b.t, v);
+            if (xb < 0 || xa > W) continue;
+            ctx.moveTo(xa, lo);
+            if (a.curve === "hold") { ctx.lineTo(xb, lo); ctx.lineTo(xb, hi); }
+            else if (a.curve === "smooth") for (let k = 1; k <= 16; k++) { const u = k / 16; ctx.lineTo(xa + (xb - xa) * u, lo + (hi - lo) * u * u * (3 - 2 * u)); }
+            else ctx.lineTo(xb, hi);
+          }
+        };
+        ctx.lineWidth = 3; ctx.strokeStyle = "#0009"; path(); ctx.stroke();
+        ctx.lineWidth = 1.2; ctx.strokeStyle = "#fffc"; path(); ctx.stroke();
         pts.forEach((p, j) => {
           const x = xOf(p.t, v);
           if (x < -8 || x > W + 8) return;

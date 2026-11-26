@@ -84,6 +84,30 @@ describe("LayerPanel", () => {
     await r.rerender({ ...base, doc: s.doc, layerId: "ring", playheadBar: 9, edit, seal });
     expect(r.container.querySelector('[data-mod="bass.hit"]')).not.toBeNull();                      // its row is open
   });
+  it("the layer's name is edited at the top of its panel; ✕ deselects; Draws, Track and Blend explain themselves", async () => {
+    const { s, edit, seal } = setup();
+    const onselect = vi.fn();
+    const r = render(LayerPanel, { ...base, onselect, doc: s.doc, layerId: "ring", playheadBar: 9, edit, seal });
+    const name = r.getByLabelText("Layer name") as HTMLInputElement;
+    name.value = "Lead 303"; await fireEvent.change(name);
+    expect(layerOf(s.doc, "full", "ring")!.name).toBe("Lead 303");
+    await fireEvent.click(r.getByLabelText("Deselect"));
+    expect(onselect).toHaveBeenLastCalledWith(null);
+    const blend = r.getByLabelText("Blend") as HTMLSelectElement;
+    expect(blend.closest(".field")!.getAttribute("title")).toMatch(/How the layer combines/);
+    expect([...blend.options].find((o) => o.value === "add")!.title).toMatch(/light adds up/);
+    expect((r.getByLabelText("Track") as HTMLElement).closest(".field")!.getAttribute("title")).toMatch(/whose sound this layer reacts to/);
+    expect((r.getByLabelText("Generator") as HTMLElement).closest(".field")!.getAttribute("title")).toMatch(/What draws this layer/);
+  });
+  it("Pump with the kick's modulations (size) show in the Layout section, to adjust or remove", async () => {
+    const { s, edit, seal } = setup();
+    const r = render(LayerPanel, { ...base, doc: s.doc, layerId: "ring", playheadBar: 9, edit, seal });
+    const menu = r.getByLabelText("Modulation preset") as HTMLSelectElement;
+    menu.value = "pump"; await fireEvent.change(menu);
+    await r.rerender({ ...base, doc: s.doc, layerId: "ring", playheadBar: 9, edit, seal });
+    expect(r.container.querySelectorAll(".laymod").length).toBe(2);              // width and height
+    expect(r.container.querySelectorAll('[data-mod="mix.low"]').length).toBe(2);  // their rows, open
+  });
   it("changes the track and generator", async () => {
     const { s, edit, seal } = setup();
     const r = render(LayerPanel, { ...base, doc: s.doc, layerId: "ring", playheadBar: 9, edit, seal });

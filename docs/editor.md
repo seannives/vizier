@@ -61,6 +61,8 @@ server isn't running, the editor says so and keeps your changes: start it again 
   lane's header) to pick its colour, Delete to remove it, and the curve buttons as for other lanes. Fades blend in
   OKLCH, so they stay bright and vivid; **Fade the long way round** (in the picker, for the fade after that point)
   goes the other way round the colour wheel: green to red through blue and purple instead of yellow. ↻ marks it.
+  A thin line across the strip shows each fade's shape, from the breakpoint's colour (low) to the next (high):
+  straight, eased (an S), or flat then a jump (hold).
 - **Transport, Ableton-style**: Play starts from the start marker (the hollow triangle in the ruler). Stop leaves the
   playhead where it stopped; the next Play jumps back to the marker, and ⇧Space continues from the stop point instead.
   Clicking the timeline or the arrow keys move the marker. With loop on (L), playback wraps at the range's end
@@ -103,14 +105,17 @@ server isn't running, the editor says so and keeps your changes: start it again 
 
 ### Layers
 
-- **Layer list** (side panel, front first): click to select; double-click a name to rename; ↑ ↓ move a layer in
+- **Layer list** (side panel, front first): click to select (Esc, ✕ in the layer panel, or a click on the list's
+  empty space deselects); double-click a name to rename (or type it at the top of the layer panel); ↑ ↓ move a layer in
   front of or behind its neighbour; ⧉ duplicates (⌘D; the copy goes just behind); ✕ removes. **+ Add layer…** adds one on top, full frame.
 - The side panel widens (up to 600 px) into room the preview doesn't use; the selected layer's name stays at the top
   of its panel while it scrolls.
 - **Layer panel** (below the list, for the selected layer; what every parameter does: [visuals.md](visuals.md)): what draws it, its track and blend mode; text for text
-  layers; every parameter as a slider with a number you can type into (typed values may go past the slider's range;
+  layers (hover Draws, Track and Blend, and each blend mode, for what they do); every parameter as a slider with a number you can type into (typed values may go past the slider's range;
   double-click a parameter to reset it to its default); the effect chain (add, reorder, remove, and each effect's
-  parameters). Parameters with an automation lane show in amber: the lane sets them while playing.
+  parameters). Parameters with an automation lane show in amber: the lane sets them while playing. Position, size
+  and rotation are set in Layout; when the music moves them (Pump with the kick moves the size), they're listed
+  under Layout as "- modulated", with M for their modulations.
 - **When a layer is on**: each layer has a row under its track in the timeline. A full faint bar means it's on for
   the whole song; amber blocks are its spans. Drag in an empty part of the row to make a span, drag a span's ends
   or body to change it (snap applies), click a span and press Delete to remove it, and ⌘E splits the selected

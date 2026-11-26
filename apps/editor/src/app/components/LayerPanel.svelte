@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { GENERATORS, EFFECTS, type Span, type ParamSpec, type BlendMode, type LayoutFamily, type Transform } from "../../../../../packages/core/src/index.ts";
+  import { GENERATORS, EFFECTS, LAYER_PARAMS, type Span, type ParamSpec, type BlendMode, type LayoutFamily, type Transform } from "../../../../../packages/core/src/index.ts";
   import ParamControl from "./ParamControl.svelte";
   import ModRow from "./ModRow.svelte";
   import { featureAt } from "../lib/features.ts";
@@ -49,6 +49,15 @@
   const ch = (st: Setting) => isChanged(doc, video, layerId, st);
   const reset = (st: Setting, what: string) => edit(`reset ${what} to base`, (d) => resetSetting(d, video, layerId, st));
   const BLENDS: BlendMode[] = ["normal", "add", "screen", "multiply"];
+  /** Position, size and rotation as parameters: set by the layout, but the music can move them (Pump with the kick). */
+  const LAYOUT_SPECS = LAYER_PARAMS.filter((s) => ["x", "y", "w", "h", "rotation"].includes(s.name));
+  /** What each blend does (as in docs/visuals.md). */
+  const BLEND_TIPS: Record<BlendMode, string> = {
+    normal: "Normal: on top, covering what's behind wherever the layer is opaque.",
+    add: "Add: brightens what's behind; light adds up, so overlaps glow. Best for lines, lasers and anything glowing on a dark background.",
+    screen: "Screen: brightens too, more gently, and never past white. Good for soft or bright layers that would wash out with add.",
+    multiply: "Multiply: darkens what's behind, like tinted glass: for shadows, vignettes and tinting.",
+  };
 
   const valueOf = (s: ParamSpec) => layer?.params?.[s.name] ?? (s.name === "opacity" ? layer?.opacity : undefined) ?? s.default;
   function param(s: ParamSpec, v: number, final: boolean) {
@@ -157,27 +166,30 @@
 {#if layer && gen}
 <div class="panel">
   <div class="title">
-    <span class="name">{layer.name ?? layer.id}</span>
+    <input class="name" type="text" value={layer.name ?? layer.id} aria-label="Layer name" title="The layer's name (also: double-click it in the Layers list)"
+      onkeydown={(e) => { e.stopPropagation(); if (e.key === "Enter" || e.key === "Escape") (e.currentTarget as HTMLInputElement).blur(); }}
+      onchange={(e) => { const n = (e.currentTarget as HTMLInputElement).value.trim(); if (n) edit("rename layer", (d) => patchLayer(d, video, layerId, { name: n })); }} />
+    <button class="desel" title="Deselect the layer (Esc)" aria-label="Deselect" onclick={() => onselect(null)}>✕</button>
     {#if inherited}<span class="inh" title="This layer comes from the base video; changes here are saved in this video only">{origin === "changed" ? "changed here" : "from base"}</span>{/if}
   </div>
   {#if origin === "changed"}
     <div class="spanbtns"><button onclick={() => edit("reset layer to base", (d) => resetLayer(d, video, layerId))} title="Drop every change this video makes to the layer">Reset layer to base</button></div>
   {/if}
 
-  <label class="field"><span>Draws</span>
+  <label class="field" title="What draws this layer: {gen.description}"><span>Draws</span>
     <select value={layer.generator} onchange={changeGenerator} aria-label="Generator">
-      {#each generatorList() as g}<option value={g.id}>{g.label}</option>{/each}
+      {#each generatorList() as g}<option value={g.id} title={GENERATORS[g.id]?.description}>{g.label}</option>{/each}
     </select>
   </label>
-  <div class="field"><span>Track{#if ch({ field: "track" })}<button class="rs" title="Back to the base's track" onclick={(e) => { e.preventDefault(); reset({ field: "track" }, "track"); }}>↺</button>{/if}</span>
+  <div class="field" title="The track (stem) whose sound this layer reacts to: put a layer on the stem it should follow (the 303, the drums…); the mix is everything"><span>Track{#if ch({ field: "track" })}<button class="rs" title="Back to the base's track" onclick={(e) => { e.preventDefault(); reset({ field: "track" }, "track"); }}>↺</button>{/if}</span>
     <select value={layer.track ?? ""} aria-label="Track" onchange={(e) => { const t = e.currentTarget.value; e.currentTarget.blur(); edit("track", (d) => patchLayer(d, video, layerId, { track: t || (inherited ? mixId : undefined) })); }}>
       <option value="">{tracks.find((t) => t.mix)?.name ?? "Mix"} (mix)</option>
       {#each tracks.filter((t) => !t.mix) as t}<option value={t.id}>{t.name}</option>{/each}
     </select>
   </div>
-  <div class="field"><span>Blend{#if ch({ field: "blend" })}<button class="rs" title="Back to the base's blend" onclick={(e) => { e.preventDefault(); reset({ field: "blend" }, "blend"); }}>↺</button>{/if}</span>
+  <div class="field" title="How the layer combines with what's behind it. {BLEND_TIPS[layer.blend ?? "normal"]}"><span>Blend{#if ch({ field: "blend" })}<button class="rs" title="Back to the base's blend" onclick={(e) => { e.preventDefault(); reset({ field: "blend" }, "blend"); }}>↺</button>{/if}</span>
     <select value={layer.blend ?? "normal"} aria-label="Blend" onchange={(e) => { const b = e.currentTarget.value as BlendMode; e.currentTarget.blur(); edit("blend", (d) => patchLayer(d, video, layerId, { blend: b })); }}>
-      {#each BLENDS as b}<option value={b}>{b}</option>{/each}
+      {#each BLENDS as b}<option value={b} title={BLEND_TIPS[b]}>{b}</option>{/each}
     </select>
   </div>
   {#if gen.kind === "canvas2d" && gen.usesText}
@@ -197,6 +209,14 @@
       <label>h <input type="text" value={pct(place.h)} aria-label="Height (% of height)" onkeydown={(e) => e.stopPropagation()} onchange={(e) => { const v = fromPct(e); if (v !== undefined && v > 0) setPlace({ h: v }); }} />%</label>
       <label class="rot">rotation <input type="text" value={String(Math.round((place.rotation ?? 0) * 10) / 10)} aria-label="Rotation (degrees)" onkeydown={(e) => e.stopPropagation()} onchange={(e) => { const v = Number(e.currentTarget.value); if (Number.isFinite(v)) setPlace({ rotation: v }); }} />°</label>
     </div>
+    {#each LAYOUT_SPECS as s (s.name)}
+      {#if modsFor(`${layerId}.${s.name}`).length}
+        <div class="laymod"><span>{s.label}<em class="auto" title="The music moves it (see its modulation: M)">- modulated</em></span>
+          <button class="auto-btn" class:on={openMods.has(`${layerId}.${s.name}`)} title={openMods.has(`${layerId}.${s.name}`) ? "Hide its modulation" : "Show its modulation"}
+            onclick={() => modulate(`${layerId}.${s.name}`, s)} aria-label="Modulate {s.label}">M</button></div>
+        {@render modRows(`${layerId}.${s.name}`, s)}
+      {/if}
+    {/each}
     {#if borrowed}<p class="note">Uses the {borrowed} layout. Changing it here gives this layer its own {family} layout.</p>{/if}
     <div class="spanbtns">
       <button onclick={() => setPlace({ x: 0.5, y: 0.5, w: 1, h: 1, rotation: 0 })}>Fill frame</button>
@@ -299,13 +319,18 @@
   /* the layer's name stays at the top of the panel while it scrolls */
   .title { display: flex; align-items: center; gap: 8px; margin: 0 -12px 8px; padding: 6px 12px; position: sticky; top: -10px; z-index: 2;
     background: var(--bg1); border-bottom: 1px solid var(--line); }
-  .name { font-weight: 600; }
+  .name { font-weight: 600; flex: 1; min-width: 0; background: transparent; border-color: transparent; font-size: inherit; padding: 2px 4px; }
+  .name:hover { border-color: var(--line2); }
+  .desel { padding: 0 6px; font-size: 11px; }
   .inh { font-size: 10px; color: var(--dim); border: 1px dashed var(--line2); border-radius: 2px; padding: 0 4px; }
   .field { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; font-size: 12px; }
   .field > span { color: var(--dim); }
   .field select { flex: 0 1 170px; min-width: 0; }
   .field.col { flex-direction: column; align-items: stretch; }
   textarea { resize: vertical; font-family: 'Special Elite', var(--ui); }
+  .laymod { display: flex; align-items: center; justify-content: space-between; font-size: 12px; margin: 6px 0 2px; }
+  .laymod .auto { font-style: normal; color: var(--accent); font-size: 11px; margin-left: 4px; font-weight: 600; }
+  .laymod .auto-btn { padding: 0 5px; font-size: 11px; font-weight: 600; }
   .presets { width: 100%; margin-bottom: 6px; color: var(--dim); }
   .colour { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
   .colour .sw { width: 26px; height: 18px; padding: 0; border: 1px solid #fff3; border-radius: 3px; }

@@ -834,4 +834,17 @@ run("editor (headless Chrome)", () => {
     expect(await page.textContent("header button.render")).toBe("Render");
     await page.keyboard.press("Escape");
   }, 180_000);
+
+  it("deselecting a layer: Esc, or a click on the Layers list's empty space", async () => {
+    await page.keyboard.press("Escape"); await page.keyboard.press("Escape");          // (whatever was open)
+    await page.click('[data-layer="ring"]');
+    expect((await state()).selectedLayer).toBe("ring");
+    await page.keyboard.press("Escape");
+    await waitUntil("Esc deselected the layer", () => (window as any).vizierEditor.state.selectedLayer === null, null, 5_000);
+    await page.click('[data-layer="ring"]');
+    await page.locator("aside.inspector .list").evaluate((el) => el.scrollIntoView({ block: "end" }));
+    const box = (await page.locator("aside.inspector .list").boundingBox())!;
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height - 8);             // below the last layer
+    await waitUntil("the click deselected the layer", () => (window as any).vizierEditor.state.selectedLayer === null, null, 5_000);
+  }, 30_000);
 });

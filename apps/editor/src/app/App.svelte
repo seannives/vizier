@@ -434,7 +434,8 @@
     { keys: "Mod+4", label: "Snap to the beat on / off", group: "Edit", run: () => { snap = !snap; flash(`snap to beat ${snap ? "on" : "off"}`); } },
     { keys: "I", label: "Show / hide frame timing (for diagnosing a jerky playhead)", group: "View", run: () => (showStats = !showStats) },
     { keys: "?", label: "Show / hide shortcuts", group: "View", run: () => (help = !help) },
-    { keys: "Escape", label: "Close the shortcuts window; deselect a breakpoint", group: "View", run: () => { help = false; selectedPoint = null; } },
+    { keys: "Escape", label: "Close the shortcuts window; deselect a breakpoint, then the layer", group: "View",
+      run: () => { if (help) help = false; else if (selectedPoint) selectedPoint = null; else selectLayer(null); } },
   ];
   // Tell the server we're here and whether there are unsaved changes (it warns before quitting), and notice
   // when the server isn't running (saving needs it; changes stay in the browser meanwhile).
