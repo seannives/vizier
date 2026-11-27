@@ -208,6 +208,38 @@ run("renderer in headless Chrome", () => {
     for (let i = 0; i < faded.length; i++) if (faded[i] !== never[i]) left++;
     expect(left).toBe(0);
   }, 180_000);
+  it("text: a panel fills its box; lines stack, wrap and align", async () => {
+    const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
+    const BOX = { x: 0.5, y: 0.5, w: 0.5, h: 0.5 }; // 120..360 × 67..202 at this size
+    const card = (text: string, params: Record<string, number>): Project => ({ ...project, palette: { bg: "#000000", ink: "#FFFFFF" },
+      automation: [{ target: "post.grain", points: [{ t: 0, v: 0 }] }, { target: "post.vignette", points: [{ t: 0, v: 0 }] }],
+      layers: [{ id: "t", generator: "typeText", z: 0, text, colors: { panel: "#FF0000" }, params, layout: { landscape: BOX } }] });
+    const shot = async (p: Project) => { const r = await openRenderer(p, "draft", { mix: track, bass: track }, SMALL); try { return await r.frame(10); } finally { await r.close(); } };
+    // the rows and columns where there are white letters (red panel or black background elsewhere)
+    const ink = (px: Buffer) => { const rows = new Set<number>(), cols: number[] = [];
+      for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 4; if (px[i + 1]! > 160) { rows.add(y); cols.push(x); } }
+      return { rows: [...rows].sort((a, b) => a - b), left: Math.min(...cols), right: Math.max(...cols) }; };
+    const bands = (rows: number[]) => rows.filter((y, i) => i === 0 || y - rows[i - 1]! > 2).length; // runs of rows with ink
+    const at = (px: Buffer, x: number, y: number) => [px[(y * W + x) * 4]!, px[(y * W + x) * 4 + 1]!];
+    // no panel by default; with one, the box is red and outside it isn't
+    const none = await shot(card("ONE", { size: 0.3 }));
+    expect(at(none, 135, 80)[0]).toBeLessThan(40);
+    const panel = await shot(card("ONE", { size: 0.3, panel: 1 }));
+    expect(at(panel, 135, 80)[0]).toBeGreaterThan(200);
+    expect(at(panel, 110, 80)[0]).toBeLessThan(40);
+    // a Return makes two lines; a long line wraps only with Wrap on
+    expect(bands(ink(await shot(card("ONE\nTWO", { size: 0.25 }))).rows)).toBe(2);
+    const long = "WORDS THAT ARE FAR TOO WIDE FOR THE BOX";
+    expect(bands(ink(await shot(card(long, { size: 0.15 }))).rows)).toBe(1);
+    const wrapped = ink(await shot(card(long, { size: 0.15, wrap: 1 })));
+    expect(bands(wrapped.rows)).toBeGreaterThan(1);
+    expect(wrapped.left).toBeGreaterThanOrEqual(120); expect(wrapped.right).toBeLessThanOrEqual(360);
+    // shrink to fit keeps the long line inside the box; left alignment starts it at the padding
+    const fit = ink(await shot(card(long, { size: 0.3, fit: 1 })));
+    expect(fit.left).toBeGreaterThanOrEqual(120); expect(fit.right).toBeLessThanOrEqual(360);
+    const left = ink(await shot(card("HI", { size: 0.3, align: 0 })));
+    expect(left.left).toBeLessThan(140); expect(left.right).toBeLessThan(200);
+  }, 180_000);
   it("a soft edge fades the layer out towards the edges of its box", async () => {
     const track = analyzeSignal(signal, { sampleRate: SR, fps: 30 });
     // flow lines all over its box

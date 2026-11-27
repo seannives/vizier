@@ -241,6 +241,9 @@ run("editor (headless Chrome)", () => {
       const orig = await layout();
       await p3.click('[data-layer="ring"]');
       const ov = (await p3.locator(".preview .overlay").boundingBox())!;
+      // the move pointer anywhere over the selected layer's box (not only on its outline)
+      const rb = (await p3.locator('[data-box="ring"] rect.box').boundingBox())!;
+      expect(await p3.evaluate(([x, y]) => getComputedStyle(document.elementFromPoint(x!, y!)!).cursor, [rb.x + rb.width * 0.4, rb.y + rb.height * 0.6])).toBe("move");
       const cx = ov.x + ov.width / 2, cy = ov.y + ov.height / 2;
       // drag the ring 100 px right (⇧: no snapping)
       await p3.keyboard.down("Shift");
@@ -506,6 +509,12 @@ run("editor (headless Chrome)", () => {
       await page.keyboard.press("ControlOrMeta+d");
       expect((await state()).selectedLayer).toBe("pulseGrid-2");
       expect(await spansOf("pulseGrid-2")).toEqual([{ from: 17 }]);
+      // + Add layer → Text card: a Text layer with its panel on, wrapping, in a box in the middle
+      await page.selectOption('select[aria-label="Add a layer"]', "textCard");
+      expect((await state()).selectedLayer).toBe("typeText");
+      const card = await E(() => (window as any).vizierEditor.session().doc.videos.full.layers.find((l: any) => l.id === "typeText")) as any;
+      expect(card).toMatchObject({ generator: "typeText", name: "Text card", params: { panel: 0.7, wrap: 1, fit: 1 } });
+      expect(card.layout.landscape.w).toBeLessThan(1);
     } finally {
       for (let i = 0; i < 20 && (await state()).undoLabel !== startLabel; i++) await E(() => (window as any).vizierEditor.session().undo());
       await page.keyboard.press("Escape");

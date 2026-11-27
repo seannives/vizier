@@ -15,6 +15,13 @@
   } = $props();
 
   let renaming = $state<string | null>(null);
+  /** A Text layer set up as a card: the background colour at 70% behind wrapped, centred lines that shrink to fit,
+   *  in a box in the middle of the frame. */
+  const TEXT_CARD = (): Partial<LayerDef> => ({
+    name: "Text card", text: "A line about the track\nand another",
+    params: { panel: 0.7, wrap: 1, fit: 1, size: 0.22, padding: 0.1, lineSpacing: 1.3 },
+    layout: { landscape: { x: 0.5, y: 0.5, w: 0.6, h: 0.32 }, portrait: { x: 0.5, y: 0.5, w: 0.86, h: 0.22 } },
+  });
   const hasBase = $derived(!!doc?.videos[video]?.base);
   const origin = (id: string) => (doc && hasBase ? layerOrigin(doc, video, id) : null);
   const removed = $derived(doc && hasBase ? removedLayers(doc, video) : []);
@@ -26,7 +33,8 @@
     sel.blur();
     if (!gen) return;
     let id = "";
-    edit(`add ${GENERATORS[gen]?.label ?? gen}`, (d) => { id = addLayer(d, video, gen, defaultTrack); });
+    if (gen === "textCard") edit("add text card", (d) => { id = addLayer(d, video, "typeText", defaultTrack, TEXT_CARD()); });
+    else edit(`add ${GENERATORS[gen]?.label ?? gen}`, (d) => { id = addLayer(d, video, gen, defaultTrack); });
     if (id) onselect(id);
   }
   function commitName(id: string, e: Event) {
@@ -70,7 +78,8 @@
   {/each}
   <select class="add" onchange={add} aria-label="Add a layer">
     <option value="">+ Add layer…</option>
-    {#each generatorList() as g}<option value={g.id}>{g.label}</option>{/each}
+    {#each generatorList() as g}<option value={g.id} title={GENERATORS[g.id]?.description}>{g.label}</option>{/each}
+    <option value="textCard" title="A Text layer set up as a card: a dark panel behind wrapped, centred lines (for a line about the track, credits, 'out now')">Text card</option>
   </select>
 </div>
 

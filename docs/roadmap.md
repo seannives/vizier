@@ -77,7 +77,9 @@ Editor milestones:
 ## Phase 4: Platform polish (then: Reels/Shorts and the YouTube video for the maleficus)
 
 - [ ] Named excerpts (in bars) per project, for Reels/Shorts; audio fade-in/out at excerpt ends
-- [ ] Text cards: several timed text blocks per video (explaining the project, progress, the track's motivation)
+- [x] Text cards: the Text layer (was Typewriter text) takes several lines, wrapping, alignment, shrink-to-fit and an
+      optional panel; **+ Add layer… → Text card** adds one set up as a card. Time them with the layer's opacity
+      or Typed lanes
 - [ ] Safe-area guides in the editor preview for vertical formats
 - [ ] Thumbnail / cover frame export
 - [ ] Upload test: check colours of a WebCodecs export on YouTube and Instagram (Chrome writes full-range video;

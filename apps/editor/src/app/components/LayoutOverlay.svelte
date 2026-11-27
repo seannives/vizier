@@ -27,6 +27,7 @@
 
   type Drag = { kind: "move" | "resize" | "rotate"; id: string; sx: number; sy: number; p0: { x: number; y: number }; orig: Transform; moved: boolean; cycle: boolean };
   let drag: Drag | null = null;
+  let dragCursor = $state<string | null>(null); // the pointer is captured while dragging: keep its cursor
   let svg: SVGSVGElement;
   const pt = (e: PointerEvent) => { const r = svg.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
 
@@ -44,6 +45,7 @@
       else if (hits[0]) { onselect(hits[0].id); drag = { kind: "move", id: hits[0].id, sx: 0, sy: 0, p0: p, orig: placement(hits[0], family), moved: false, cycle: false }; }
       else { onselect(null); return; }
     }
+    dragCursor = drag.kind === "move" ? "move" : drag.kind === "rotate" ? "grabbing" : ((e.target as Element).getAttribute?.("style")?.match(/cursor:\s*([\w-]+)/)?.[1] ?? null);
     svg.setPointerCapture(e.pointerId);
     e.preventDefault();
   }
@@ -63,6 +65,7 @@
   function up(e: PointerEvent) {
     const d = drag;
     drag = null;
+    dragCursor = null;
     svg.releasePointerCapture(e.pointerId);
     guides = [];
     if (d?.moved && live) onlayout(d.id, live, true);
@@ -84,7 +87,7 @@
 </script>
 
 <div class="overlay" bind:clientWidth={W} bind:clientHeight={H}>
-  <svg bind:this={svg} width={W} height={H} onpointerdown={down} onpointermove={move} onpointerup={up} role="presentation">
+  <svg bind:this={svg} width={W} height={H} onpointerdown={down} onpointermove={move} onpointerup={up} role="presentation" style:cursor={dragCursor}>
     {#each guides as g}
       {#if g.axis === "x"}<line class="guide" x1={g.at * W} x2={g.at * W} y1="0" y2={H} />
       {:else}<line class="guide" y1={g.at * H} y2={g.at * H} x1="0" x2={W} />{/if}
@@ -113,7 +116,8 @@
 <style>
   .overlay { position: absolute; inset: 0; }
   svg { display: block; overflow: visible; cursor: default; touch-action: none; }
-  .box { fill: none; stroke: var(--accent); stroke-width: 1; vector-effect: non-scaling-stroke; cursor: move; }
+  /* filled (invisibly) so the whole box shows the move pointer; clicks are still worked out from the position */
+  .box { fill: transparent; pointer-events: all; stroke: var(--accent); stroke-width: 1; vector-effect: non-scaling-stroke; cursor: move; }
   .handle { fill: var(--bg0); stroke: var(--accent); stroke-width: 1; }
   .stem { stroke: var(--accent); stroke-width: 1; }
   .knob { fill: var(--accent); cursor: grab; }

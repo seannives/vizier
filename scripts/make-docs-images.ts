@@ -55,6 +55,9 @@ await shot("typeText", [{ id: "title", track: "mix", generator: "typeText", z: 0
 await shot("glow", [ring({ effects: [{ type: "glow", params: { amount: 3, radius: 30 } }] })], 20);
 await shot("trails", [ring({ effects: [{ type: "trails", params: { persistence: 1, zoom: 1.3, rotate: 20 } }] })], 20);
 await shot("hueShift", [ring({ params: { hueShift: 120 }, effects: [{ type: "glow" }] })], 20);
+await shot("textCard", [{ id: "flow", track: "drums", generator: "flowField", z: 0, layout: FULL },
+  { id: "card", track: "mix", generator: "typeText", z: 1, text: "the maleficus\nout now on Bandcamp", params: { panel: 0.7, wrap: 1, fit: 1, size: 0.22, padding: 0.1, lineSpacing: 1.3 },
+    layout: { landscape: { x: 0.5, y: 0.5, w: 0.6, h: 0.32 } } }], 12.5);
 await shot("lasers", [{ id: "lasers", track: "drums", generator: "lasers", z: 0, blend: "add", layout: FULL, effects: [{ type: "glow", params: { amount: 1.2, radius: 10 } }] }], 12.5);
 await shot("tunnel", [{ id: "tunnel", track: "drums", generator: "tunnel", z: 0, layout: FULL }], 12.5);
 await shot("truchet", [{ id: "maze", track: "drums", generator: "truchet", z: 0, layout: FULL }], 12.5);

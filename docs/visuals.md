@@ -116,16 +116,23 @@ Colours: **Lines** (`line`, default: ink), **Highlight (bright)** (`highlight`, 
 | Hide lines behind (`fill`) | on/off (on) | Fill under each ridge with the fill colour, hiding the ridges behind it. Off gives see-through wireframes. |
 | Highlight amount (`acid`) | 0–2 (0) | How strongly ridges take the highlight colour when that moment was bright. |
 
-### Typewriter text (`typeText`)
+### Text (`typeText`)
 
-![Typewriter text with stutter](images/visuals/typeText.jpg)
+![Text with stutter](images/visuals/typeText.jpg)
 
-The layer's text in Special Elite, centred in the layer. It can be typed out letter by letter (with a blinking
-caret), shaken, sliced into glitchy strips, and blurred. The layer's size and position set where it goes; the text
-is set in the layer panel.
+The layer's text in Special Elite: a title, a caption or a text card. Lines break where the text has a Return, and
+can also wrap to fit the box; they can sit left, centred or right, and shrink to fit. It can be typed out letter by
+letter (with a blinking caret), shaken, sliced into glitchy strips, and blurred. The layer's size and position set
+where it goes; the text is set in the layer panel.
+
+With **Panel** above 0 a filled, rounded panel the size of the layer's box sits behind the text. **+ Add layer… →
+Text card** adds a Text layer set up as a card: the background colour at 70% behind wrapped, centred lines that
+shrink to fit, in a box in the middle of the frame.
+
+![A text card over a flow field](images/visuals/textCard.jpg)
 
 Listens to: `onset` (stutter strips appear on hits).
-Colour: **Text** (`text`, default: ink).
+Colours: **Text** (`text`, default: ink), **Panel** (`panel`, default: bg).
 
 | Parameter | Range (default) | What it does |
 |---|---|---|
@@ -134,6 +141,13 @@ Colour: **Text** (`text`, default: ink).
 | Shake (`shake`) | 0–3 (0) | Random jitter of the whole text, every frame (the same in every render). |
 | Stutter (`stutter`) | 0–2 (0) | Glitch: horizontal strips of the text slide sideways on hits, and sometimes in between. |
 | Blur (`blur`) | 0–20 (0) | Softens the letters; automate it down to bring text into focus. |
+| Align (`align`) | 0–2 (1) | Where lines sit across the box: 0 left, 1 centred, 2 right (inside the padding). |
+| Wrap (`wrap`) | on/off (off) | Break long lines at spaces to fit the box's width. Off: each line (Return in the text) stays one line. |
+| Shrink to fit (`fit`) | on/off (off) | Make the letters smaller, if needed, so all the text fits inside the box (and its padding). |
+| Line spacing (`lineSpacing`) | 0.8–2.5 (1.2) | Distance from one line to the next, in letter heights. |
+| Panel (`panel`) | 0–1 (0) | A filled panel behind the text, the size of the layer's box: its opacity. 0: no panel. |
+| Padding (`padding`) | 0–0.4 (0.06) | Space between the box's edge and the text, as a share of the box's shorter side. |
+| Panel corners (`corner`) | 0–0.5 (0.05) | How rounded the panel's corners are, as a share of the box's shorter side. 0: square. |
 
 ### Laser fan (`lasers`)
 
