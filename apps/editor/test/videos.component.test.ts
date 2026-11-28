@@ -100,6 +100,24 @@ describe("video settings", () => {
     expect(s.doc.videos.reel!.base).toBeUndefined();
     expect(layersOf(s.doc, "reel").map((l) => l.id).sort()).toEqual(["caption", "ring", "title"]);
   });
+  it("fades: shows the defaults, sets this video's (↺ back to the base's); the cover: at the playhead, or back", async () => {
+    const { s, edit } = setup();
+    s.apply("base fade", (d) => { d.videos.full!.fade = { out: 2 }; });
+    const props = () => ({ ...vprops(s, edit, vi.fn()), playheadBar: 12.5 });
+    const r = render(VideoPanel, props());
+    const fin = r.getByLabelText("Fade in") as HTMLInputElement, fout = r.getByLabelText("Fade out") as HTMLInputElement;
+    expect([fin.value, fout.value]).toEqual(["0", "2"]);                       // the default in; the base's out
+    fin.value = "0.5"; await fireEvent.change(fin);
+    expect(s.doc.videos.reel!.fade).toEqual({ in: 0.5 });
+    await r.rerender(props());
+    await fireEvent.click(r.getByTitle("Back to the base's: 0"));
+    expect(s.doc.videos.reel!.fade).toBeUndefined();
+    await fireEvent.click(r.getByText("Here"));
+    expect(s.doc.videos.reel!.cover).toBe(12.5);
+    await r.rerender(props());
+    await fireEvent.click(r.getByTitle("Back to the base's"));
+    expect(s.doc.videos.reel!.cover).toBeUndefined();
+  });
   it("the new-video dialog builds on, copies, or starts blank", async () => {
     const oncreate = vi.fn();
     const r = render(NewVideo, { currentName: "Reel", currentFormat: "reels", how: "copy", oncreate, oncancel: () => {} });

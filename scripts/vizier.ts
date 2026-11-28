@@ -29,6 +29,7 @@ snapshot of exactly what was rendered. A new render replaces the old one of the 
   --start <s> --duration <s>   only this stretch, in seconds
   --still-bar <bar>    one frame as a PNG, at a bar position (e.g. 105 or 105.5)
   --still <frame>      one frame as a PNG, by frame number
+  --cover              the cover image: a JPEG at the video's cover moment (or first frame), under 2 MB
   --keep               add a timestamp to the file name instead of replacing the last render
   --whole              the whole song, even when the video has a range (adds -song to the name)
   --progress           machine-readable progress lines ("PROGRESS done total"; the editor uses them)

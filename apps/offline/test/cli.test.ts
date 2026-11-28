@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { spawnSync, spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { existsSync, mkdtempSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -58,5 +58,17 @@ describe("render options the editor uses", () => {
     expect(progress.at(-1)).toMatch(/^PROGRESS (\d+) \1$/);                    // ends at done = total
     expect(existsSync(out)).toBe(true);
     expect(existsSync(out.replace(/\.mp4$/, ".partial.mp4"))).toBe(false);
+  }, 180_000);
+  it2("--cover writes the cover as a JPEG at the format's size, under 2 MB, with a snapshot beside it", async () => {
+    const out = mkdtempSync(join(tmpdir(), "vizier-out-")) + "/cover.jpg";
+    const r = await vizierAsync(["render", "projects/demo", "--video", "reel", "--cover", "--progress", "--out", out, ...(process.platform === "darwin" ? ["--gpu"] : [])], 150_000);
+    expect(r.status, r.stderr).toBe(0);
+    expect(r.stderr).toMatch(/PROGRESS 1 1/);
+    const jpg = readFileSync(out);
+    expect(jpg.subarray(0, 2).toString("hex")).toBe("ffd8");                      // a JPEG
+    expect(jpg.length).toBeLessThan(2 * 1024 * 1024);
+    const probe = spawnSync("ffprobe", ["-v", "error", "-show_entries", "stream=width,height", "-of", "csv=p=0", out], { encoding: "utf8" });
+    expect(probe.stdout.trim()).toBe("1080,1920");                                // the reel's format, full size
+    expect(JSON.parse(readFileSync(out.replace(/\.jpg$/, ".json"), "utf8")).cover.frame).toBeGreaterThan(0); // (the reel starts mid-song)
   }, 180_000);
 });

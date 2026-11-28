@@ -726,6 +726,8 @@
   }
   const rangeLabel = $derived(rangeBars && grid ? `bars ${barLabel(rangeBars.from ?? 1, grid)} – ${barLabel(rangeBars.to ?? secondsToBar(duration, grid), grid)}` : "whole song");
   const mmss = (t: number) => `${Math.floor(t / 60)}:${(t % 60).toFixed(1).padStart(4, "0")}`;
+  /** Where the cover image is taken: the video's cover moment, or its first frame. */
+  const coverLabel = $derived(project?.cover !== undefined && grid ? `bar ${barLabel(project.cover, grid)}` : "the first frame");
   const rangeTime = $derived.by(() => {
     const r = rangeSec ?? { from: 0, to: duration };
     return `${mmss(r.from)} – ${mmss(r.to)} · ${(r.to - r.from).toFixed(1)} s`;
@@ -792,7 +794,7 @@
     <aside class="inspector">
       <h3>Video</h3>
       {#if doc && videoName && doc.videos[videoName]}
-        <VideoPanel {doc} video={videoName} {rangeLabel} {rangeTime} {rangeInherited} {edit} onopen={(v) => (videoName = v)} />
+        <VideoPanel {doc} video={videoName} {rangeLabel} {rangeTime} {rangeInherited} {coverLabel} playheadBar={grid ? round(secondsToBar(time, grid)) : null} {edit} onopen={(v) => (videoName = v)} />
       {/if}
       <h3 class="fold-h"><button class="fold-btn" onclick={() => { showTracks = !showTracks; if (showTracks) refreshMedia(); }} aria-expanded={showTracks}
         title="{showTracks ? "Hide" : "Show"} the song's tracks (shared by every video)"><svg class="tri" class:open={showTracks} viewBox="0 0 10 10" width="12" height="12" aria-hidden="true"><path d="M2 0.5 L9 5 L2 9.5 Z" /></svg>Tracks</button>
@@ -891,7 +893,7 @@
 {#if showRender && doc && videoName}
   <RenderDialog video={videoName} videoName={doc.videos[videoName]?.name ?? videoName}
     videos={Object.fromEntries(Object.entries(doc.videos).map(([k, v]) => [k, v.name ?? k]))}
-    {rangeLabel} hasRange={!!rangeBars} dirty={dirtyFiles} jobs={renderJobs} files={renderFiles}
+    {rangeLabel} hasRange={!!rangeBars} {coverLabel} dirty={dirtyFiles} jobs={renderJobs} files={renderFiles}
     onsave={save} onclose={() => (showRender = false)} onrefresh={refreshRenders} />
 {/if}
 {#if showProjects}<Projects dirty={dirtyFiles} onclose={() => (showProjects = false)} />{/if}

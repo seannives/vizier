@@ -4,7 +4,7 @@
  * (only what changed) to this video, and the base is never touched.
  */
 import {
-  resolveVideo, normalizePalette, PALETTE_ALIASES, POST_PARAMS, GENERATORS, EFFECTS, LAYER_PARAMS, type VideoFile, type VideoLayer, type LayerDef, type EffectRef, type Span, splitSpans, type LaneInput, type BreakpointInput, type Modulation, layoutFor, type LayoutFamily, type Transform,
+  resolveVideo, FADE_MAX_BEATS, normalizePalette, PALETTE_ALIASES, POST_PARAMS, GENERATORS, EFFECTS, LAYER_PARAMS, type VideoFile, type VideoLayer, type LayerDef, type EffectRef, type Span, splitSpans, type LaneInput, type BreakpointInput, type Modulation, layoutFor, type LayoutFamily, type Transform,
 } from "../../../../../packages/core/src/index.ts";
 import type { Doc } from "./session.ts";
 
@@ -370,7 +370,16 @@ export function detachVideo(doc: Doc, video: string): void {
   doc.videos[video] = { ...flat, name: own.name ?? flat.name, format: own.format ?? flat.format };
 }
 /** Change a video's own settings (name, format, range); `undefined` removes the setting (inherit / default). */
-export function setVideo(doc: Doc, video: string, patch: Partial<Pick<VideoFile, "name" | "format" | "range">>): void {
+/** Set the video's fade-in or fade-out, in beats; undefined goes back to the base's (or the default). */
+export function setFade(doc: Doc, video: string, which: "in" | "out", beats: number | undefined): void {
+  const v = doc.videos[video]!;
+  const f = { ...v.fade };
+  if (beats === undefined) delete f[which];
+  else f[which] = Math.min(FADE_MAX_BEATS, Math.max(0, beats));
+  if (Object.keys(f).length) v.fade = f; else delete v.fade;
+}
+
+export function setVideo(doc: Doc, video: string, patch: Partial<Pick<VideoFile, "name" | "format" | "range" | "cover">>): void {
   const v = doc.videos[video]!;
   for (const [k, val] of Object.entries(patch)) {
     if (val === undefined) delete (v as unknown as Record<string, unknown>)[k];

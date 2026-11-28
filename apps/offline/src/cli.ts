@@ -9,14 +9,14 @@
  * timestamp) plus a .json snapshot of exactly what was rendered.
  */
 import { parseArgs } from "node:util";
-import { mkdirSync, writeFileSync, existsSync, readFileSync, renameSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync, renameSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { getProfile, validateProject, rangeSeconds, positionToSeconds, videoFormat } from "../../../packages/core/src/index.ts";
+import { getProfile, validateProject, rangeSeconds, audioFades, positionToSeconds, videoFormat } from "../../../packages/core/src/index.ts";
 import { loadFeatures } from "./audio.ts";
 import { openRenderer } from "./browser.ts";
-import { startEncoder, startMuxer, probeVideo } from "./encode.ts";
+import { startEncoder, startMuxer, probeVideo, writeCover } from "./encode.ts";
 import { frameAtOrAfter } from "./frames.ts";
 import { loadProject } from "./project-io.ts";
 
@@ -37,6 +37,7 @@ const { values, positionals } = parseArgs({
     encoder: { type: "string", default: "webcodecs" },
     bitrate: { type: "string" },
     whole: { type: "boolean", default: false },     // the whole song, whatever the video's range
+    cover: { type: "boolean", default: false },     // the cover image: the video's cover moment (or first frame), as a JPEG
     progress: { type: "boolean", default: false },  // machine-readable progress for the editor: "PROGRESS done total"
   },
 });
@@ -102,6 +103,21 @@ try {
     log(`  frames over budget: ${b.over60} over 16.7 ms (would drop at 60 fps), ${b.over30} over 33.3 ms (would drop at 30 fps)`);
     log(`  slowest frames: ${b.worst.map((w) => `#${w.frame} ${w.ms.toFixed(1)} ms`).join(", ")}`);
     log(`  per layer (draw + upload, avg ms): ${Object.entries(b.layersMs).map(([k, v]) => `${k} ${v.toFixed(1)}`).join(" · ")}`);
+  } else if (values.cover) {
+    // the cover: at the video's cover moment, else its first frame; a JPEG at the format's size, under 2 MB
+    const frame = project.cover !== undefined && project.grid
+      ? Math.min(totalFrames - 1, frameAtOrAfter(positionToSeconds({ bar: project.cover }, project.grid), profile.fps))
+      : start;
+    if (values.progress) process.stderr.write(`PROGRESS 0 1\n`);
+    const out = outPath(`${lp.videoName}-${profile.id}-cover`, ".jpg");
+    const q = writeCover(await r.frame(frame), profile.width, profile.height, out);
+    if (values.progress) process.stderr.write(`PROGRESS 1 1\n`);
+    writeFileSync(out.replace(/\.jpg$/, "") + ".json", JSON.stringify({
+      renderedAt: new Date().toISOString(), vizier: versionInfo(), command: process.argv.slice(2),
+      project: lp.id, video: lp.videoName, profile: profile.id, cover: { frame, seconds: frame / profile.fps, bar: project.cover ?? null, jpegQuality: q },
+      song: lp.song, resolvedVideo: lp.video,
+    }, null, 2));
+    log(`wrote ${relative(process.cwd(), out)} (frame ${frame}, ${profile.width}x${profile.height}, ${(statSync(out).size / 1e6).toFixed(2)} MB)`);
   } else if (values.still !== undefined || values["still-bar"] !== undefined) {
     const frame = values["still-bar"] !== undefined
       ? frameAtOrAfter(positionToSeconds({ bar: Number(values["still-bar"]) }, project.grid), profile.fps)
@@ -117,7 +133,9 @@ try {
     // written under a temporary name and renamed when complete: a stopped or failed render never leaves a broken
     // video under the real name (or replaces a good one)
     const partial = out.replace(/\.mp4$/, "") + ".partial.mp4";
-    const media = { out: partial, fps: profile.fps, audio: project.tracks[project.mix], audioStart: start / profile.fps, duration: (end - start) / profile.fps };
+    const fades = audioFades(project, start / profile.fps, end / profile.fps, duration);
+    const media = { out: partial, fps: profile.fps, audio: project.tracks[project.mix], audioStart: start / profile.fps, duration: (end - start) / profile.fps, fadeIn: fades.in, fadeOut: fades.out };
+    if (fades.in || fades.out) log(`audio fades: in ${fades.in.toFixed(2)} s, out ${fades.out.toFixed(2)} s`);
     const bitrateMbps = Number(values.bitrate ?? profile.videoBitrateMbps * 1.5);
     let mode = values.encoder === "ffmpeg" ? "ffmpeg" : "webcodecs";
     let info = null as Awaited<ReturnType<typeof r.encodeStart>> | null;
@@ -160,6 +178,7 @@ try {
       command: process.argv.slice(2),
       project: lp.id, video: lp.videoName, profile: profile.id,
       range: { fromSeconds: start / profile.fps, toSeconds: end / profile.fps, frames: end - start },
+      audioFades: fades,
       encoder: mode === "webcodecs" ? info : "libx264",
       song: lp.song, resolvedVideo: lp.video,
     }, null, 2));

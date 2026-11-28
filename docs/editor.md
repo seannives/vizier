@@ -86,6 +86,10 @@ server isn't running, the editor says so and keeps your changes: start it again 
   the timeline starts just tall enough for its rows.
 - **Range**: drag in the bar ruler to set the video's range; drag its ends to adjust, or the bar to move it. The
   side panel shows it in bars and in minutes:seconds. A faint bar means the range is inherited from the base video.
+- **Fade in / Fade out** (side panel, under Range): the sound's fades in beats where the range cuts into the song
+  (defaults 0 and 1; a cut never clicks). Rendered files have them; the preview doesn't.
+- **Cover** (side panel): **Here** takes the cover image at the playhead; ↺ goes back to the video's first frame
+  (or the base's cover).
 - **Preview**: shows whole frames at the video's frame rate (30 fps for most formats), as the export will.
 - **Frame timing** (I): shows the display rate, the share of late frames and what a preview frame costs, for
   diagnosing a jerky playhead.
@@ -99,7 +103,8 @@ server isn't running, the editor says so and keeps your changes: start it again 
   file); close it and the top bar shows "Rendering 42%" until it's done. Below: the renders in `output/`, with
   format, length, size, date and the vizier version, to **Play** here, **Show in Finder**, or make **Again** the
   same way (a draft or a few bars stay so). A render with the same name is replaced; a finished file only appears
-  when it's complete.
+  when it's complete. **Cover image** saves the video's cover (at its Cover moment) as a JPEG at the format's size,
+  under 2 MB for a YouTube thumbnail, a Short's thumbnail or a Reel's cover; **View** shows it.
 - **Save, undo, redo**: ⌘S, ⌘Z, ⇧⌘Z. Changes aren't written until you save; the Save button and the status bar
   show unsaved files, and Chrome warns before closing with unsaved changes.
 

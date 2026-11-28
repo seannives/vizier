@@ -43,6 +43,10 @@ export interface VideoFile {
   /** @deprecated older files: a list of formats; the first is used. Use `format`. */
   profiles?: string[];
   range?: { from?: number; to?: number }; // bars; `to` is where it ends (exclusive): 17–49 = bars 17..48
+  /** Audio fades in beats where the range cuts into the song (default: in 0, out 1; a cut is always de-clicked). */
+  fade?: { in?: number; out?: number };
+  /** The cover image's moment, a bar position (33.5: half way through bar 33). None: the video's first frame. */
+  cover?: number;
   seed?: number;
   palette?: Record<string, string>; // overrides the song's
   /** Film grain and vignette when no lane sets them (POST_PARAMS: "grain", "vignette"). */
@@ -85,6 +89,7 @@ export function mergeVideos(base: VideoFile, child: VideoFile): VideoFile {
   out.modulations = [...mods.values()].filter((m) => !ofGone(m.target));
   if (base.palette || child.palette) out.palette = { ...base.palette, ...child.palette };
   if (base.post || child.post) out.post = { ...base.post, ...child.post };
+  if (base.fade || child.fade) out.fade = { ...base.fade, ...child.fade };
   return pruneStale(out);
 }
 
@@ -149,6 +154,8 @@ export function buildProject(song: SongFile, video: VideoFile, trackPath: (t: Tr
     palette: { ...song.palette, ...video.palette },
     ...(video.post ? { post: video.post } : {}),
     range: video.range,
+    ...(video.fade ? { fade: video.fade } : {}),
+    ...(video.cover !== undefined ? { cover: video.cover } : {}),
     layers: (video.layers ?? []).filter((l) => !l.remove).map((l) => l as LayerDef),
     automation: video.automation ?? [],
     modulations: (video.modulations ?? []).filter((m) => !m.remove),

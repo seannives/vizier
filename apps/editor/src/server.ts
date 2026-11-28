@@ -207,6 +207,7 @@ const server = createServer(async (req, res) => {
     if (p === "/api/output") {
       const path = projectFile(url.searchParams.get("file")!);
       if (!path.startsWith(join(need(), "output") + "/") || !existsSync(path)) return json(res, { error: "not found" }, 404);
+      if (path.endsWith(".jpg")) { res.writeHead(200, { "content-type": "image/jpeg", "cache-control": "no-store" }); return void createReadStream(path).pipe(res); }
       // ranges, so the player can seek
       const size = statSync(path).size, range = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range ?? "");
       if (range) {

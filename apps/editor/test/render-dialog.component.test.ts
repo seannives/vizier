@@ -21,6 +21,11 @@ describe("the render dialog's jobs", () => {
     expect(text(r)).toMatch(/Reel test 1: done in 42 s/);
     expect(text(r)).not.toMatch(/cancelled/);
   });
+  it("a cover image job is its own line, beside the video's render", () => {
+    const r = show([job(1, "done", { file: "output/reel-reels.mp4" }), job(2, "done", { file: "output/reel-reels-cover.jpg", args: ["--cover"] })]);
+    expect(text(r)).toMatch(/Reel test 1: done in 42 s/);
+    expect(text(r)).toMatch(/Reel test 1, cover image: done in 42 s.*View/);
+  });
   it("a cancel or failure shows while it's the last thing that happened to that video", () => {
     const r = show([job(1, "done", { file: "output/reel-reels.mp4" }), job(2, "failed", { error: "unknown generator" })]);
     expect(text(r)).toMatch(/Reel test 1: failed.*unknown generator/);

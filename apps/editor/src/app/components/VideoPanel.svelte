@@ -1,11 +1,13 @@
 <script lang="ts">
-  import { PROFILES, videoFormat, resolveVideo } from "../../../../../packages/core/src/index.ts";
-  import { setVideo, detachVideo } from "../lib/edits.ts";
+  import { PROFILES, videoFormat, resolveVideo, FADE_DEFAULTS, FADE_MAX_BEATS } from "../../../../../packages/core/src/index.ts";
+  import { setVideo, detachVideo, setFade } from "../lib/edits.ts";
   import type { Doc } from "../lib/session.ts";
 
   /** The open video's settings: name, format, what it builds on (Open base, Detach), and its range. */
-  let { doc, video, rangeLabel, rangeTime, rangeInherited, edit, onopen }: {
+  let { doc, video, rangeLabel, rangeTime, rangeInherited, coverLabel = "the first frame", playheadBar = null, edit, onopen }: {
     doc: Doc; video: string; rangeLabel: string; rangeTime: string; rangeInherited: boolean;
+    /** Where the cover image is taken, in words; and the playhead as a bar position (none without a tempo). */
+    coverLabel?: string; playheadBar?: number | null;
     edit: (label: string, fn: (d: Doc) => void) => void;
     onopen: (video: string) => void;
   } = $props();
@@ -21,6 +23,14 @@
   const formatChanged = $derived(!!base && !!videoFormat(own) && !!baseFormat && videoFormat(own) !== baseFormat);
   const rangeChanged = $derived(!!base && own.range !== undefined);
   const baseName = $derived(base ? doc.videos[base]?.name ?? base : null);
+  // the fades in force (this video's, else inherited, else the defaults), and what ↺ goes back to
+  const fadeOf = (name: string) => { try { return resolveVideo(name, (n) => doc.videos[n]!).fade ?? {}; } catch { return {}; } };
+  const fade = $derived({ ...FADE_DEFAULTS, ...fadeOf(video) });
+  const fadeBack = $derived(base ? { ...FADE_DEFAULTS, ...fadeOf(base) } : FADE_DEFAULTS);
+  const FADE_TIPS = {
+    in: "Fade the sound in over this many beats where the video starts after the song does. 0: start hard (still without a click).",
+    out: "Fade the sound out over this many beats where the video ends before the song does. 0: stop hard (still without a click).",
+  };
 </script>
 
 <div class="video">
@@ -49,6 +59,16 @@
       <span class="dim">{rangeTime}</span>
     </span>
   </div>
+  <div class="field" title="The moment the cover image (Render → Cover image) is taken from. None: the video's first frame."><span>Cover{#if own.cover !== undefined}<button class="rs" title="Back to {base ? "the base's" : "the video's first frame"}" onclick={() => edit("cover: as before", (d) => setVideo(d, video, { cover: undefined }))}>↺</button>{/if}</span>
+    <span class="base"><span class="mono cov">{coverLabel}</span>
+      <button title="Take the cover image at the playhead" disabled={playheadBar === null} onclick={() => edit(`cover at bar ${playheadBar}`, (d) => setVideo(d, video, { cover: playheadBar! }))}>Here</button></span>
+  </div>
+  {#each ["in", "out"] as const as w}
+    <label class="field" title={FADE_TIPS[w]}><span>Fade {w} (beats){#if own.fade?.[w] !== undefined}<button class="rs" title="Back to {base ? "the base's" : "the default"}: {fadeBack[w]}" onclick={(e) => { e.preventDefault(); edit(`fade ${w}: as ${base ? "the base" : "default"}`, (d) => setFade(d, video, w, undefined)); }}>↺</button>{/if}</span>
+      <input class="num" type="number" min="0" max={FADE_MAX_BEATS} step="0.25" value={fade[w]} aria-label="Fade {w}" onkeydown={(e) => { e.stopPropagation(); if (e.key === "Enter") e.currentTarget.blur(); }}
+        onchange={(e) => { const b = Number(e.currentTarget.value); if (Number.isFinite(b)) edit(`fade ${w}: ${b} beats`, (d) => setFade(d, video, w, b)); }} />
+    </label>
+  {/each}
 </div>
 
 <style>
@@ -57,10 +77,12 @@
   .field.top { align-items: flex-start; }
   .field > span:first-child { color: var(--dim); display: flex; align-items: center; flex: 0 0 auto; }
   .field input, .field select { flex: 0 1 170px; min-width: 0; }
+  .field input.num { flex: 0 0 64px; text-align: right; }
   .base { display: flex; gap: 4px; align-items: center; min-width: 0; }
   .base button { font-size: 11px; padding: 1px 6px; }
   .link { background: none; border: none; color: var(--accent); text-decoration: underline; padding: 0; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .none { color: var(--faint); }
+  .cov { font-size: 12px; }
   .range { display: flex; flex-direction: column; align-items: flex-end; font-size: 12px; }
   .dim { color: var(--dim); }
   .inh { font: 10px var(--ui); color: var(--dim); border: 1px dashed var(--line2); border-radius: 2px; padding: 0 4px; margin-left: 6px; }

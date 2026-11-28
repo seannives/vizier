@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { evaluateLane, thinRecording, ParamResolver, validateProject, layoutFor, PROFILES, frameRng, type Project } from "../src/index.ts";
+import { evaluateLane, thinRecording, ParamResolver, validateProject, layoutFor, PROFILES, frameRng, audioFades, DECLICK_SEC, type Project } from "../src/index.ts";
 import { readFileSync } from "node:fs";
 
 describe("automation lanes", () => {
@@ -172,5 +172,25 @@ describe("plugins", () => {
     expect(errs).toMatch(/unknown effect "sparkle"/);
     expect(errs).toMatch(/"bass.trails.nope" doesn't exist/);
     expect(errs).not.toMatch(/bass.trails.zoom/);
+  });
+});
+
+describe("audio fades", () => {
+  const grid = { tempo: [{ bar: 1, bpm: 120 }, { bar: 9, bpm: 60 }] }; // a beat is 0.5 s, then 1 s from bar 9 (16 s)
+  it("only where the range cuts into the song; a fade of 0 is still de-clicked", () => {
+    expect(audioFades({ grid }, 0, 60, 60)).toEqual({ in: 0, out: 0 });            // the whole song: none
+    expect(audioFades({ grid }, 2, 60, 60)).toEqual({ in: DECLICK_SEC, out: 0 });  // default in: 0 beats → de-click
+    const f = audioFades({ grid }, 0, 10, 60);                                       // default out: 1 beat at 120
+    expect(f.in).toBe(0); expect(f.out).toBeCloseTo(0.5, 3);
+  });
+  it("counts beats at the tempo where the fade is, and never takes more than the render", () => {
+    expect(audioFades({ grid, fade: { in: 2, out: 2 } }, 2, 20, 60)).toMatchObject({ in: expect.closeTo(1, 3), out: expect.closeTo(2, 3) });
+    expect(audioFades({ grid, fade: { in: 2, out: 1 } }, 15.75, 30, 60).in).toBeCloseTo(1.75, 3); // half a beat at 120, then 1.5 at 60
+    const short = audioFades({ grid, fade: { in: 8, out: 8 } }, 2, 4, 60);
+    expect(short.in + short.out).toBeCloseTo(2, 5);
+  });
+  it("is checked in a project", () => {
+    expect(validateProject({ ...project, fade: { in: 1, out: 2 } } as Project)).toEqual([]);
+    expect(validateProject({ ...project, fade: { in: -1, sideways: 1 } } as unknown as Project).join(" ")).toMatch(/fade.in.*fade: "sideways"|fade: "sideways".*fade.in|fade.in/);
   });
 });

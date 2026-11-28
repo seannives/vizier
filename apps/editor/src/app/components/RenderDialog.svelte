@@ -7,13 +7,15 @@
    * then the renders in output/ to play, show in Finder or make again. Renders use the saved files, as the
    * `vizier render` command does, so it waits until changes are saved.
    */
-  let { video, videoName, videos, rangeLabel, hasRange, dirty, jobs, files, onsave, onclose, onrefresh }: {
+  let { video, videoName, videos, rangeLabel, hasRange, coverLabel = "the first frame", dirty, jobs, files, onsave, onclose, onrefresh }: {
     /** The open video's id, and its name. */
     video: string; videoName: string;
     /** Every video: id → name. */
     videos: Record<string, string>;
     /** The open video's range, in words ("bars 81–97"), and whether it has one. */
     rangeLabel: string; hasRange: boolean;
+    /** Where the open video's cover image is taken ("bar 33.5", or its first frame). */
+    coverLabel?: string;
     /** Unsaved files: a render would use the saved ones. */
     dirty: string[];
     jobs: RenderJob[]; files: RenderFile[];
@@ -29,10 +31,14 @@
   const recent = $derived.by(() => {
     const finished = jobs.filter((j) => j.status === "done" || j.status === "failed" || j.status === "cancelled");
     const last = new Map<string, RenderJob>();
-    for (const j of finished) last.set(`${j.video}|${j.whole}`, j);              // (jobs are in the order they were added)
-    return [...last.values()].filter((j) => !active.some((a) => a.video === j.video && a.whole === j.whole && a.id > j.id))
+    for (const j of finished) last.set(kind(j), j);              // (jobs are in the order they were added)
+    return [...last.values()].filter((j) => !active.some((a) => kind(a) === kind(j) && a.id > j.id))
       .sort((a, b) => (b.endedAt ?? 0) - (a.endedAt ?? 0)).slice(0, 3);
   });
+  const isCover = (j: RenderJob) => !!j.args?.includes("--cover");
+  const kind = (j: RenderJob) => `${j.video}|${j.whole}|${isCover(j)}`;
+  const label = (j: RenderJob) => `${videos[j.video] ?? j.video}${isCover(j) ? ", cover image" : j.whole ? ", whole song" : ""}`;
+  const isImage = (f: string) => f.endsWith(".jpg");
   const took = (j: RenderJob) => { const s = Math.round(((j.endedAt ?? 0) - (j.startedAt ?? 0)) / 1000); return s < 60 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`; };
 
   async function start(videosToRender: string[], whole: boolean, options?: string[]) {
@@ -51,7 +57,7 @@
     return s < 60 ? `${Math.ceil(s)} s left` : `${Math.ceil(s / 60)} min left`;
   }
   const mmss = (s?: number) => (s === undefined ? "" : `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`);
-  const mb = (n: number) => (n > 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.round(n / 1e6)} MB`);
+  const mb = (n: number) => (n > 1e9 ? `${(n / 1e9).toFixed(1)} GB` : n < 1e7 ? `${(n / 1e6).toFixed(2)} MB` : `${Math.round(n / 1e6)} MB`);
   const when = (f: RenderFile) => new Date(f.renderedAt ?? f.modified).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
   const formatLabel = (id?: string) => { try { return id ? getProfile(id).label : ""; } catch { return id ?? ""; } };
 </script>
@@ -63,8 +69,9 @@
 
     {#if playing}
       <!-- svelte-ignore a11y_media_has_caption -->
-      <video src={api.outputUrl(playing)} controls autoplay></video>
-      <div class="row"><span class="dim">{playing.replace(/^output\//, "")}</span><button onclick={() => (playing = null)}>Close the player</button></div>
+      {#if isImage(playing)}<img src={api.outputUrl(playing) + `&t=${Date.now()}`} alt="Cover" />
+      {:else}<video src={api.outputUrl(playing)} controls autoplay></video>{/if}
+      <div class="row"><span class="dim">{playing.replace(/^output\//, "")}</span><button onclick={() => (playing = null)}>Close {isImage(playing) ? "the picture" : "the player"}</button></div>
     {/if}
 
     {#if dirty.length}
@@ -78,21 +85,24 @@
     </div>
     <div class="row"><span class="dim">On the GPU, into the project's output/ folder; a render with the same name is replaced.</span>
       <button class="primary" onclick={go} disabled={dirty.length > 0}>Render</button></div>
+    <div class="row"><span class="dim">The cover image for {videoName}: {coverLabel}, as a JPEG at the format's size, under YouTube's 2 MB limit
+      (set its moment under the video's settings).</span>
+      <button onclick={() => start([video], false, ["--cover"])} disabled={dirty.length > 0}>Cover image</button></div>
     {#if error}<p class="warn" role="alert">{error}</p>{/if}
 
     {#each active as j (j.id)}
       <div class="job" data-job={j.id}>
-        <div class="row"><span>{videos[j.video] ?? j.video}{j.whole ? ", whole song" : ""}</span>
-          <span class="dim">{j.status === "queued" ? "waiting" : j.total ? `${pct(j)}% · ${j.done}/${j.total} frames · ${eta(j)}` : "starting…"}</span>
+        <div class="row"><span>{label(j)}</span>
+          <span class="dim">{j.status === "queued" ? "waiting" : j.total && !isCover(j) ? `${pct(j)}% · ${j.done}/${j.total} frames · ${eta(j)}` : "starting…"}</span>
           <button onclick={() => api.cancelRender(j.id).then(onrefresh)}>Cancel</button></div>
         <div class="bar"><div style:width="{pct(j)}%"></div></div>
       </div>
     {/each}
     {#each recent as j (j.id)}
       <div class="job {j.status}" data-job={j.id}>
-        <div class="row"><span>{videos[j.video] ?? j.video}{j.whole ? ", whole song" : ""}:
+        <div class="row"><span>{label(j)}:
           {j.status === "done" ? `done in ${took(j)}` : j.status === "failed" ? "failed" : "cancelled"}</span>
-          {#if j.status === "done" && j.file}<span class="dim">{j.file.replace(/^output\//, "")}</span><button onclick={() => (playing = j.file!)}>Play</button>{/if}</div>
+          {#if j.status === "done" && j.file}<span class="dim">{j.file.replace(/^output\//, "")}</span><button onclick={() => (playing = j.file!)}>{isImage(j.file) ? "View" : "Play"}</button>{/if}</div>
         {#if j.error}<pre>{j.error}</pre>{/if}</div>
     {/each}
 
@@ -102,9 +112,9 @@
       {#each files as f (f.file)}
         <li data-file={f.file}>
           <div class="fname">{f.file.replace(/^output\//, "")}</div>
-          <div class="meta dim">{formatLabel(f.profile)} · {mmss(f.seconds)} · {mb(f.bytes)} · {when(f)}{#if f.commit} · <span title="The vizier version it was made with{f.localChanges ? ', with uncommitted changes' : ''}">{f.commit}{f.localChanges ? "+" : ""}</span>{/if}</div>
+          <div class="meta dim">{formatLabel(f.profile)} · {isImage(f.file) ? "cover image" : mmss(f.seconds)} · {mb(f.bytes)} · {when(f)}{#if f.commit} · <span title="The vizier version it was made with{f.localChanges ? ', with uncommitted changes' : ''}">{f.commit}{f.localChanges ? "+" : ""}</span>{/if}</div>
           <div class="acts">
-            <button onclick={() => (playing = f.file)} title="Play it here">Play</button>
+            <button onclick={() => (playing = f.file)} title={isImage(f.file) ? "Look at it here" : "Play it here"}>{isImage(f.file) ? "View" : "Play"}</button>
             <button onclick={() => api.reveal(f.file)} title="Show the file in Finder">Show in Finder</button>
             {#if f.video && videos[f.video]}<button onclick={() => again(f)} disabled={dirty.length > 0} title="Render it again the same way{f.options?.length ? ` (${f.options.join(" ")})` : ""}, from the saved files as they are now">Again</button>{/if}
           </div>
@@ -120,7 +130,7 @@
   .top { display: flex; align-items: center; justify-content: space-between; }
   h2 { margin: 0; font-weight: 500; }
   h3 { margin: 10px 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--dim); font-weight: 500; }
-  video { width: 100%; max-height: 50vh; background: #000; border-radius: 4px; }
+  video, img { width: 100%; max-height: 50vh; object-fit: contain; background: #000; border-radius: 4px; }
   .choose { display: flex; flex-direction: column; gap: 4px; }
   .row { display: flex; align-items: center; gap: 8px; }
   .row > span:first-child { flex: 1; }

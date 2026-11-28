@@ -42,6 +42,28 @@
       },
       "description": "Bars; `to` is where the video ends (exclusive)"
     },
+    "fade": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "in": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "out": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 32
+        }
+      },
+      "description": "Audio fades in beats where the range cuts into the song (default: in 0, out 1; a cut is always de-clicked)"
+    },
+    "cover": {
+      "type": "number",
+      "minimum": 1,
+      "description": "The cover image's moment, a bar position (33.5: half way through bar 33). None: the video's first frame"
+    },
     "seed": {
       "type": "integer"
     },
@@ -175,7 +197,7 @@
               "type": "string",
               "pattern": "^(#[0-9A-Fa-f]{6}|bg|ink|accent|extra1|extra2|acid)$"
             },
-            "description": "Generator colour \u2192 #rrggbb or a palette slot"
+            "description": "Generator colour → #rrggbb or a palette slot"
           },
           "spans": {
             "type": "array",

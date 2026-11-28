@@ -76,12 +76,13 @@ Editor milestones:
 
 ## Phase 4: Platform polish (then: Reels/Shorts and the YouTube video for the maleficus)
 
-- [ ] Named excerpts (in bars) per project, for Reels/Shorts; audio fade-in/out at excerpt ends
+- [x] Audio fade-in/out where a video's range cuts into the song (in beats; per video, inherited by Reels)
 - [x] Text cards: the Text layer (was Typewriter text) takes several lines, wrapping, alignment, shrink-to-fit and an
       optional panel; **+ Add layer… → Text card** adds one set up as a card. Time them with the layer's opacity
       or Typed lanes
 - [ ] Safe-area guides in the editor preview for vertical formats
-- [ ] Thumbnail / cover frame export
+- [x] Cover image: Cover → Here in the video settings, Render → Cover image (a JPEG at the format's size, under
+      YouTube's 2 MB thumbnail limit)
 - [ ] Upload test: check colours of a WebCodecs export on YouTube and Instagram (Chrome writes full-range video;
       the libx264 path writes limited range). If they shift, convert range in the browser before encoding
 - [ ] Release videos for the maleficus; repeat for the second song (in mixing)

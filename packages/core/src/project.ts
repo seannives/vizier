@@ -1,5 +1,5 @@
 import { positionToSeconds, type LaneInput } from "./automation.ts";
-import { validateGrid, type Grid } from "./grid.ts";
+import { validateGrid, beatsAt, type Grid } from "./grid.ts";
 import { GENERATORS } from "./generators/index.ts";
 import { EFFECTS } from "./effects/index.ts";
 import { LAYER_PARAMS, POST_PARAMS, PALETTE_SLOTS, PALETTE_ALIASES, isPaletteSlot } from "./plugins.ts";
@@ -69,6 +69,10 @@ export interface Project {
   sections?: Section[];
   /** The video's bar range: `to` is exclusive. */
   range?: { from?: number; to?: number };
+  /** Audio fades, in beats, where the range cuts into the song (see audioFades). */
+  fade?: { in?: number; out?: number };
+  /** The cover image's moment: a bar position (33.5 is half way through bar 33). None: the video's first frame. */
+  cover?: number;
   layers: LayerDef[];
   automation?: LaneInput[];
   modulations?: Modulation[];
@@ -144,6 +148,11 @@ export function validateProject(p: Project): string[] {
     if (!spec) errs.push(`post: "${k}" isn't a whole-picture setting (${POST_PARAMS.map((x) => x.name).join(", ")})`);
     else if (typeof v !== "number" || !(v >= spec.min && v <= spec.max)) errs.push(`post.${k} must be a number from ${spec.min} to ${spec.max}`);
   }
+  if (p.cover !== undefined && !(typeof p.cover === "number" && Number.isFinite(p.cover) && p.cover >= 1)) errs.push(`cover must be a bar position (1 or later)`);
+  for (const [k, v] of Object.entries(p.fade ?? {})) {
+    if (k !== "in" && k !== "out") errs.push(`fade: "${k}" isn't a fade (in, out)`);
+    else if (typeof v !== "number" || !(v >= 0 && v <= FADE_MAX_BEATS)) errs.push(`fade.${k} must be a number of beats from 0 to ${FADE_MAX_BEATS}`);
+  }
   for (const [k, v] of Object.entries(p.palette ?? {})) {
     if (!isPaletteSlot(PALETTE_ALIASES[k] ?? k)) errs.push(`palette: "${k}" is not a slot (${PALETTE_SLOTS.map((s) => s.id).join(", ")})`);
     if (!isHex(v)) errs.push(`palette: ${k} must be #rrggbb`);
@@ -175,6 +184,36 @@ export function validateProject(p: Project): string[] {
 /** Sections with their start times in seconds, in order. */
 export function sectionTimes(p: Project): { t: number; name: string }[] {
   return (p.sections ?? []).map((s) => ({ t: positionToSeconds(s, p.grid), name: s.name })).sort((a, b) => a.t - b.t);
+}
+
+export const FADE_MAX_BEATS = 32;
+/** Default fades, in beats: start hard on the downbeat, fade out over the last beat. */
+export const FADE_DEFAULTS = { in: 0, out: 1 } as const;
+/** Even a fade of 0 is this long where the audio is cut, so the cut doesn't click. */
+export const DECLICK_SEC = 0.01;
+
+/**
+ * The audio fades for a render of [from, to) seconds of a song `duration` long, in seconds: a fade-in only where
+ * the render starts after the song does, a fade-out only where it ends before the song does (a whole-song render
+ * has neither). Beats are counted at the tempo where each fade happens; together they never take more than the
+ * whole render.
+ */
+export function audioFades(p: Pick<Project, "fade" | "grid">, from: number, to: number, duration: number): { in: number; out: number } {
+  const len = Math.max(0, to - from);
+  // seconds for `beats` beats starting at `at` (forwards) or ending there (backwards), by bisection on the beat count
+  const span = (at: number, beats: number, dir: 1 | -1) => {
+    if (beats <= 0) return 0;
+    const b0 = beatsAt(at, p.grid);
+    let lo = 0, hi = len;
+    if (Math.abs(beatsAt(at + dir * hi, p.grid) - b0) < beats) return hi;
+    for (let i = 0; i < 40; i++) { const m = (lo + hi) / 2; if (Math.abs(beatsAt(at + dir * m, p.grid) - b0) < beats) lo = m; else hi = m; }
+    return hi;
+  };
+  const cutIn = from > 0.001, cutOut = to < duration - 0.001;
+  let fin = cutIn ? Math.max(DECLICK_SEC, span(from, p.fade?.in ?? FADE_DEFAULTS.in, 1)) : 0;
+  let fout = cutOut ? Math.max(DECLICK_SEC, span(to, p.fade?.out ?? FADE_DEFAULTS.out, -1)) : 0;
+  if (fin + fout > len && fin + fout > 0) { const k = len / (fin + fout); fin *= k; fout *= k; }
+  return { in: fin, out: fout };
 }
 
 /** The video's range in seconds ([from, to)), clipped to [0, duration]. */

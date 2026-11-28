@@ -70,6 +70,11 @@ Keep `media/`, `output/` and `.cache/` out of it.
 - `format`: the output format: `youtube`, `youtube60`, `youtube4k`, `shorts`, `reels`, `igfeed` or `draft`.
   One per video: a Reel and a Short are two videos (one can build on the other).
 - `range`: bars, where `to` is exclusive (21–31 = bars 21 to 30). Leave it out for the whole song.
+- `fade`: audio fades in beats where the range cuts into the song: `{ "in": 0, "out": 1 }` are the defaults
+  (start hard on the downbeat, fade out over the last beat). A render that starts with the song has no fade-in,
+  and one that ends with it no fade-out. A cut is always faded over 10 ms, so even 0 doesn't click.
+- `cover`: the moment for the cover image (`vizier render … --cover`), a bar position: `33.5` is half way through
+  bar 33. Leave it out for the video's first frame.
 - `layers`: each has an `id`, an optional `name`, a `generator`, the `track` it listens to (default: the mix),
   `z`, `blend`, `opacity`, `params`, `colors`, `effects`, `text`, `spans` (when it's on, below) and a `layout` per
   shape (`landscape`, `portrait`, `feed`).
@@ -114,7 +119,8 @@ A video with `base` starts from that video and changes only what it lists:
   `"remove": true` drops it; a new id adds a layer;
 - an automation lane replaces the base's lane for the same target (an empty `points` list removes it);
 - a modulation replaces the base's one with the same target and source (`"remove": true` drops it);
-- everything else (`profiles`, `range`, `seed`, `palette`) overrides.
+- `fade` merges (a Reel can change just its fade-out);
+- everything else (`format`, `range`, `cover`, `seed`, `palette`) overrides.
 
 Settings that no longer fit drop out when the two are combined, so editing one video can't break the other:
 a layer the video removes takes its inherited lanes and modulations with it (even ones the base adds later);
@@ -132,6 +138,7 @@ vizier render projects/demo --video full --gpu                       # its own r
 vizier render projects/demo --video reel --profile shorts --gpu
 vizier render projects/demo --video full --bars 21-31 --profile reels --gpu
 vizier render projects/demo --video full --still-bar 13 --gpu
+vizier render projects/demo --video reel --cover --gpu                # the cover image, as a JPEG
 vizier render projects/demo --video full --keep --gpu                # keep: adds a timestamp
 vizier live   projects/demo --video full
 vizier validate projects/demo
@@ -142,7 +149,9 @@ vizier migrate  projects/demo              # update old names in a project's fil
 `--video` can be left out when a project has only one video.
 
 Renders are named `<video>-<profile>[-b<from>-<to>].mp4` and **replace the previous render with the same name**.
-Rename or move a render to keep it, or use `--keep`, which adds a timestamp (`…-20261116T130102.mp4`). Each render
+A cover is `<video>-<profile>-cover.jpg`: a JPEG at the format's full size (1920×1080 for YouTube, 1080×1920 for
+Reels and Shorts), at the best quality that stays under YouTube's 2 MB thumbnail limit. Rename or move a render to
+keep it, or use `--keep`, which adds a timestamp (`…-20261116T130102.mp4`). Each render
 writes a `.json` snapshot next to it: the song and the resolved video exactly as rendered, the command, and the
 vizier version, so it can be reproduced later. Watch disk space: a full 1080p song is about 550 MB.
 

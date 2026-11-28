@@ -81,7 +81,7 @@ export class RenderQueue {
         const line = buf.slice(0, nl); buf = buf.slice(nl + 1);
         const m = /^PROGRESS (\d+) (\d+)$/.exec(line);
         if (m) { j.done = Number(m[1]); j.total = Number(m[2]); continue; }
-        const w = /^\[vizier\] wrote (.+\.mp4) /.exec(line);
+        const w = /^\[vizier\] wrote (.+\.(?:mp4|jpg)) /.exec(line);
         if (w) j.file = w[1]!.replace(/^.*?(output\/)/, "output/");
         tail.push(line); if (tail.length > 12) tail.shift();
       }
@@ -105,11 +105,11 @@ export class RenderQueue {
 export function listRenders(dir: string): RenderFile[] {
   const out = join(dir, "output");
   if (!existsSync(out)) return [];
-  return readdirSync(out).filter((f) => f.endsWith(".mp4") && !f.endsWith(".partial.mp4")).map((f) => {
+  return readdirSync(out).filter((f) => (f.endsWith(".mp4") && !f.endsWith(".partial.mp4")) || f.endsWith("-cover.jpg")).map((f) => {
     const st = statSync(join(out, f));
     const r: RenderFile = { file: `output/${f}`, bytes: st.size, modified: st.mtimeMs };
     try {
-      const m = JSON.parse(readFileSync(join(out, f.replace(/\.mp4$/, ".json")), "utf8"));
+      const m = JSON.parse(readFileSync(join(out, f.replace(/\.(mp4|jpg)$/, ".json")), "utf8"));
       Object.assign(r, { options: againOptions(m.command), video: m.video, profile: m.profile, seconds: m.range ? m.range.toSeconds - m.range.fromSeconds : undefined, frames: m.range?.frames, renderedAt: m.renderedAt, commit: m.vizier?.commit, localChanges: m.vizier?.localChanges });
     } catch { /* no snapshot: just the file */ }
     return r;
