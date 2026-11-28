@@ -83,8 +83,11 @@ Editor milestones:
 - [ ] Safe-area guides in the editor preview for vertical formats
 - [x] Cover image: Cover → Here in the video settings, Render → Cover image (a JPEG at the format's size, under
       YouTube's 2 MB thumbnail limit)
-- [ ] Upload test: check colours of a WebCodecs export on YouTube and Instagram (Chrome writes full-range video;
-      the libx264 path writes limited range). If they shift, convert range in the browser before encoding
+- [x] Upload test, YouTube: a 4K WebCodecs export plays at 2160p (VP9) with matching colours. Same frame side by
+      side: hues and brights equal, darks about 4 levels lighter (YouTube's re-encode and the browser's video path,
+      not a range mismatch, which would be about 12). No conversion needed
+- [ ] Upload test, Instagram: the same check on a Reel (Chrome writes full-range video; the libx264 path writes
+      limited range). If it shifts, convert range in the browser before encoding
 - [ ] Release videos for the maleficus; repeat for the second song (in mixing)
 - [ ] **Open question:** videos for earlier songs, or new tracks only?
 
